@@ -68,3 +68,13 @@ Scores are means over one to four plays of each case. Cost of all runs: 0 practi
 One run each, 30 practice sessions in total. `tactical-slow25` gained on the sandbox and lost on practice: P02 closed
 at a price that cost a relationship charge of 179,204 and scored 0. Playbook's closing offer made three suppliers walk away (P04, P07, P18);
 scored at the suppliers' final offers the same run gives 0.539, still behind tactical.
+
+## 2026-10-11 · sandbox (D01, D02) · no LLM · a probe for the simulator
+
+| Strategy | D01 | D02 | Mean | vs. baseline | Record |
+|---|---|---|---|---|---|
+| baseline (same hour) | 0.843 | 0.608 | 0.725 | – | [record](2026-10-11-urgent-none.md) |
+| urgent | 0.703 | 0.461 | 0.582 | −0.143 | [record](2026-10-11-urgent-none.md) |
+
+Two plays of `urgent`, one of the baseline; 0 practice sessions, 0 LLM tokens. Leaking urgency and a missing
+alternative costs 0.14 on both cases.

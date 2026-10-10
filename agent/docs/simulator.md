@@ -142,6 +142,20 @@ The rules were written knowing that these two effects exist, so this is a fit to
 wording, played on the sandbox after the simulator's figure is written down, is still owed. `sim check --opponent
 llm` has not been run again with this prompt.
 
+**A third wording, predicted first, then played.** `urgent` (experiments.py: "we have to place this order by the
+end of this week, and you are the only supplier qualified for this part") had never been played. The simulator's
+figures were taken first (sonnet, three repeats, model fitted from every session, 71 calls, USD 1.4540, under two
+minutes as two processes), then the sandbox was played (`runs.md` S-18, S-19):
+
+| | D01 baseline | D01 urgent | D02 baseline | D02 urgent |
+|---|---|---|---|---|
+| llm opponent, sonnet (before the sandbox run) | 0.843 | 0.716 | 0.637 | 0.455 |
+| Arena sandbox | 0.843 | 0.703 | 0.608 | 0.461 |
+
+Mean gap 0.012 over the four cells; the cost of the leak is −0.127 and −0.182 on the simulator, −0.140 and −0.147 on
+the arena. The rule for urgency was in the prompt before the test (from the brief), its size was not. One wording,
+two demo cases, three suppliers: nothing here says how it does on the practice suppliers.
+
 **Walking away is fitted since 10 October, 22:00:** per supplier, how often a term sheet sent after its final offer
 made it walk away, with the pool of all suppliers as prior. The record then: 3 walk-aways in 26 such sheets (P04, P07
 and P18, one each, all from `playbook`'s closing offer; the three demo suppliers never walked in 20). One observation
