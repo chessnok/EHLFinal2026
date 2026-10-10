@@ -47,6 +47,7 @@ suppliers, leverage).
 | P-23 | 11 Oct 00:24 | `9af44f6` | `tactical` | P11 | Vector (Claude session) | complaints (`qn:`) as further arguments in a quality case, one per round | P11 0.672 | no change: the complaint came back `duplicate` in round 4 and the supplier's offer became final; reverted |
 | P-24 | 11 Oct 00:33 | `9f95282` | `tactical` | P08, P18 | Vector (Claude session) | the running contract's index clause cited against the supplier's index argument | P08 0.539, P18 0.485 | worse than P-22 (0.550, 0.618): the clause sentence got no claim result; reverted |
 | P-25 | 11 Oct 00:38 | `cfd6310` | `tactical` | P07 | Vector (Claude session) | first ask at most 13 % under the quote for a `routine` goal (25 % before) | P07 **0.740** | supplier: 5.59 → 5.48 → 5.45 → final 5.42; at 25 % it was 5.69 → final 5.54 (P-22, 0.663); team best on P07 |
+| P-26 | 11 Oct 00:43 | `7742d51` | `tactical` | P01, P03 | Vector (Claude session) | own-plant should-cost cited from 3 % under the quote | P01 0.952, P03 **0.923** | P03: first reply 432.15 (432.94 before), team best; P01: the should-cost took the forecast's place in round 4, final offer 131.80 (131.30 in P-22) - ranked behind the forecast afterwards |
 
 **Team best per case** (what the practice board counts), as of P-12:
 
@@ -81,6 +82,6 @@ above: 73.2 on the practice board. Quota after P-14: 96 used of 650.
 | S-16 | 21:44 | `556a31d` | `tactical` | D01, D02 | Vector (Claude session) | control for S-17 on the current main | 0.969 / 0.587 · 0.778 | – |
 | S-17 | 21:46 | uncommitted → `ef1bb70` | `tactical-slow25` | D01, D02; our step a quarter of tactical's | Vector (Claude session) | slower concessions, from `backlog.md` 2.1 | 0.957 / 0.671 · 0.814 | D02 +0.084, D01 −0.012; the simulator had pointed the same way; not played on practice |
 
-After P-25 (11 October, 00:40): 30 practice sessions spent by this series (P-16 to P-25). Team bests from `negotiator
+After P-26 (11 October, 00:45): 32 practice sessions spent by this series (P-16 to P-26). Team bests from `negotiator
 me` then: P01 0.969, P02 0.733, P03 0.905, P04 0.860, P05 0.839, P07 0.721, P08 0.626, P10 0.663, P11 0.692,
 P18 0.618.

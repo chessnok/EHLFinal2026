@@ -241,7 +241,9 @@ class WorldData:
                         kind="should_cost",
                         refs=[row["id"]],
                         sentence=f"Our should-cost estimate for this part is EUR {row['unit_cost']:.2f} ({row['id']}).",
-                        strength=(price / row["unit_cost"] - 1) * 5,
+                        # under 12 % it is a weak argument and goes last: ahead of the forecast it took P01's
+                        # fourth round and the final offer came at 131.80 instead of 131.30 (P-26)
+                        strength=(price / row["unit_cost"] - 1) * 5 if price > row["unit_cost"] * 1.12 else 0.1,
                         meta={"unit_cost": row["unit_cost"]},
                     )
                 )
