@@ -156,6 +156,42 @@ Mean gap 0.012 over the four cells; the cost of the leak is −0.127 and −0.18
 the arena. The rule for urgency was in the prompt before the test (from the brief), its size was not. One wording,
 two demo cases, three suppliers: nothing here says how it does on the practice suppliers.
 
+**Verdict of 11 October: not a clone of the arena.** The wider blind test, from recorded sessions only:
+`openai:gpt-6.1-sol`, `LLM_REASONING=medium`, two repeats, each strategy fitted without its own sessions
+(`--without`). The bar was set before the run: the right direction wherever the arena's effect exceeds 0.08, strategies
+without an effect within 0.08 of the baseline, mean gap at most 0.08.
+
+| Sandbox, blind | Arena D01 / D02 | llm opponent D01 / D02 | Fitted D01 / D02 |
+|---|---|---|---|
+| baseline | 0.843 / 0.629 | 0.843 / 0.608 | 0.823 / 0.558 |
+| budget | 0.863 / 0.314 | 0.863 / 0.451 | 0.823 / 0.558 |
+| shelby | 0.663 / 0.566 | 0.543 / 0.244 | 0.823 / 0.558 |
+| polite | 0.843 / 0.608 | 0.843 / 0.611 | 0.823 / 0.558 |
+| questions | 0.828 / 0.650 | 0.843 / 0.636 | 0.823 / 0.558 |
+| trade | 0.856 / 0.587 | 0.863 / 0.236 | 0.823 / 0.547 |
+| lowball | 0.863 / 0.650 | 0.856 / 0.650 | 0.826 / 0.554 |
+| urgent | 0.703 / 0.461 | 0.663 / 0.331 | 0.823 / 0.558 |
+| Mean gap to the arena | – | 0.073 | 0.071 |
+
+| `playbook` on practice, blind | P01 | P02 | P03 | P04 | P05 | P07 | P08 | P10 | P11 | P18 | Mean | Mean gap |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Arena (P-14) | 0.917 | 0.385 | 0.762 | 0.000 | 0.295 | 0.121 | 0.316 | 0.568 | 0.398 | 0.000 | 0.376 | – |
+| llm opponent | 0.845 | 0.342 | 0.762 | 0.860 | 0.341 | 0.697 | 0.109 | 0.562 | 0.360 | 0.162 | 0.504 | 0.201 |
+| Fitted | 0.833 | 0.324 | 0.762 | 0.775 | 0.218 | 0.796 | 0.178 | 0.565 | 0.007 | 0.378 | 0.483 | 0.258 |
+
+- **It sees the leaks:** budget on D02, urgency on both cases, the hard tone on D01 - the right direction each time,
+  and the strategies without an effect (polite, questions, lowball) stay at the baseline.
+- **It punishes what the arena does not:** `trade` on D02 0.236 against 0.587, `shelby` on D02 0.244 against 0.566.
+  A firm sentence reads to it as a threat.
+- **It does not see the walk-aways:** playbook's closing offer cost the deal on P04, P07 and P18 on the arena; here
+  P04 and P07 close at 0.86 and 0.70.
+- **On the mean it is no closer than the fitted supplier** on the sandbox (0.073 against 0.071).
+
+The bar is not met, so no arena session was spent on a further test and the work stops here. Use the llm opponent as
+a cheap alarm for leaks (budget, urgency), not as a judge of wording. 227 model calls, 859,831 tokens in / 55,557
+out, cost APPROX-NOT-MEASURED, 3 minutes as nine processes at once. A run on the same model with reasoning `low`
+was stopped after 136 calls and not used.
+
 **Walking away is fitted since 10 October, 22:00:** per supplier, how often a term sheet sent after its final offer
 made it walk away, with the pool of all suppliers as prior. The record then: 3 walk-aways in 26 such sheets (P04, P07
 and P18, one each, all from `playbook`'s closing offer; the three demo suppliers never walked in 20). One observation
