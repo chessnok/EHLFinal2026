@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "5041f7ae7068",
+  "strategy": "manual-commit",
+  "branch": "feat/tactic-experiments",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "AGENTS.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/50/41f7ae7068/0/metadata.json",
+      "transcript": "/50/41f7ae7068/0/full.jsonl",
+      "compact_transcript": "/50/41f7ae7068/0/transcript.jsonl",
+      "content_hash": "/50/41f7ae7068/0/content_hash.txt",
+      "prompt": "/50/41f7ae7068/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 130,
+    "cache_creation_tokens": 135164,
+    "cache_read_tokens": 6699795,
+    "output_tokens": 44530,
+    "api_call_count": 54
+  }
+}
