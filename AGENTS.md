@@ -56,6 +56,29 @@ Example of the required question:
 > This spends practice quota: `uv run negotiator run --set practice --cases case:P01 case:P05 --strategy tactical`
 > → 2 sessions. Balance now 197 / 200 left, after the run 195. Quota resets at 2026-10-11 12:47 UTC. Run it?
 
+## Run registry and pushed code only
+
+**Never run unpushed code on a limited run.** A practice run, or any run that spends quota, must use code that is
+committed **and pushed**. Before starting it:
+- `git status` is clean;
+- `git log origin/main..HEAD` is empty, or the branch is pushed;
+- note the hash from `git rev-parse --short HEAD`.
+
+Without this nobody can reproduce or compare the result, and the quota spent on it is wasted. Free runs (sandbox,
+local `arena-sim`) may use uncommitted code.
+
+**Every run goes into the registry** [`agent/docs/runs.md`](agent/docs/runs.md): practice runs always, sandbox runs
+when they inform a decision. One row per run, with these columns:
+- commit;
+- strategy;
+- parameters (cases, `--llm`, flags);
+- author;
+- description;
+- results (per-case scores and the mean);
+- conclusions.
+
+Add the row in the same change that discusses the result.
+
 ## Rules
 
 Read the file for the area you touch before changing it:

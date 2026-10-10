@@ -1,6 +1,6 @@
 # Practice runs: where the score is lost and how to fix it
 
-As of 10 October 2026.
+As of 10 October 2026. Russian version: [`practice-analysis.ru.md`](practice-analysis.ru.md).
 
 **Source.** All 42 practice sessions the team has played on the arena (`GET /v1/sessions?set=practice`). For each
 session: the result with the cost breakdown, C_best, the deal's terms, and the arena's trace with the supplier's
