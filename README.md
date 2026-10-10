@@ -6,6 +6,8 @@ dependencies or tooling; they talk over HTTP only.
 ```
 frontend/   Next.js 16 · React 19 · TypeScript · Tailwind v4 · pnpm   (DESIGN.md = UI style reference)
 backend/    Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic
+agent/      Python 3.12 · uv · negotiator: Tacto Negotiation Arena buyer agent (see agent/README.md)
+negotiation-arena-kit/   git submodule: the arena brief, API, data and starter kit
 docker-compose.yml   db (postgres:17) · backend · frontend
 ```
 

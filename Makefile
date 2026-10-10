@@ -8,7 +8,7 @@ DATABASE_URL ?= postgresql+asyncpg://app:app@localhost:5432/app
 BACKEND_URL ?= http://localhost:8000
 export DATABASE_URL BACKEND_URL
 
-.PHONY: db db-stop install migrate backend frontend test lint up down
+.PHONY: db db-stop install migrate backend frontend test lint up down agent-sandbox agent-stats
 
 db:
 	docker compose up -d --wait db
@@ -19,6 +19,7 @@ db-stop:
 install:
 	cd backend && uv sync
 	cd frontend && pnpm install
+	cd agent && uv sync
 
 migrate:
 	cd backend && uv run alembic upgrade head
@@ -31,10 +32,19 @@ frontend:
 
 test:
 	cd backend && uv run pytest
+	cd agent && uv run pytest
 
 lint:
 	cd backend && uv run ruff check . && uv run ruff format --check .
 	cd frontend && pnpm lint && pnpm exec tsc --noEmit
+	cd agent && uv run ruff check . && uv run ruff format --check .
+
+# Negotiation arena agent (see agent/README.md)
+agent-sandbox:
+	cd agent && uv run negotiator run --set sandbox
+
+agent-stats:
+	cd agent && uv run negotiator stats
 
 # Whole stack in Docker (production builds)
 up:

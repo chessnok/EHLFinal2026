@@ -1,0 +1,39 @@
+[project]
+name = "negotiator"
+version = "0.1.0"
+description = "Buyer agent toolkit for the Tacto Negotiation Arena: full API client, telemetry, reports, baseline strategy"
+authors = [
+    { name = "Mikhail Fadin", email = "fadin.edu@gmail.com" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "arena-kit[sim]",
+    "httpx>=0.28.1",
+    "rich>=15.0.0",
+]
+
+[project.scripts]
+negotiator = "negotiator.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+arena-kit = { path = "../negotiation-arena-kit/starter-kit", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
