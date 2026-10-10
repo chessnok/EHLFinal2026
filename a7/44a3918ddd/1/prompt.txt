@@ -1,0 +1,107 @@
+(the repo rule forbids pushing to main directly) - i allow you
+
+---
+
+push
+
+---
+
+tell what you want to test
+
+---
+
+<pasted_content id="efc7">
+2  git push                                                                                                     ✔ 
+[entire] Pushing entire/checkpoints/v1 to origin..... done
+To github.com:chessnok/EHLFinal2026.git
+ ! [rejected]        main -> main (non-fast-forward)
+error: failed to push some refs to 'github.com:chessnok/EHLFinal2026.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. If you want to integrate the remote changes,
+hint: use 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+    ~/Desktop/Programming/EHLFinal2026/agent    main ⇣26 ?2                
+</pasted_content id="efc7">
+
+ fix
+
+---
+
+<pasted_content id="efc7">
+ Ran 2 shell commands
+
+I want to test one thing: whether the simulator ranks two strategies the same way the real arena does. That is the only job you would give it, so it is the only thing worth spending sessions on.
+
+The test
+
+Play baseline and tactical on five practice cases on the arena and compare with what the simulator says for the same code. Both strategies have no LLM, so the arena gives the same replies every time and one run each is enough.
+
+I re-ran the simulator just now on the current code (5 repeats, refitted on all recorded sessions). tactical changed a lot on main today, and the two now differ strongly:
+
+┌──────┬─────────────────────┬─────────────────────┬──────────────────────────────────────────────────────┐
+│ Case │ Simulator: baseline │ Simulator: tactical │ What the arena should show if the simulator is right │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P11  │ 0.24                │ 0.64                │ tactical clearly ahead                               │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P05  │ 0.25                │ 0.53                │ tactical clearly ahead                               │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P08  │ 0.30                │ 0.57                │ tactical clearly ahead                               │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P02  │ 0.25                │ 0.45                │ tactical ahead                                       │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P01  │ 0.79                │ 0.70                │ about level, baseline slightly ahead                 │
+└──────┴─────────────────────┴─────────────────────┴──────────────────────────────────────────────────────┘
+
+How I'll read it
+
+- Trust it for ranking: tactical wins on at least three of the four cases where the simulator says so, and P01 is not a large tactical win.
+- Trust it only for big differences: two of four.
+- Don't use it on practice cases: one or none.
+
+I'll also report how far the absolute scores are off per case, and read the ten conversations to explain each miss. Afterwards the ten sessions go into the simulator's fit, since they are the first non-LLM data on practice cases.
+
+The limit is that five cases and one pair of strategies show whether the simulator points the right way; they do not prove it is accurate everywhere.
+
+The run, for your yes
+
+This spends practice quota, as two commands run one after the other:
+
+- uv run negotiator run --set practice --cases case:P01 case:P02 case:P05 case:P08 case:P11 --strategy baseline → 5 sessions
+- the same with --strategy tactical → 5 sessions
+
+Balance now is 590 of 650 left, 580 after both. The first slot frees at 2026-10-11 12:47 UTC. The checkout is on main, clean and level with origin/main (another session switched it there; the simulator code is merged). Run it?
+
+✻ Worked for 1m 50s · done 8:12 PM
+
+※ recap: We are checking whether the local supplier simulator ranks strategies the way the real arena does, and the 10-session baseline versus tactical practice run is ready. Next action: your yes to spend those 10 sessions. (disable recaps in /config)
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+</pasted_content id="efc7">
+
+ and intersecting with this one. count how much you need attempts
+
+---
+
+explain what is playbook and tactical strategies. also explain whether you test middlewhere and decide whter we need to work on in if we have 550 attemps 
+
+<pasted_content id="efc7">
+    Undeterministic Tornado (active)             
+┏━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ used ┃ left ┃ limit ┃ resets_at                        ┃
+┡━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 76   │ 574  │ 650   │ 2026-10-11T12:47:17.353012+00:00 │
+└──────┴──────┴───────┴──────────────────────────────────┘
+{
+</pasted_content id="efc7">
+
+---
+
+i mean is it worth wotking on middleware if we have lots of attempts. actually, the strategy i want to test you the most is a the one based on economic guidelines. i also want you to test middleware to understand if it is quite accurate and whether it is usefull to use it. also langsuse shiuld be connected
+
+---
+
+okay, is it a good idea to run playbookk and tactical on public now or should we combine them together?
+
+---
+
+okay lets run two of them. i allow you to spend 20 attempts.
