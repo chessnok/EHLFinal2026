@@ -1,0 +1,17 @@
+<task-notification>
+<task-id>b54iweblw</task-id>
+<tool-use-id>toolu_01J8FEptPJ5yWc2C2p2AhdfA</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/b54iweblw.output</output-file>
+<status>completed</status>
+<summary>Background command "Run backend dev server" completed (exit code -1)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bsx3fdmeq</task-id>
+<tool-use-id>toolu_011FtPfZv21qmgMghegH2L8b</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/bsx3fdmeq.output</output-file>
+<status>completed</status>
+<summary>Background command "Run frontend dev server" completed (exit code -1)</summary>
+</task-notification>
