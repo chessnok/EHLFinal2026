@@ -20,6 +20,7 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | Slower concessions, a quarter of the step (`tactical-slow25`) | sandbox S-17, practice P-15 | failed: sandbox 0.778 → 0.814, practice 0.695 → 0.621 | no gain without P02 (0.696 → 0.690); P02 closed below the supplier's cost and scored 0 |
 | One closing offer after the supplier's final offer (`playbook`) | sandbox S-15, practice P-14 | failed: sandbox +0.047, practice 0.376 | three of ten practice suppliers walked away (P04, P07, P18); a final offer is final |
 | Deep first ask, 27-34 % under the quote (`playbook`, `lowball`) | sandbox, practice P-14 | mixed: +0.02 on sandbox; worst first counters on P08 (5.71) and P18 (5.70) | P07: a 26 % ask got "not feasible" and a final offer in round 2 (0.585) against 0.721 at 13 % |
+| First ask capped at 13 % under the quote for a `routine` goal | practice P-25 (P07) | worked: 0.663 → 0.740 | at 25 % the supplier answered "not feasible" with a final offer in round 2 (5.54); at 13 % it came down over four replies to 5.42 |
 
 ## Wording and arguments
 
