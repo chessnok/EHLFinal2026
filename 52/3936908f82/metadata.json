@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "523936908f82",
+  "strategy": "manual-commit",
+  "branch": "feat/llm-writer",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/52/3936908f82/0/metadata.json",
+      "transcript": "/52/3936908f82/0/full.jsonl",
+      "compact_transcript": "/52/3936908f82/0/transcript.jsonl",
+      "content_hash": "/52/3936908f82/0/content_hash.txt",
+      "prompt": "/52/3936908f82/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 4961,
+    "cache_read_tokens": 2648564,
+    "output_tokens": 1574,
+    "api_call_count": 6
+  }
+}
