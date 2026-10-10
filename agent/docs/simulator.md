@@ -86,26 +86,33 @@ uv run negotiator sim check --opponent llm --sessions 24    # next to the fitted
 uv run negotiator sim serve --opponent llm
 ```
 
-The model is `--supplier-llm`, else `SIM_LLM`, else `LLM`. Measured on 11 October with `claude-code:haiku`, model
-fitted from 182 sessions:
+The model is `--supplier-llm`, else `SIM_LLM`, else `LLM`. Measured on 11 October, model fitted from 182 sessions.
 
-| `sim check --opponent llm --sessions 24` (two per case, each left out of its fit) | Fitted | llm |
-|---|---|---|
-| Mean error of the score | 0.051 | 0.058 |
-| Replies with the recorded status | 0.75 | 0.76 |
+`sim check --opponent llm --sessions 24` (two per case, each left out of its fit; the fitted supplier on the same
+sessions in the same run - the sample moved between the two runs as sessions were added to `runs/`):
 
-71 model calls, 440,451 tokens in / 77,561 out, USD 0.1108, 3 minutes.
+| Supplier model | Score error, fitted | Score error, llm | Same status, fitted | Same status, llm | Calls | Cost |
+|---|---|---|---|---|---|---|
+| `claude-code:haiku` | 0.051 | 0.058 | 0.75 | 0.76 | 71 | USD 0.1108 |
+| `claude-code:sonnet` | 0.036 | 0.030 | 0.77 | 0.85 | 75 | USD 1.7658 |
 
-**It does not reproduce the arena's reaction to wording.** `sim bench baseline budget shelby --opponents llm`, D01
-and D02, two repeats (106 calls, USD 0.1657, 9 minutes):
+Same status: the share of replies with the recorded status (open, final offer, agreed). Sonnet's worst case is P08
+(error 0.115 against 0.020 for the fitted supplier).
 
-| | D01 baseline | D01 shelby | D02 baseline | D02 budget |
-|---|---|---|---|---|
-| Arena | 0.843 | 0.663 | 0.629 | 0.314 |
-| llm opponent | 0.89 | 0.89 | 0.64 | 0.64 |
+**Wording: sonnet follows the arena's direction, haiku does not.** `sim bench baseline budget shelby --opponents
+llm`, D01 and D02, two repeats each:
 
-So for now it is as good as the fitted supplier on the numbers and no better on text: wording still needs the
-sandbox.
+| | D01 baseline | D01 budget | D01 shelby | D02 baseline | D02 budget | D02 shelby | Mean gap to the arena | Calls | Cost |
+|---|---|---|---|---|---|---|---|---|---|
+| Arena | 0.843 | 0.863 | 0.663 | 0.629 | 0.314 | 0.566 | – | – | – |
+| Fitted supplier | 0.83 | 0.85 | 0.80 | 0.63 | 0.61 | 0.55 | – | 0 | 0 |
+| llm, haiku | 0.89 | 0.90 | 0.89 | 0.64 | 0.64 | 0.64 | 0.122 | 106 | USD 0.1657 |
+| llm, sonnet | 0.84 | 0.86 | 0.76 | 0.65 | 0.51 | 0.51 | 0.063 | 76 | USD 1.6758 |
+
+With sonnet a named budget ceiling costs on D02 (0.65 → 0.51; arena 0.629 → 0.314) and the hard tone costs on D01
+(0.84 → 0.76; arena 0.843 → 0.663): the right direction, about half the size. These strategies were played on the
+arena, so their recorded exchanges are among the examples the model is shown; a wording nobody has played is not
+covered by this test.
 
 **Walking away is fitted since 10 October, 22:00:** per supplier, how often a term sheet sent after its final offer
 made it walk away, with the pool of all suppliers as prior. The record then: 3 walk-aways in 26 such sheets (P04, P07
