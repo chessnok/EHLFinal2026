@@ -50,4 +50,30 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | Supplier simulator fitted from replays as a score predictor | `negotiator sim check`, practice P-15 | failed as a predictor, kept as a smoke test | its figures for slow25 did not hold on practice |
 | Supplier's full cost = should-cost moved with the cost drivers | practice P-15 | failed | 380.01 for P02 against a quote of 370.96; the charge would have dominated every move, so it was switched off |
 | Margin charge estimated only when the quote PDF names payment terms and Incoterm | practice P-13, P-15 | failed | no PDF of P01, P02, P03 or P10 names them: the charge was 0 in our C and P02 closed at 345.39 (charge 179,204, score 0) |
-| Standard terms from the supplier master data; full cost = 0.98 x own-plant should-cost; never ask under the price that minimises C | fitted on 14 recorded deals (P01, P02, P03); practice run pending | unknown | recorded charges are reproduced to within EUR 56; not yet played |
+| Margin charge in our C: standard terms from the supplier master data, full cost = 0.98 x own-plant should-cost | fitted on 14 recorded deals; practice P-16 to P-22 | worked: no deal above C_open in 26 sessions | the recorded charges of P01, P02, P03 are reproduced to within EUR 56; `c_best` of P01 equals the minimum of C with the charge ([`investigation-2026-10-10.md`](investigation-2026-10-10.md)) |
+| First ask at the price that minimises C, usual 0.4 % of C step | practice P-16, P-17 | failed: P02 0.421, P01 0.785 | near the minimum C is flat in the price, so a small step in C is a large step in price; we met the supplier in round 3 of 10 |
+
+## Strategic cases (`stabilise`, `secure_supply`)
+
+| Idea | Measured on | Result | Why |
+|---|---|---|---|
+| Deep first ask on the low-price side of the cost curve (a deal on it costs at most a quarter of the room), rising in small steps | practice P-18, P-21, P-22 | worked on P01: 0.856 → 0.896 → 0.969 | the supplier came down 138.55 → 131.30 in four replies while our rising ask cost us nothing; this is the "ask for less than we will take" idea, bounded by the charge |
+| The same deep ask on every structure | practice P-18 | failed: P02 0.576, P03 0.828 | the supplier agreed at once to the deep sheet on a dearer structure (index clause; 30 days' payment) |
+| Minimum step and upper bound as shares of the room instead of C | practice P-20 → P-21 | worked: P01 0.733 → 0.969 | 1 % and 6 % of C are more than the whole room; the bound had become the supplier's own offer and its alternative sheet was taken in round 3 |
+| Our step at 0.1 % of C | sandbox D01 | failed: 0.809 against 0.969 | the supplier answered in crumbs of 0.1 a reply |
+| P02 without an index clause | practice P-16, P-19 | failed: 0.421, 0.380 | it stops at 372.62-372.96 at 90 days whatever we ask |
+| P02: index clause (5 % deadband) at the price that minimises our C | practice P-20 to P-22 | worked: 0.733 three times | it gives 9-22 off its price for a clause; under 361 the margin charge eats the gain (358.45 → 0.686, 356.17 → 0.576, 345.39 → 0) |
+| Early price match at the assumed floor (1 % under the quote) | practice P-19 | failed: P01 0.728 | P01's supplier goes 4-5 % under its quote; matching 133.50 in round 3 ended the talks |
+
+## Read from the replays, not yet played
+
+| Idea | Evidence | Result |
+|---|---|---|
+| "We have alternatives" without naming one, indifference | sandbox `shelby`: the supplier asks for the competitive data, final offer a round earlier, 0.614 against 0.736; brief: an unsupported claim "gives nothing" | unknown on practice; the sandbox says no |
+| P11: three sheets at chargeback 0 with ppm 300 / 800 / 1500 | its scorecard ppm is 2376: a EUR 500 chargeback costs it about 1.19 a unit and us 0.135; it priced 800 ppm / 0 at 46.50 against 300 ppm / 0 at 47.00 | unknown |
+| P11, P01: one fresh citable argument per round, never an empty round | each accepted argument moved P11's price by 0.50; a round without one got a final offer | unknown |
+| P08, P18: first ask 18-20 % under the quote instead of 25-34 %, short-window index falls in the first e-mail | first counters 5.41-5.46 (P08) and 5.40-5.60 (P18) against 5.71 and 5.70 after a 30 % ask | unknown |
+| P08, P18: argue that the metal is already passed through by the contract's clause (double counting) | `ctr:4600070710#3.2` passes AS-14404 through quarterly; the opening cites the same rise again | unknown |
+| P10: accept the alternative sheet by its own ID instead of resending it | the alternative has an ID of its own (54 days) | unknown |
+| P05: offers that arrive after a timeout move are lost | the arena trace shows 14 such offers over 6 P05 sessions; our counter says 0 | unknown |
+| LLM as reader and writer around `tactical` (numbers stay with `tactical`) | – | in work on `feat/llm-writer`, sandbox only |

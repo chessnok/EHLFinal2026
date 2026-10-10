@@ -75,11 +75,11 @@ DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
 ANCHOR_WITH_LEVERS = 0.25  # first ask 25 % under the quote where competition, material or capacity give a lever
 ANCHOR_DATA_EXTRA = 0.05  # how much deeper the data may take the first ask
 # The supplier's full cost as a share of its own plant's should-cost. The margin charges the arena recorded on
-# P01, P02 and P03 (14 deals, runs.md P-16) put it at 0.975-0.980; company.md gives the estimate an error of
+# P01, P02 and P03 (14 deals up to runs.md P-15) put it at 0.975-0.980; company.md gives the estimate an error of
 # about 5 %. Too high a cost only leaves price on the table, too low a cost scores 0 - so the upper end.
 SHOULD_COST_SHARE = 0.98
 # What money now is worth to a supplier short of cash, as a multiple of our rate: P01's charges at 14, 45 and
-# 60 days (runs.md P-16) fit 9.6 % a year against our 8 %.
+# 60 days (runs.md P-2 to P-15) fit 9.6 % a year against our 8 %.
 CASH_SHORT_RATE = 1.2
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us

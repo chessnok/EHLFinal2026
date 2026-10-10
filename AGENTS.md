@@ -120,16 +120,16 @@ Put each case in the first category that fits, and sort inside a category by the
    we do not use. Second priority.
 3. **Close to the best, or a high house score that few teams beat.** A ceiling. Spend no attempts.
 
-As of 10 October 2026: house, best, tried and beaten from the live page at about 21:05; ours from `negotiator me` at
-22:30. Refresh both before using it.
+As of 11 October 2026: house, best, tried and beaten from the live page of 10 October at about 21:05; ours from
+`negotiator me` on 11 October at 00:20. Rows keep the order of 10 October. Refresh both before using it.
 
 | Category | Case | Lever, goal | Ours | House | Best | Tried | Beaten | Gap to best |
 |---|---|---|---|---|---|---|---|---|
 | 1 | P08 | raw material, leverage | 0.626 | 0.75 | 0.91 | 22 | 1 | 0.284 |
-| 1 | P02 | price increase, stabilise | 0.686 | 0.74 | 0.85 | 21 | 1 | 0.164 |
+| 1 | P02 | price increase, stabilise | 0.733 | 0.74 | 0.85 | 21 | 1 | 0.117 |
 | 1 | P07 | bundling, routine | 0.721 | 0.78 | 0.81 | 21 | 1 | 0.089 |
-| 1 | P01 | price increase, stabilise | 0.917 | 0.97 | 0.99 | 22 | 2 | 0.073 |
-| 1 | P10 | capacity, secure_supply | 0.647 | 0.69 | 0.70 | 22 | 3 | 0.053 |
+| 1 | P01 | price increase, stabilise | 0.969 | 0.97 | 0.99 | 22 | 2 | 0.021 |
+| 1 | P10 | capacity, secure_supply | 0.663 | 0.69 | 0.70 | 22 | 3 | 0.037 |
 | 1 | P03 | renewal, stabilise | 0.905 | 0.92 | 0.94 | 21 | 1 | 0.035 |
 | 2 | P11 | quality, quality_first | 0.692 | 0.31 | 0.81 | 20 | 17 | 0.118 |
 | 2 | P05 | RFQ, leverage | 0.839 | 0.56 | 0.92 | 21 | 12 | 0.081 |
@@ -137,7 +137,7 @@ As of 10 October 2026: house, best, tried and beaten from the live page at about
 | 3 | P04 | renewal, routine | 0.860 | 0.86 | 0.87 | 21 | 14 | 0.010 |
 
 We are below the house on six cases. Four of them are `stabilise` or `secure_supply` cases (see the next section).
-P01, P10 and P03 are in category 1 by the rule and within 0.08 of the best team.
+P01, P02, P10 and P03 are in category 1 by the rule and within 0.12 of the best team.
 
 ## Firmness follows the case goal
 
@@ -155,8 +155,20 @@ Measured on P02 (`stabilise`), [`agent/docs/runs.md`](agent/docs/runs.md) P-13 a
 | EUR 358.45 | 56,127 | 0.686 |
 | EUR 345.39 | 179,204 | 0.000 (C above C_open) |
 
-Our own cost estimate had the charge at 0 in both deals. Until that estimate is fixed, a strategy change that lowers
-prices must be checked on the `stabilise` and `secure_supply` cases before it is used anywhere.
+Our cost estimate had the charge at 0 in both deals. Since `7143676` it is in our C (the supplier's standard terms
+from its master data, its full cost at 0.98 of the own-plant should-cost), and the recorded charges are reproduced
+to within EUR 56.
+
+**The target is the price that minimises C with the charge, not the price where the charge starts.** Measured
+([`agent/docs/investigation-2026-10-10.md`](agent/docs/investigation-2026-10-10.md), `runs.md` P-16 to P-22):
+
+| Case | Price where the charge starts → score | Deal near the minimum of C → score |
+|---|---|---|
+| P01 | 138.41 at 14 days from April → 0.660 | 131.30 at 30 days from January → 0.969 |
+| P02 | 373.56 at 90 days → 0.305 | 362.02 at 90 days with a 5 % deadband clause → 0.733 |
+
+A strategy change that lowers prices must still be checked on the `stabilise` and `secure_supply` cases, and on a
+case without a should-cost of the supplier's own plant the charge stays out of our C (sandbox D01).
 
 ## Rules
 
