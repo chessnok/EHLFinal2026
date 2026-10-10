@@ -1,0 +1,2 @@
+[10/10/26 7:59 PM] Mikhail Fadin: negotiator session <sid> --json
+[10/10/26 8:00 PM] Mikhail Fadin: cd agent && uv run negotiator sessions how to look with this commands?
