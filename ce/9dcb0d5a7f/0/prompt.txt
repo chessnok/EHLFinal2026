@@ -433,3 +433,7 @@ Okey, now create a monorepo with completly separated infra of frontend(next, rea
 ---
 
 Запусти dev вариант, без docker, ну точнее, база в docker а остальное хочется иметь возможность запускать локально, шаришь?
+
+---
+
+Add https://github.com/tacto-ai/negotiation-arena-kit.git as a git submodule, commit this
