@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "105db19e2d29",
+  "strategy": "manual-commit",
+  "branch": "feat/bot-mechanics-flags",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "agent/docs/bot-mechanics.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/10/5db19e2d29/0/metadata.json",
+      "transcript": "/10/5db19e2d29/0/full.jsonl",
+      "content_hash": "/10/5db19e2d29/0/content_hash.txt",
+      "prompt": "/10/5db19e2d29/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1264,
+    "cache_creation_tokens": 1380480,
+    "cache_read_tokens": 271229417,
+    "output_tokens": 559654,
+    "api_call_count": 634
+  }
+}
