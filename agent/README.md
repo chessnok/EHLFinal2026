@@ -123,6 +123,11 @@ should-cost, alternative quote, a cheaper rival in an RFQ); a concession schedul
 thread on agreed / final offer / stall / close enough / last round and accepts the cheapest standing sheet that
 beats the alternative.
 
+**Experiments** (`strategy/experiments.py`): the baseline with exactly one tactic changed each - `lowball` (a deeper
+anchor), `questions` (three questions per e-mail), `polite` / `shelby` (tone), `budget` (a ceiling "set by
+management" that we do not cross), `trade` (no move without a move, said so). They exist to measure a tactic, not to
+win; the runs are in [`docs/benchmarks/`](docs/benchmarks/).
+
 ## Tests
 
 ```sh

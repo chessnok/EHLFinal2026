@@ -246,9 +246,9 @@ class BaselineStrategy:
         candidates.append(own)
         if "payment_days" in case["negotiable"]:
             options = sorted(o for o in case.get("term_options", {}).get("payment_days", []) if o is not None)
-            shorter = [o for o in options if o < ideal.get("payment_days", 0)]
-            if shorter:
-                cash = {**ideal, "payment_days": shorter[len(shorter) // 2]}
+            days = self._cash_days(neg, sid, [o for o in options if o < ideal.get("payment_days", 0)])
+            if days is not None:
+                cash = {**ideal, "payment_days": days}
                 cash["unit_price"] = self._iso_cost_price(neg, sid, cash, c_target)
                 candidates.append(complete_offer(case, cash))
         out, seen = [], set()
@@ -267,6 +267,10 @@ class BaselineStrategy:
             key = structure_key(sheet["terms"])
             plan.offered[key] = max(plan.offered.get(key, 0.0), sheet["terms"]["unit_price"])
         return out[:3]
+
+    def _cash_days(self, neg: Negotiation, sid: str, shorter: list[int]) -> int | None:
+        """Payment days of the cash variant, from the options shorter than our ideal (a hook for variants)."""
+        return shorter[len(shorter) // 2] if shorter else None
 
     def _close_enough(self, neg: Negotiation, sid: str, theirs: dict, price: float) -> bool:
         """Hold only when the standing offer costs us no more than our best structure at its price would:
@@ -360,16 +364,12 @@ class BaselineStrategy:
     ) -> dict:
         case = neg.case
         lines = [f"Dear {plan.name} team," if plan.name != plan.supplier_id else "Dear Sir or Madam,", ""]
-        if first:
-            lines.append(
-                "thank you for your quote. We have reviewed it against our data and cannot accept it as it stands."
-            )
-        else:
-            lines.append("thank you for your reply. We have moved towards you; we need you to move as well.")
+        lines.append(self._opener(first))
         lines += [c.sentence for c in claims]
         if first and not plan.asked_cost_breakdown:
             lines.append("Could you send us a cost breakdown for this part?")
             plan.asked_cost_breakdown = True
+        lines += self._extra_lines(neg, plan, first)
         lines.append("")
         lines.append("We can award on any of these options:" if len(sheets) > 1 else "Our proposal:")
         for i, sheet in enumerate(sheets):
@@ -382,6 +382,15 @@ class BaselineStrategy:
             "term_sheets": sheets,
             "refs": refs,
         }
+
+    def _opener(self, first: bool) -> str:
+        if first:
+            return "thank you for your quote. We have reviewed it against our data and cannot accept it as it stands."
+        return "thank you for your reply. We have moved towards you; we need you to move as well."
+
+    def _extra_lines(self, neg: Negotiation, plan: SupplierPlan, first: bool) -> list[str]:
+        """Sentences after the arguments, before the options (a hook for variants)."""
+        return []
 
     # ------------------------------------------------------------------ closing
     def conclude(self, neg: Negotiation) -> Decision:
