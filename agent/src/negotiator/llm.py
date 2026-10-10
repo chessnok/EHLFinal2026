@@ -33,6 +33,7 @@ import httpx
 from negotiator.telemetry import Recorder, log
 
 DEFAULT_SPEC = "openai:gpt-6.1-sol"
+DEFAULT_TEMPERATURE = 0.3
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,7 @@ class LLM:
         max_tokens: int = 700,
         timeout: float | None = None,
         context: dict | None = None,
+        temperature: float | None = None,
     ) -> dict:
         """One call that must return a JSON object; raises LLMError on timeout, HTTP error or bad output."""
         budget = timeout or self.timeout
@@ -105,7 +107,7 @@ class LLM:
                 raise LLMError("no free LLM slot in time")
             waited = time.perf_counter() - start
             try:
-                text, usage = self._call(system, user, max_tokens, max(1.0, budget - waited))
+                text, usage = self._call(system, user, max_tokens, max(1.0, budget - waited), temperature)
             finally:
                 self._slots.release()
             return parse_json(text)
@@ -116,8 +118,12 @@ class LLM:
             prompt = {"system": system, "user": user}
             self._record(purpose, time.perf_counter() - start, waited, usage, error, len(user), text, context, prompt)
 
-    def _call(self, system: str, user: str, max_tokens: int, timeout: float) -> tuple[str, tuple]:
+    def _call(
+        self, system: str, user: str, max_tokens: int, timeout: float, temperature: float | None = None
+    ) -> tuple[str, tuple]:
+        """`temperature` applies where the provider takes one: not `claude -p`, not OpenAI's current models."""
         system = system + "\nReply with one JSON object and nothing else."
+        temperature = DEFAULT_TEMPERATURE if temperature is None else temperature
         self._last.cost_usd = None
         if self.protocol == "claude-code":
             return self._claude_code(system, user, timeout)
@@ -128,7 +134,7 @@ class LLM:
                 json={
                     "model": self.model,
                     "max_tokens": max_tokens,
-                    "temperature": 0.3,
+                    "temperature": temperature,
                     "system": system,
                     "messages": [{"role": "user", "content": user}],
                 },
@@ -148,7 +154,7 @@ class LLM:
             # OpenAI's current models take max_completion_tokens and only their default temperature
             body["max_completion_tokens"] = max_tokens
         else:
-            body.update(temperature=0.3, max_tokens=max_tokens)
+            body.update(temperature=temperature, max_tokens=max_tokens)
         if self.reasoning:
             body["reasoning_effort"] = self.reasoning
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
