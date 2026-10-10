@@ -433,6 +433,22 @@ class Negotiation:
                 reply = self.client.send_message(self.session_id, supplier_id, message)
                 self.result = reply.get("result", reply)
             except ArenaError as e:
+                if e.status == 422 and (message.get("action") or {}).get("type") == "accept":
+                    # a keepalive answered meanwhile and replaced the standing offer (case:D02 lost its deal
+                    # this way): read the thread again and take the current sheet if it still passes the guards
+                    fresh = self._refreshed_standing(supplier_id)
+                    if fresh and not accept_problems(self, supplier_id, fresh):
+                        self.recorder.event(
+                            "accept_retry", session_id=self.session_id, supplier_id=supplier_id, offer=fresh
+                        )
+                        log.warning("%s: standing offer changed - accepting %s instead", supplier_id, fresh)
+                        reply = self.client.send_message(
+                            self.session_id, supplier_id, {"action": {"type": "accept", "term_sheet_id": fresh}}
+                        )
+                        self.result = reply.get("result", reply)
+                        self.ended.set()
+                        return self.result
+                    raise
                 if e.status != 409:
                     raise
                 self.recorder.metrics.incr("moves.close_conflict")
@@ -448,6 +464,21 @@ class Negotiation:
                 self.result = state.get("result") or {"deal": False, "end_reason": state.get("end_reason")}
             self.ended.set()
             return self.result
+
+    def _refreshed_standing(self, supplier_id: str) -> str | None:
+        """Reload one thread from the arena; returns its current standing offer id."""
+        try:
+            thread = self.client.thread(self.session_id, supplier_id)
+        except ArenaError:
+            return None
+        t = self.threads[supplier_id]
+        with t.lock:
+            t.messages = [
+                self._with_documents(m, supplier_id) if m.get("from") != "buyer" else m
+                for m in thread.get("messages", [])
+            ]
+            t.closed = thread.get("closed")
+        return t.standing[0]
 
     def _decision(self, kind: str, supplier_id: str, rationale: dict | None, **extra) -> None:
         entry = {
