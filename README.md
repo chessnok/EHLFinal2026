@@ -12,7 +12,7 @@ negotiation-arena-kit/   git submodule: brief, API docs, data package, starter k
 
 ```sh
 git clone --recurse-submodules git@github.com:chessnok/EHLFinal2026.git   # or: git submodule update --init
-echo "ARENA_API_KEY=<team key>" > .env                                     # git-ignored, never commit it
+cp .env.example .env                                                       # then fill in the keys; git-ignored
 make install
 make me                                                                     # team and practice quota
 ```
