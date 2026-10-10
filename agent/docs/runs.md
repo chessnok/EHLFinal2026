@@ -82,6 +82,8 @@ above: 73.2 on the practice board. Quota after P-14: 96 used of 650.
 | S-15 | 19:56 | uncommitted → `97e6004` | `playbook`; `playbook-noprobe` | D01, D02 | Vector (Claude session) | baseline plus a deeper anchor, a cash sheet and one closing offer after a final offer; the control leaves the closing offer out | playbook 0.943 / 0.660 · 0.801; noprobe 0.869 / 0.639 · 0.754 | the closing offer gained on both demo cases and no demo supplier walked away - practice (P-14) contradicted it |
 | S-16 | 21:44 | `556a31d` | `tactical` | D01, D02 | Vector (Claude session) | control for S-17 on the current main | 0.969 / 0.587 · 0.778 | – |
 | S-17 | 21:46 | uncommitted → `ef1bb70` | `tactical-slow25` | D01, D02; our step a quarter of tactical's | Vector (Claude session) | slower concessions, from `backlog.md` 2.1 | 0.957 / 0.671 · 0.814 | D02 +0.084, D01 −0.012; the simulator had pointed the same way; not played on practice |
+| S-18 | 11 Oct 01:47 | uncommitted → the commit that adds this row | `urgent` | D01, D02, played twice | Vector (Claude session) | a wording nobody had played (urgency and no alternative leaked), after the simulator's llm opponent had given its figures | 0.703 / 0.461 · 0.582 (both plays) | −0.14 on both cases against S-19; the simulator had said 0.716 / 0.455 |
+| S-19 | 11 Oct 01:52 | same | `baseline` | D01, D02 | Vector (Claude session) | control for S-18 in the same hour | 0.843 / 0.608 · 0.725 | – |
 
 After P-27 (11 October, 01:05): 42 practice sessions spent by this series (P-16 to P-27). Team bests from `negotiator
 me` then: P01 0.969, P02 0.733, P03 0.905, P04 0.860, P05 0.839, P07 0.721, P08 0.626, P10 0.663, P11 0.692,
