@@ -27,3 +27,7 @@ do not say cost if you cannot measure it then(open-ai). you can add this rule in
 ---
 
 who used this 42 sessions?
+
+---
+
+commit and push
