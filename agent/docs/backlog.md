@@ -22,6 +22,27 @@ the `thread_hold` events; the rule in `tactical.py` behind each stop has not bee
 | Capacity | P10 | 0.647 | 212,881 | 2 | `final_offer` in its first reply (33.80, alternative 31.90); we took the alternative |
 | Quality | P11 | 0.545 | 43,244 | 4 | held: "last word: take it", supplier still `open` |
 
+### The best any team reached, per case
+
+From the arena's live page (screenshot of 10 October, about 21:05; 24 teams) against our best score per case
+(`runs.md`, after P-14):
+
+| Case | Lever | Best team | House agent | Teams that beat the house | Our best | Gap to the best |
+|---|---|---|---|---|---|---|
+| P08 | raw-material surcharge | 0.91 | 0.75 | 1 | 0.603 | 0.31 |
+| P18 | raw-material surcharge | 0.68 | 0.39 | 17 | 0.467 | 0.21 |
+| P02 | price increase (copper) | 0.85 | 0.74 | 1 | 0.686 | 0.16 |
+| P11 | quality | 0.81 | 0.31 | 17 | 0.692 | 0.12 |
+| P05 | RFQ | 0.92 | 0.56 | 12 | 0.824 | 0.10 |
+| P07 | bundling | 0.81 | 0.78 | 1 | 0.721 | 0.09 |
+| P01 | price increase | 0.99 | 0.97 | 2 | 0.917 | 0.07 |
+| P10 | capacity | 0.70 | 0.69 | 3 | 0.647 | 0.05 |
+| P03 | renewal | 0.94 | 0.92 | 1 | 0.905 | 0.04 |
+| P04 | renewal | 0.87 | 0.86 | 14 | 0.860 | 0.01 |
+
+The two raw-material cases hold 0.52 of the 1.16 between us and the best team on every case; P08 at 0.91 was reached
+by one team. The practice board showed us 6th with a mean of 0.73; the leader had 0.81.
+
 ## 2. The problems, largest first
 
 ### 2.1 We stop after two to four of ten rounds

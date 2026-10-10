@@ -89,6 +89,7 @@ class Profile:
     steps: dict = field(default_factory=dict)  # kind[/first] -> [[share of the gap, clarify?], ...]
     finals: dict = field(default_factory=dict)  # reply number -> [final offers, replies seen]
     convinced: dict = field(default_factory=dict)  # claim type -> [took into account, checked]
+    walks: list = field(default_factory=lambda: [0, 0])  # [walked away, term sheets sent after its final offer]
     full_cost: float | None = None  # for the relationship term of C, where a recorded deal showed it
     floor_source: str = ""
 
@@ -142,6 +143,13 @@ class Thread:
         prior = pk / pn if pn else 0.0
         return min(1.0, self.persona.final * (k + POOL_WEIGHT * prior) / (n + POOL_WEIGHT))
 
+    def _walk_rate(self) -> float:
+        """How often a term sheet sent after its final offer made it walk away: its own record, the pool as prior."""
+        k, n = self.profile.walks
+        pk, pn = self.pool.walks
+        prior = pk / pn if pn else 0.0
+        return (k + POOL_WEIGHT * prior) / (n + POOL_WEIGHT)
+
     def convincing(self, claim_type: str) -> bool:
         k, n = self.profile.convinced.get(claim_type, (0, 0))
         pk, pn = self.pool.convinced.get(claim_type, (0, 0))
@@ -189,13 +197,18 @@ class Thread:
             reasons.append("Without movement from your side we cannot move either.")
         self.value = max(p.floor, self.value - min(step, gap))
 
-        if kind == "final":
+        fitted = self.persona.name == "fitted"
+        if kind == "final" and not fitted:
             self.pushes += not moved
             if self.pushes >= self.persona.walk_pushes and self.rng.random() < self.persona.walk_p:
                 self.status = "walked_away"
                 return self._out(case, ["We end the talks here."])
         structure = self._feasible(case, top[1]) if top else self.terms
-        if self.best_buyer and self.best_buyer[0] >= self.value - EPS and self._allowed(case, self.best_buyer[1]):
+        accepts = self.best_buyer and self.best_buyer[0] >= self.value - EPS and self._allowed(case, self.best_buyer[1])
+        if kind == "final" and fitted and top and not accepts and self.rng.random() < self._walk_rate():
+            self.status = "walked_away"  # as recorded: a sheet below its final offer, whatever its size
+            return self._out(case, ["We end the talks here."])
+        if accepts:
             self.status, self.value = "agreed", self.best_buyer[0]
             self.terms = dict(self._feasible(case, self.best_buyer[1]))
             self.replies += 1

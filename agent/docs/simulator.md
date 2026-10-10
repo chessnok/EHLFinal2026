@@ -73,8 +73,12 @@ So: use it for what the numbers do (anchor, concession schedule, menus, which ar
 never for tone, questions, unbacked claims or leaks. Those need the sandbox, which is free and, for a strategy
 without an LLM, gives the same replies every time.
 
-**Not fitted at all:** walking away (no recorded supplier did; the simulator walks after three pushes past a final
-offer with probability 0.5), the price of a volume change (no recorded alternative varied it), suppliers of cases
+**Walking away is fitted since 10 October, 22:00:** per supplier, how often a term sheet sent after its final offer
+made it walk away, with the pool of all suppliers as prior. The record then: 3 walk-aways in 26 such sheets (P04, P07
+and P18, one each, all from `playbook`'s closing offer; the three demo suppliers never walked in 20). One observation
+per practice supplier is thin: read a simulated walk-away as "this can happen", not as a rate.
+
+**Not fitted at all:** the price of a volume change (no recorded alternative varied it), suppliers of cases
 we have not played, the relationship charge except on P01.
 
 ## Keeping it honest: a pool of opponents
@@ -103,3 +107,20 @@ of anything on the arena.
    simulator, go to step 2.
 2. Sandbox (free): both cases, the real bots.
 3. Practice (quota): only what passed 1 and 2, then `sim calibrate` again - every practice run makes the fit better.
+
+## Checks against arena runs the fit had not seen
+
+| When | What | Simulator | Arena |
+|---|---|---|---|
+| 10 Oct, fit of 20:10, before the practice passes P-13 and P-14 | `tactical`, mean over the 10 practice cases | 0.673 | 0.695 |
+| same | `tactical`, largest misses on one case | P05 0.43, P02 0.42, P11 0.72 | 0.74, 0.69, 0.55 |
+| same | `playbook`, mean over the 10 practice cases | 0.514, no walk-away | 0.376, three walk-aways |
+| 10 Oct, fit of 21:40 | `tactical-slow25` against `tactical` on the sandbox | D02 0.54 → 0.66, D01 0.84 → 0.85 | D02 0.587 → 0.671, D01 0.969 → 0.957 |
+
+With walk-aways fitted (fit of 22:00, 10 repeats) the simulator gives `playbook` 0.405 over the practice cases; that
+is the same data it was fitted on, not a check.
+
+**Open check.** Simulator figures for `tactical-slow25` on the practice cases, written down before any arena run of
+it (fit of 22:00, 10 repeats; `tactical` in brackets): P01 0.87 (0.85), P02 0.51 (0.34), P03 0.96 (0.86), P04 1.00
+(1.00), P05 0.60 (0.50), P07 0.79 (0.74), P08 0.40 (0.47), P10 0.65 (0.61), P11 0.52 (0.42), P18 0.26 (0.24); mean
+0.656 (0.603).

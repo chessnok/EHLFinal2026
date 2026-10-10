@@ -189,10 +189,13 @@ def calibrate(sessions: list[dict]) -> dict:
     for key, p in profiles.items():
         case = cases[key.split("|")[0]]
         steps, finals, convinced = defaultdict(list), defaultdict(lambda: [0, 0]), defaultdict(lambda: [0, 0])
-        costs = []
+        costs, walks = [], [0, 0]
         for t in seen[key]:
             value, status, prev_reasons, best_buyer, n = p.opening_value, "open", [], None, 0
             for buyer, m, reasons in _moves(t, p.supplier_id):
+                if status == "final_offer" and buyer and buyer.get("term_sheets") and m["status"] != "agreed":
+                    walks[0] += m["status"] == "walked_away"
+                    walks[1] += 1
                 if buyer is None or m["terms"].get("unit_price") is None:
                     prev_reasons = reasons
                     continue
@@ -220,10 +223,11 @@ def calibrate(sessions: list[dict]) -> dict:
             charge = (t["outcome"].get("cost_breakdown") or {}).get("relationship") or 0
             if charge > 0 and t["outcome"].get("supplier_id") == p.supplier_id:
                 costs.append(_full_cost(case, p, t["outcome"]["terms"], charge))
-        p.steps, p.finals, p.convinced = dict(steps), dict(finals), dict(convinced)
+        p.steps, p.finals, p.convinced, p.walks = dict(steps), dict(finals), dict(convinced), walks
         p.full_cost = round(statistics.median(costs), 4) if costs else None
 
     pool = Profile("pool", {"unit_price": 1.0}, {}, {}, pool_rates, floor=0.0)
+    pool.walks = [sum(p.walks[i] for p in profiles.values()) for i in (0, 1)]
     for table in ("steps", "finals", "convinced"):
         merged: dict = {}
         for p in profiles.values():
