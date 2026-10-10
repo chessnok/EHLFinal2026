@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "3ed82c1e8201",
+  "strategy": "manual-commit",
+  "branch": "feat/sim-llm-supplier",
+  "checkpoints_count": 2,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/3e/d82c1e8201/0/metadata.json",
+      "transcript": "/3e/d82c1e8201/0/full.jsonl",
+      "compact_transcript": "/3e/d82c1e8201/0/transcript.jsonl",
+      "content_hash": "/3e/d82c1e8201/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 6966,
+    "cache_read_tokens": 2247678,
+    "output_tokens": 1806,
+    "api_call_count": 5
+  }
+}
