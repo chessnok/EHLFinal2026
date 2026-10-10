@@ -3,7 +3,7 @@
   "checkpoint_id": "4c3329c85e7d",
   "strategy": "manual-commit",
   "branch": "fix/relationship-charge",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "agent/src/negotiator/conduct.py",
     "agent/src/negotiator/guards.py",
@@ -19,13 +19,27 @@
       "compact_transcript": "/4c/3329c85e7d/0/transcript.jsonl",
       "content_hash": "/4c/3329c85e7d/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/4c/3329c85e7d/1/metadata.json",
+      "transcript": "/4c/3329c85e7d/1/full.jsonl",
+      "compact_transcript": "/4c/3329c85e7d/1/transcript.jsonl",
+      "content_hash": "/4c/3329c85e7d/1/content_hash.txt",
+      "prompt": "/4c/3329c85e7d/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 90,
+    "cache_creation_tokens": 146388,
+    "cache_read_tokens": 5408380,
+    "output_tokens": 46405,
+    "api_call_count": 44,
+    "subagent_tokens": {
+      "input_tokens": 158,
+      "cache_creation_tokens": 589843,
+      "cache_read_tokens": 10725437,
+      "output_tokens": 10644,
+      "api_call_count": 79
+    }
   }
 }

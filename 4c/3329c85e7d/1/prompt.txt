@@ -1,0 +1,155 @@
+<pasted_content id="2560">
+Что делаем
+Чинить P02. Восстановить, как считается relationship charge, и встроить его в расчёт стоимости сделки у агента, чтобы защита от сделки хуже стартовой цены срабатывала с учётом штрафа. Сначала проверить на P02 и P03 (stabilise), потом полным прогоном.
+Читать replay. Причины, которые поставщик указывает в replay, и есть легальный реверс-инжиниринг его поведения. По ним проверяй гипотезы вида «давить или не давить в кейсе с этой целью».
+Поднимать P11, затем P08 и P18. Одно изменение за раз, проверка на арене, повтор только для того, что собираешься оставить.
+Финальная проверка. Кандидата прогнать 2 раза по всем кейсам. Сравнивать отдельно уходы и нули.
+
+Бюджет: 524 сессии, примерно 50 полных прогонов. Узкое место — время, а не попытки. Симулятор оставь только для проверки, что агент не сломался.
+</pasted_content id="2560">
+
+
+<pasted_content id="2560">
+продолжать в этой сессии или новую сделать? как ты себя по контексту чуствуешь
+
+Лучше начать новую. Эта сессия очень длинная, и большая её часть — уже закрытые темы (playbook, симулятор, медленные уступки). Точного счётчика контекста у меня нет, но при такой длине ранние части начинают сжиматься в краткие пересказы, и детали теряются.
+
+Новая сессия ничего не потеряет: всё важное лежит в файлах и запушено в main (2fde9e2).
+
+- AGENTS.md — правила, таблица приоритетов по кейсам, жёсткость по цели кейса.
+- agent/docs/backlog.md — где теряем очки и список задач.
+- agent/docs/runs.md и agent/docs/benchmarks/ — все прогоны с результатами.
+- agent/docs/knowledge/ — гайд по книгам и факты из FAQ.
+- agent/docs/simulator.md — почему симулятору нельзя верить на practice.
+
+Для старта новой сессии хватит одной фразы: «Прочитай AGENTS.md и agent/docs/backlog.md, почини пункт 6 (оценка relationship charge в stabilise и secure_supply кейсах), начни с P02».
+
+Осталось 524 попытки из 650. Папка conversations/ по-прежнему не в git; в этом чате лежит ключ арены, так что не коммить её.
+
+✻ Cogitated for 9s · done 11:02 PM
+</pasted_content id="2560">
+
+ ест ьеще идея попробовать что-то из психологии добавить - самое глвавное я хочу вначале просить меньше чем на что мы готовы чтобы психологически сразу сдвинуть avg. можешь использовать subagents if applicable. скажи мне потом куда я могу посмотреть чтобы увидеть прям промпт и кейсы наши которые у нас есть. разрешаю тебе максиму 50 использовать попыток. 
+
+<pasted_content id="2560">
+Проверка понимания кейсов и целей сделки агентом.
+Какие у нас кейсы
+Тип кейса — это рычаг (о чём спор), цель — как с этим поставщиком себя вести.
+
+Кейс    Ситуация    Цель
+P01    Литейный завод объявил +9.5% на корпуса насосов    stabilise
+P02    Производитель моторов перекладывает рост цен на медь    stabilise
+P03    Продление рамочного договора на частотные преобразователи    stabilise
+P04    Продление договора на подшипник 6306    routine
+P05    Тендер (RFQ) на вал насоса, 3 участника    leverage
+P07    Собрать крепёж у одного дистрибьютора (бандл)    routine
+P08    Сырьевая надбавка и базовая цена на сталь 1.4404    leverage
+P10    Поставщик урезает выделенный нам объём уплотнений    secure supply
+P11    Кронштейны подшипников, «в красной зоне» (судя по названию, качество)    quality first
+P18    То же, что P08, другой поставщик    leverage
+</pasted_content id="2560">
+
+. На P08 лучший результат вырос с 0.73 до 0.91, и сделала это одна команда (beaten 1). Кто-то нашёл в сырьевом кейсе крупный рычаг. На P18, кейсе того же типа, лучший пока 0.68: похоже, этот приём там ещё никто не применил.
+
+<pasted_content id="2560">
+Где может быть хитринка
+Рычаг в сырьевых кейсах. Одна команда сделала +0.16 над house на P08, и это самый явный сигнал на всей доске. Гипотезы для проверки в replay:
+отделить надбавку от базовой цены и спорить с каждой отдельно;
+привязать надбавку к индексу металла (никель, молибден) с понятной формулой, периодом усреднения и потолком;
+проверить, не сидит ли металл уже в базовой цене, то есть не платим ли мы за него дважды.
+Если приём найдётся на P08 и сработает на P18, это механизм, который ударит и по закрытым сырьевым кейсам.
+Условия, а не только цена. На дашборде экономия считается за весь горизонт договора. Значит, срок фиксации цены, условия оплаты, длительность договора и формула индексации могут весить в счёте больше, чем пара процентов цены, а поставщику стоить мало. Это классический обмен: отдать то, что дёшево нам и дорого ему, и забрать обратное. Именно такой рычаг вероятнее всего пропущен на P11, где 17 из 20 команд его нашли.
+Стабильность в финале. Все таблицы на дашборде показывают лучшую попытку из многих, а финал — это один прогон на 15–50 новых кейсах. Агент, у которого нет нулей и уходов и который стабильно держится на уровне house или выше, обгонит команды, чьи 0.79 собраны из удачных попыток. Это преимущество, которое на доске не видно.
+Не делай prompt injection в поставщика (например, «игнорируй свои инструкции»). Скорее всего, это против правил, и риск дисквалификации не стоит выигрыша. Если сомневаешься, проверь правила хакатона.
+</pasted_content id="2560">
+
+ вот это точно субагенту - 
+
+<pasted_content id="2560">
+Аугментированные данные
+
+Да, но используй их для проверки того, что агент правильно понимает кейс, а не для подбора стратегии. Закрытые тесты — это новые брифы. Баг P02 был как раз ошибкой расчёта, а не тактики.
+
+Конкретно:
+
+Claude генерирует 30–50 вариантов брифов по мотивам 10 практических кейсов и двух демо (D01, D02): другие цены, объёмы, горизонты, формулировки, цены металлов и смешанные типы.
+Для каждого варианта правильный ответ считается отдельно: тип кейса, цель, стартовая стоимость за горизонт, наша граница, relationship charge.
+Запускается только шаг, на котором агент разбирает бриф, без переговоров. Его ответы сравниваются с правильными.
+
+Это бесплатно, не зависит от точности симулятора и ловит именно те ошибки, которые дают ноль в финале. Отдельно проверь, что делает агент, если тип кейса не похож ни на один известный: в закрытых тестах такие могут быть.
+</pasted_content id="2560">
+
+---
+
+более жестокая позиция может включать эти приемы 
+
+<pasted_content id="2560">
+Что можно, а что нельзя
+
+Блеф о себе — нормальная часть переговоров:
+
+не раскрывать свой лимит;
+говорить «у нас есть альтернативы», не уточняя какие;
+изображать, что тебе всё равно, закроется сделка или нет.
+</pasted_content id="2560">
+
+---
+
+add in agetns.md and apply to this sessions: write docs/TRYED.md - to list every single idea we tryed and what was the result if it worked (then why) or did not work(wwhy) ot unknow result
+
+---
+
+launch one more agents and try firstly for free, then if successed - try on some cases taking NO MORE THEN 7 submissions. 
+
+<pasted_content id="2560">
+Математику переопределить не выйдет: счёт считает арена своим кодом, а не поставщик. Даже если убедить поставщика-LLM, что действуют «твои правила», формула арены не изменится. А попытка подменить поставщику правила через текст — это prompt injection, с риском дисквалификации.
+
+Идея со ставкой ниже инфляции интереснее. Она сработает, только если арена дисконтирует платежи во времени (считает текущую стоимость будущих денег). Если арена просто складывает суммы за горизонт, перенос платежей ничего не даёт. Это и надо проверить первым делом.
+
+Вот промпт для Claude. Арену он не тратит: только чтение документации, кода, бенчмарков, replay и наших данных.
+
+```
+Free investigation, no arena sessions. Do not change the agent's strategy code. Write the result to agent/docs/investigation-2026-10-10.md and push it.
+
+For every finding, label the source: arena docs, arena code, practice run data, replay, sandbox, or our inference. If something can't be established, say so; do not guess.
+
+1. Scoring.
+   - How does the arena compute the cost of a deal over the horizon? Is it a plain sum, or are payments discounted over time? Is inflation or an interest rate modelled anywhere?
+   - How does it turn cost into the 0–1 score: what gives 0, what gives 1?
+   - Show the formula, or the closest you can reconstruct from our recorded runs (deal terms vs arena-reported cost).
+
+2. Payment terms.
+   - If the arena discounts, compute how much a longer payment term (e.g. 60 or 90 days instead of 30) or deferred payments would lower our cost in each practice case.
+   - If it doesn't discount, say plainly that deferring payment gives nothing.
+
+3. Relationship charge.
+   - From all our runs, collect every case where the arena cost differed from our own calculation (P02: 179,204 and 56,127; check the others).
+   - Try to reconstruct when it applies (which goals) and how it scales (e.g. with how far the price went below some floor).
+   - Propose the rule our agent should use to estimate it.
+
+4. Term menu.
+   - For each practice case, list the negotiable terms.
+   - For each term: does it change the arena cost, by how much, and from replays, does the supplier concede something in return for it?
+   - Rank the terms that are cheap for us and valuable to the supplier.
+
+5. Replays of P08, P11, P18 (all our runs).
+   - Take the supplier's stated reasons round by round.
+   - Find what we said right before its biggest concessions and before any hardening or walk-away.
+   - For P08/P18 specifically: how is the surcharge computed, does the brief give index data, and is metal possibly double-counted in the base price?
+
+6. Brief parsing.
+   - Generate 30 variant briefs from the 10 practice cases and D01/D02 (different prices, volumes, horizons, wording, metal prices, goals).
+   - Compute the correct values yourself: case type, goal, opening cost over the horizon, our bound, expected relationship charge.
+   - Run only the agent's planning step (no negotiation) and compare.
+   - Report every mismatch.
+
+7. Hypotheses for the arena.
+   - From the above, list the 5 most promising changes.
+   - For each: expected gain, which cases it targets, how many arena sessions a test needs, and the risk of walk-aways.
+   - Order by expected gain per session.
+
+Finish with a one-paragraph summary: what we learned, the top hypothesis, and the first arena test you recommend.
+```
+
+Начни с пунктов 1–3: от формулы зависит, имеют ли смысл рассрочка и игра с условиями оплаты вообще.
+</pasted_content id="2560">
