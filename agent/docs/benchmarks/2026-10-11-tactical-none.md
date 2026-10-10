@@ -62,3 +62,14 @@ Run cost: 10 practice sessions, 0 LLM tokens, about 3 minutes wall time. Added s
 (first ask for a `routine` goal), and the own-plant should-cost cited from 3 % under the quote, ranked last. Eight
 cases repeat the first pass to the cent; P03 and P07 are the two the later changes touch.
 
+## Re-anchor fix, commit `17fc8ad` (branch `fix/reanchor-no-step-back`, on main `ec4776a`)
+
+| Run | Mean | Deals | P01 | P02 | P03 | P04 | P05 | P07 | P08 | P10 | P11 | P18 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `20261011-004458-practice-tactical` | **0.746** | 10 of 10 | 0.969 | 0.733 | 0.923 | 0.860 | 0.742 | 0.740 | 0.550 | 0.647 | 0.672 | 0.618 |
+
+Run cost: 10 practice sessions, 0 LLM tokens, about 15 seconds wall time (the arena answered from its cache). One
+change against `6bb73d1`: re-anchoring never asks below our own last ask. Every case repeats the second pass to the
+cent; re-anchoring fired in four of them, each time above our last ask. On sandbox D01 the same change gave 0.749
+against 0.649 (`../runs.md` S-18).
+
