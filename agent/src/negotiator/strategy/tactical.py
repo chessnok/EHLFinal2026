@@ -107,6 +107,7 @@ UPPER_ROOM = 0.06  # the upper bound sits at least this far above our first ask
 STOP_MARGIN = 0.01  # we take an offer within 1 % of where we expect the supplier to stop
 MIN_STEP = 0.004  # every message moves at least 0.4 % of C: these bots punish a repeated offer
 MAX_SPREAD = 0.08  # options of one message stay within 8 % of each other's price
+EQUAL_C = 0.005  # ... and within 0.5 % of each other's C
 
 
 def reply_signals(body: str) -> dict:
@@ -934,6 +935,11 @@ class TacticalStrategy(BaselineStrategy):
                 bumped = round(before * (1 + MIN_STEP), 2)
                 if bumped < theirs.get("unit_price", bumped + 1):
                     t["unit_price"] = bumped
+        # every option of a message costs us the same: floors and bumps can lift one above our ask, and the supplier
+        # then picks the one dearest to us (P02 agreed at once to an index clause at the same price, EUR 39k more C;
+        # without it practice P02 0.167 -> 0.731)
+        cheapest = min(neg.cost(sid, t) for t in picked)
+        picked = [t for t in picked if neg.cost(sid, t) <= cheapest * (1 + EQUAL_C)]
         out, keys = [], set()
         for t in picked:
             if structure_key(t) not in keys:

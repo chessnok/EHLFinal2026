@@ -373,6 +373,7 @@ def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str
             local = Settings(**{**settings.__dict__, "arena_url": url, "api_key": key, "runs_dir": runs_dir,
                                 "final_mode": False})  # fmt: skip
             for name in strategies:
+                sim.opened.clear()  # the session seed counts opened sessions: each strategy starts from the same one
                 recorder = Recorder(runs_dir, f"sim-{name}-{opponent}-s{rep}", logging.ERROR)
                 client = ArenaClient(local, recorder)
                 client.pacer = _Pacer(1000.0)
