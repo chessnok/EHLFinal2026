@@ -1,0 +1,25 @@
+did we do public submissions recently?
+
+---
+
+and lets save the whole conversation in json or whatever. do not make any public submissions without my approve
+
+---
+
+so are the middle layer is going to be right or not? how about to test it and spend a few submissions (just discussing). do not write any predictions in files - only real verifyed data (add this rule in agents.md)
+
+---
+
+can we set up LangFuse?
+
+---
+
+do commit, git pull
+
+---
+
+push
+
+---
+
+write in agents md to do pull,push,commit regularly
