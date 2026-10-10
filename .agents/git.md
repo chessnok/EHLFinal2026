@@ -60,4 +60,5 @@ Keep `main` deployable; merge through pull requests, squash when the branch hist
 - `make test && make lint` (ruff and pytest in `agent/`).
 - Never commit secrets (`.env`, API keys), data (`bmw_data/`, `agent/data/`), run telemetry (`agent/runs/`),
   virtualenvs or caches.
-- Do not commit or push unless asked; never force-push `main`.
+- Commit, pull and push regularly without being asked (see AGENTS.md, Rules); never push to `main` directly and
+  never force-push it.

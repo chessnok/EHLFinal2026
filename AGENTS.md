@@ -112,7 +112,15 @@ Files hold measured data only: a number in a doc, a benchmark record or a commen
 expected scores in files - say them in the conversation, and write the result down once the run has verified it.
 
 General: keep changes scoped to the request, match the surrounding code's style, run the checks above for every
-area you changed, and do not commit or push unless asked.
+area you changed.
+
+Commit, pull and push regularly, without waiting to be asked - several people and agents work in this repository at
+once, and a limited run needs pushed code:
+- **pull** before you start and before every push: `git fetch`, then merge `origin/main` into your branch;
+- **commit** every finished logical change as soon as `make test && make lint` pass - do not let work pile up;
+- **push** your branch after every commit.
+
+Work on a branch, never push to `main` directly and never force-push it (see [`.agents/git.md`](.agents/git.md)).
 
 Costs: report an LLM cost only when the provider measured it (`cost_usd` on the `llm_call` event, e.g.
 `claude-code`). When it did not (OpenAI-compatible endpoints return tokens, not money), write
