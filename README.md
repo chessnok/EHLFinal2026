@@ -1,79 +1,36 @@
-# EHL monorepo
+# EHL Final 2026 – Tacto Negotiation Arena
 
-Two independent apps plus PostgreSQL, orchestrated with Docker Compose. Frontend and backend share no code,
-dependencies or tooling; they talk over HTTP only.
+Our AI buyer agent for the [Tacto Negotiation Arena](negotiation-arena-kit/README.md): it reads the case file
+and the data package, negotiates by e-mail with the arena's supplier bots and closes the cheapest total deal.
 
 ```
-frontend/   Next.js 16 · React 19 · TypeScript · Tailwind v4 · pnpm   (DESIGN.md = UI style reference)
-backend/    Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic
-agent/      Python 3.12 · uv · negotiator: Tacto Negotiation Arena buyer agent (see agent/README.md)
-negotiation-arena-kit/   git submodule: the arena brief, API, data and starter kit
-docker-compose.yml   db (postgres:17) · backend · frontend
+agent/                   negotiator: API client, runner, telemetry, reports, strategies (Python 3.12, uv)
+negotiation-arena-kit/   git submodule: brief, API docs, data package, starter kit (read-only)
 ```
 
-## Run everything
+## Setup
 
 ```sh
-cp .env.example .env        # optional: override ports and DB credentials
-docker compose up --build
+git clone --recurse-submodules git@github.com:chessnok/EHLFinal2026.git   # or: git submodule update --init
+echo "ARENA_API_KEY=<team key>" > .env                                     # git-ignored, never commit it
+make install
+make me                                                                     # team and practice quota
 ```
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000/api, OpenAPI docs at http://localhost:8000/docs
-- PostgreSQL: localhost:5432 (`app`/`app`)
-
-The backend container runs `alembic upgrade head` on start. The frontend proxies `/api/*` to the backend, so
-the browser only ever talks to the frontend. Networks are split: the frontend can reach the backend but not
-the database.
-
-## Develop locally (database in Docker, apps on the host)
+## Play
 
 ```sh
-git submodule update --init   # negotiation-arena-kit/
-make install                  # uv sync + pnpm install
-make db                       # PostgreSQL on localhost:5432
-make backend                  # terminal 1: migrations + fastapi dev  -> http://localhost:8000/docs
-make frontend                 # terminal 2: next dev                  -> http://localhost:3000
+make sandbox                                    # the free sandbox cases against real supplier bots
+cd agent && uv run negotiator play case:P05     # one practice case (200 per team per 24 h)
+cd agent && uv run negotiator run --set practice --parallel 4
+make stats                                      # best and mean score per case across all runs
+NEGOTIATOR_FINAL=1 make final                   # Live Final: waits for each wave, plays it in parallel
+```
+
+Every run writes its telemetry, transcripts and a report to `agent/runs/<run_id>/` (git-ignored). Details,
+the architecture and the baseline strategy: [`agent/README.md`](agent/README.md). The rules of the game:
+[`negotiation-arena-kit/brief/brief.md`](negotiation-arena-kit/brief/brief.md).
+
+```sh
 make test && make lint
 ```
-
-Both dev servers reload on save. `make up` / `make down` run the whole stack in Docker instead.
-
-## Backend: three layers
-
-```
-src/app/
-  api/            presentation: routes, request/response handling, dependency wiring (deps.py)
-  services/       business logic and rules; raises ServiceError subclasses, mapped to HTTP in main.py
-  repositories/   data access: SQLAlchemy queries, nothing else
-  models/         ORM models (tables)
-  schemas/        Pydantic DTOs for the API
-  core/           settings and database engine/session
-```
-
-Each request gets a session (`core/database.py`) → repository → service → route. Services never touch HTTP or
-SQL directly, so they are unit-tested with an in-memory fake repository (`tests/test_item_service.py`).
-`items` is an example resource showing the pattern end to end.
-
-```sh
-cd backend
-uv sync
-uv run pytest
-uv run ruff check . && uv run ruff format .
-DATABASE_URL=postgresql+asyncpg://app:app@localhost:5432/app uv run fastapi dev src/app/main.py
-uv run alembic revision --autogenerate -m "describe change"   # after changing models
-uv run alembic upgrade head
-```
-
-## Frontend
-
-```sh
-cd frontend
-pnpm install
-BACKEND_URL=http://localhost:8000 pnpm dev   # http://localhost:3000
-pnpm lint && pnpm build
-```
-
-Design tokens from `frontend/DESIGN.md` live in `src/app/globals.css` (`@theme` plus `card`, `btn-*`, `input`,
-`badge` utilities). `BACKEND_URL` is read at build time; the Docker image is built with
-`BACKEND_URL=http://backend:8000`.
