@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01D4M946t5FLXtVg85tsi4sh",
+  "agent_id": "a14683a4b1510f7ae",
+  "subagent_type": "general-purpose",
+  "task_description": "Replay analysis P08 P18 P11",
+  "token_usage": {
+    "input_tokens": 80,
+    "cache_creation_tokens": 292645,
+    "cache_read_tokens": 6285702,
+    "output_tokens": 3796,
+    "api_call_count": 40
+  },
+  "started_at": "2026-10-10T23:22:12.792199092+03:00",
+  "completed_at": "2026-10-10T23:33:50.677589602+03:00"
+}

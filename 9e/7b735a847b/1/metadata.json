@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "9e7b735a847b",
+  "session_id": "a11516cb-b9ab-4f94-b7ba-983b5e97b58f",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-10T20:34:44.957739137Z",
+  "branch": "fix/relationship-charge",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "d94ed54aa6d2",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 94,
+    "cache_creation_tokens": 157275,
+    "cache_read_tokens": 5762365,
+    "output_tokens": 47464,
+    "api_call_count": 46
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 647,
+      "user_lines_removed": 8,
+      "agent_lines_added": 1096,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "agent/tests/brief_variants.py": 9,
+        "agent/tests/test_brief_variants.py": 2,
+        "conversations/2026-10-10-supplier-simulator.jsonl": 337,
+        "conversations/2026-10-10-supplier-simulator.md": 299
+      },
+      "user_removed_per_file": {
+        "agent/tests/brief_variants.py": 6,
+        "agent/tests/test_brief_variants.py": 2
+      }
+    }
+  ]
+}
