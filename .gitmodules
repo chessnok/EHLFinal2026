@@ -1,0 +1,3 @@
+[submodule "negotiation-arena-kit"]
+	path = negotiation-arena-kit
+	url = https://github.com/tacto-ai/negotiation-arena-kit.git
