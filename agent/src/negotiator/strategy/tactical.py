@@ -32,14 +32,15 @@ Conduct (conduct.py): honest, sourced, no empty threats, the supplier's margin r
 import math
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 
-from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer
+from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer, horizon_start
 
 from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
 from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
-from negotiator.ledger import CITED_DRIVER, data_facts, reply_facts
+from negotiator.ledger import CITED_DRIVER, HEDGE, data_facts, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
 from negotiator.profile import SupplierProfile, build_profile
 from negotiator.session import Negotiation
@@ -216,6 +217,8 @@ FLAGS: dict[str, str] = {
     "60 % of the usual but never under 0.6 % of C",
     "answers": "plain answers: the volume we need, an opener that matches its move, a fixed field said once, a "
     "clause it must have kept, no 'pays early' that is not",
+    "hedge_turn": "its hedge answered with the contract's dates: the months of our term after its cover ends, instead "
+    "of agreeing that market moves do not reach it (P08: 16 sessions said the latter)",
 }
 
 
@@ -599,6 +602,9 @@ class TacticalStrategy(BaselineStrategy):
                 if series[0] not in plan.pressures:
                     plan.pressures.append(series[0])
             for fact in reply_facts(self.data, reply.get("body", "")):
+                if self.flags["hedge_turn"] and fact.kind == "their_hedge":
+                    if not (fact := self._hedge_turn(neg, reply.get("body", ""))):
+                        continue
                 if fact.sentence not in plan.used_sentences and all(fact.sentence != c.sentence for c in plan.counters):
                     plan.counters.append(fact)
             for f, values in proposed_values(neg.case, reply.get("term_sheets") or []).items():
@@ -629,6 +635,32 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief.observe(reply)
             self._update_upper(neg, sid, plan)
         plan.seen_replies = len(replies)
+
+    @staticmethod
+    def _hedge_turn(neg: Negotiation, body: str) -> Evidence | None:
+        """ "Covered at fixed prices until March 2027, so that fall does not reach our cost": true only for the months
+        before its cover ends. Our term runs on after it - say how many of its months the market reaches."""
+        m = HEDGE.search(body or "")
+        start = horizon_start(neg.case)
+        if not m or not start:
+            return None
+        try:
+            end = datetime.strptime(m.group(1).title(), "%B %Y").date()
+        except ValueError:
+            return None
+        months = int(round(12 * neg.buyer.get("horizon_years", 1)))
+        covered = max(0, min(months, (end.year - start.year) * 12 + end.month - start.month + 1))
+        after = months - covered
+        if after <= months // 2:
+            return None  # most of our term is inside its cover: its point stands
+        return Evidence(
+            kind="their_hedge",
+            refs=[],
+            sentence=f"Your cover runs until {m.group(1)}; our agreement runs {months} months from "
+            f"{start:%B %Y}, so {after} of them come after it - the material market reaches your costs for most "
+            "of the term.",
+            strength=3.0,
+        )
 
     def _read_breakdown(self, neg: Negotiation, sid: str, plan: Plan, reply: dict) -> None:
         """A cost breakdown XLSX: the supplier's own cost per unit is the floor it will not go below."""
