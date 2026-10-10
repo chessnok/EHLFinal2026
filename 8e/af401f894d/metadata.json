@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "8eaf401f894d",
+  "strategy": "manual-commit",
+  "branch": "feat/bot-mechanics-flags",
+  "checkpoints_count": 2,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/8e/af401f894d/0/metadata.json",
+      "transcript": "/8e/af401f894d/0/full.jsonl",
+      "content_hash": "/8e/af401f894d/0/content_hash.txt",
+      "prompt": "/8e/af401f894d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1330,
+    "cache_creation_tokens": 1413559,
+    "cache_read_tokens": 280916825,
+    "output_tokens": 578037,
+    "api_call_count": 664
+  }
+}
