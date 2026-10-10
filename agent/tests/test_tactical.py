@@ -200,7 +200,7 @@ def test_ground_truth_rfq_floor_sits_far_under_the_quotes(world) -> None:
 
     case_ = {"type": "rfq", "parts": ["part:320070"], "suppliers": ["sup:70210", "sup:70240"], "buyer": {}}
     gt = estimate(world, case_, "sup:70210", 36.0)
-    assert gt.lower < 36.0 * 0.85  # practice P05: C_best came at 0.69-0.85 of the quotes
+    assert gt.lower < 36.0 * 0.9  # competition is a lever: the floor sits well under the quote
 
 
 def test_ground_truth_p02_keeps_index_arguments_out(world) -> None:

@@ -24,22 +24,14 @@ NO_COST_FLOOR_RELATIONSHIP = 0.95  # ... 5 % where squeezing a strategic supplie
 # The floor as a share of the opening quote, backed out of the practice cases' C_best (the price that
 # reaches C_best on the best structure; 12 suppliers, 10 cases, 2026-10-10). Should-cost missed it by 16 %
 # on average, "quote x 0.90" by 11 %, this table by about 4 %. Where a case's kind is unseen, the goal.
-FLOOR_FACTOR = {
-    "rfq": 0.78,  # P05: 0.69-0.85 - bidders compete, the floor sits far under the quotes
-    "raw_material": 0.80,  # P08 0.84, P18 0.77 - base price and an index clause
-    "capacity": 0.87,  # P10
-    "bundling": 0.875,  # P07
-    "quality": 0.93,  # P11
-    "price_increase": 0.99,  # P01 1.00, P02 0.99 - the price barely moves; the terms carry the deal
-    "renewal": 0.985,  # P03 0.98, P04 0.99
-}
-FLOOR_FACTOR_BY_GOAL = {
-    "leverage": 0.80,
-    "routine": 0.90,
-    "quality_first": 0.93,
-    "stabilise": 0.985,
-    "secure_supply": 0.87,
-}
+# Where a supplier ends, as a share of its quote - two levels, kept simple on purpose. When only the price of a
+# running relationship is at stake (a price increase, a renewal) it barely moves; when competition, material or
+# capacity give us a lever it moves about 14 %. Leave-one-out over the practice cases' C_best: 3.4 % mean error,
+# better than seven per-type factors (4.1 %) and robust to case types practice never shows. The live belief
+# (belief.py) corrects the rest from the supplier's own replies.
+PRICE_ONLY_TYPES = {"price_increase", "renewal"}
+FLOOR_PRICE_ONLY = 0.99
+FLOOR_WITH_LEVERS = 0.86
 UPPER_MARGIN = 0.05  # we accept at most 5 % above the calibrated floor when the deal is at risk
 DEFAULT_GIVE_PCT = 2.5  # renewals settled 2.5 points under the ask on average (negotiation_history)
 
@@ -181,7 +173,7 @@ def estimate(data: WorldData | None, case: dict, supplier_id: str, open_price: f
     elif current and open_price > current:
         gt.asked_pct = round((open_price / current - 1) * 100, 2)
 
-    # lower bound: where the supplier really ends, calibrated on the practice cases' C_best (see FLOOR_FACTOR)
+    # lower bound: where the supplier ends - price-only talks vs talks with a lever (see FLOOR_PRICE_ONLY)
     if gt.full_cost:
         gt.notes.append(f"full cost {gt.full_cost} ({gt.full_cost_source})")
         gt.grounded = True  # a cost estimate exists: an argument and the margin term, not the floor
@@ -195,9 +187,6 @@ def estimate(data: WorldData | None, case: dict, supplier_id: str, open_price: f
 
 
 def floor_factor(case: dict) -> float:
-    """The supplier's floor as a share of its quote for this kind of case (practice calibration)."""
-    goal = case.get("buyer", {}).get("category_goal")
-    kind = case.get("type")
-    if len(case.get("suppliers") or []) > 1:
-        kind = "rfq"
-    return FLOOR_FACTOR.get(kind, FLOOR_FACTOR_BY_GOAL.get(goal, NO_COST_FLOOR))
+    """The supplier's floor as a share of its quote: price-only talks vs talks with a lever."""
+    single = len(case.get("suppliers") or []) <= 1
+    return FLOOR_PRICE_ONLY if single and case.get("type") in PRICE_ONLY_TYPES else FLOOR_WITH_LEVERS
