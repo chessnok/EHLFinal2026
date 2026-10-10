@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "toolu_01RSAqdsVvFeN82DNcEuH2be",
+  "agent_id": "a9d1a8bf273c8f0f3",
+  "subagent_type": "general-purpose",
+  "task_description": "Free scoring and term-menu investigation",
+  "files": [
+    "agent/docs/investigation-2026-10-10.md"
+  ],
+  "token_usage": {
+    "input_tokens": 74,
+    "cache_creation_tokens": 266008,
+    "cache_read_tokens": 6052040,
+    "output_tokens": 24946,
+    "api_call_count": 37
+  },
+  "started_at": "2026-10-10T23:32:31.126116464+03:00",
+  "completed_at": "2026-10-10T23:50:25.697036141+03:00"
+}

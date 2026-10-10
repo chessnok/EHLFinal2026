@@ -1,0 +1,42 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "3ea4ac9d4619",
+  "session_id": "a11516cb-b9ab-4f94-b7ba-983b5e97b58f",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-10T20:51:38.55646144Z",
+  "branch": "fix/relationship-charge",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "272c773d06fc",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 142,
+    "cache_creation_tokens": 237105,
+    "cache_read_tokens": 11214962,
+    "output_tokens": 85153,
+    "api_call_count": 70
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 1161,
+      "user_lines_removed": 13,
+      "agent_lines_added": 1111,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "agent/docs/investigation-2026-10-10.md": 491,
+        "agent/src/negotiator/strategy/baseline.py": 6,
+        "agent/src/negotiator/strategy/tactical.py": 28,
+        "conversations/2026-10-10-supplier-simulator.jsonl": 337,
+        "conversations/2026-10-10-supplier-simulator.md": 299
+      },
+      "user_removed_per_file": {
+        "agent/src/negotiator/strategy/baseline.py": 5,
+        "agent/src/negotiator/strategy/tactical.py": 8
+      }
+    }
+  ]
+}
