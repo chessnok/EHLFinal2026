@@ -417,3 +417,7 @@ Okey, now create a monorepo with completly separated infra of frontend(next, rea
 ---
 
 Добавь в gitignore данные от bmw
+
+---
+
+Сделай коммит, кстати какой нибудь нормальные правила по названию коммитов и тд, все эти правила пиши в .agents, напиши AGENTS.md и слинкуй его с CLAUDE.md
