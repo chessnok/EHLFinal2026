@@ -36,11 +36,11 @@ def accept_problems(neg, supplier_id: str, term_sheet_id: str | None) -> list[st
     t = neg.threads.get(supplier_id)
     if t is None:
         return ["unknown supplier"]
-    offers = dict(t.offers)
-    terms = offers.get(term_sheet_id) or {}
+    standing_id, terms = t.standing
     problems = []
-    if not term_sheet_id or term_sheet_id not in offers:
-        problems.append(f"{term_sheet_id} is not among the supplier's standing sheets {sorted(offers)}")
+    if not term_sheet_id or term_sheet_id != standing_id:
+        # the arena closes on the primary sheet whatever id we send (P10): only that one can be accepted
+        problems.append(f"{term_sheet_id} is not the standing offer {standing_id}")
     if not terms or terms.get("unit_price") is None:
         problems.append("the standing offer has no price")
         return problems

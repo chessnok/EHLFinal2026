@@ -84,7 +84,7 @@ ROOM_SIGNALS = re.compile(
 FIRM_SIGNALS = re.compile(
     r"cannot (?:reduce|lower|go) (?:the price )?(?:any )?further|all possible concessions"
     r"|no further (?:room|concession)|our (?:absolute )?limit|not able to move|this is our last"
-    r"|must (?:hold|maintain) our (?:current )?offer|does not allow us to reduce|unable to (?:reduce|improve)"
+    r"|must (?:\w+ )?(?:hold|maintain) our (?:current )?offer|does not allow us to reduce|unable to (?:reduce|improve)"
     r"|we maintain our (?:current )?offer",
     re.I,
 )
@@ -135,6 +135,7 @@ class Plan:
     proposed: dict = field(default_factory=dict)  # field -> values the supplier put on its own sheets
     text_price: float | None = None  # a lower price it wrote in the text but not on a sheet
     text_price_used: bool = False
+    alternatives_taken: set = field(default_factory=set)
     request_counts: dict = field(default_factory=dict)  # lever -> replies that asked for it
     reanchored: bool = False
     asked_breakdown: bool = False
@@ -341,25 +342,25 @@ class TacticalStrategy(BaselineStrategy):
         if their_c <= plan.lower_c or self._undercut_after_big_step(neg, supplier_id, plan, theirs):
             if reanchor := self._reanchor(neg, supplier_id, plan, theirs, their_c):
                 return reanchor
+        if alt := self._take_alternative(neg, supplier_id, plan):
+            return alt  # its cheapest sheet is an alternative: the arena closes on the primary one, so ask for it
         last_word = t.status == "final_offer" or (signals["firm"] and t.rounds_used > 0)
-        soft = signals["room"] and not signals["firm"]
-        if last_word and their_c <= plan.upper_c and not soft:
-            return Decision.hold(supplier_id, "last word inside our upper bound: take it", their_c=their_c)
+        if last_word:
+            # a last word is taken (the guards still check it): across ~65 pushes on final offers, 17 % ended in a
+            # walk-away for ~+0.05 on average - only an RFQ with a safe rival offer may push once, with a real step
+            if (
+                their_c > plan.upper_c
+                and not plan.probed_final
+                and self._may_probe(neg, supplier_id, their_c)
+                and self._may_push(neg, supplier_id)
+            ):
+                plan.probed_final = True
+                last = plan.our_c[-1] if plan.our_c else plan.target_c
+                ask_c = last + 0.5 * max(0.0, their_c - last)  # not capped: a crumb reads as a refusal (P18)
+                return self._offer(neg, supplier_id, plan, theirs, ask_c, their_c, probe=True)
+            return Decision.hold(supplier_id, "last word: take it", their_c=their_c)
         if match := self._price_match(neg, supplier_id, plan, theirs, their_c):
             return match
-        if last_word:
-            if their_c <= plan.upper_c and not (soft and not plan.probed_final and self._may_push(neg, supplier_id)):
-                return Decision.hold(supplier_id, "final offer within our upper bound", their_c=their_c)
-            if soft and not plan.probed_final and self._may_push(neg, supplier_id):
-                plan.probed_final = True  # its words ask for our step: answer it, once - and visibly
-                last = plan.our_c[-1] if plan.our_c else plan.target_c
-                ask_c = min(last + 0.5 * max(0.0, their_c - last), plan.upper_c)
-                return self._offer(neg, supplier_id, plan, theirs, ask_c, their_c, probe=True)
-            if plan.probed_final or not self._may_probe(neg, supplier_id, their_c):
-                return Decision.hold(supplier_id, "final offer above our upper bound", their_c=their_c)
-            plan.probed_final = True
-            ask_c = their_c - 0.35 * max(0.0, their_c - (plan.our_c[-1] if plan.our_c else plan.target_c))
-            return self._offer(neg, supplier_id, plan, theirs, ask_c, their_c, probe=True)
 
         if plan.stalls >= 2 and their_c <= plan.upper_c:
             return Decision.hold(supplier_id, "stalled inside our upper bound: take it", their_c=their_c)
@@ -497,11 +498,7 @@ class TacticalStrategy(BaselineStrategy):
         for other, ot in neg.threads.items():
             if other != sid and ot.live and ot.standing[0] and not accept_problems(neg, other, ot.standing[0]):
                 return True  # a rival offer we could take instead
-        if math.isfinite(neg.c_alt) and neg.c_alt <= their_c * 1.01:
-            return True
-        # above our upper bound alone is no reason to risk the deal: the practice calibration showed the
-        # upper bound below the real C_best in P01 and P04 - push only on a rival, a cheap alternative or room
-        return reply_signals(t.latest.get("body", ""))["room"]
+        return False  # room words alone are no reason: "bridge the remaining gap" (P18) ended in a walk-away
 
     # ------------------------------------------------------------------ the offer
     def _undercut_after_big_step(self, neg: Negotiation, sid: str, plan: Plan, theirs: dict) -> bool:
@@ -514,10 +511,61 @@ class TacticalStrategy(BaselineStrategy):
         step = (prices[-2] - prices[-1]) / prices[-2]
         return theirs["unit_price"] <= ours[-1] * 1.005 and step >= BIG_STEP
 
+    def _take_alternative(self, neg: Negotiation, sid: str, plan: Plan) -> Decision | None:
+        """Its alternative sheet costs us less than its primary one: say yes to the alternative as our offer.
+
+        The arena closes an accept on the supplier's primary sheet whatever id we send (P10: we accepted the
+        EUR 31.90 alternative and were booked at 33.80) - so the alternative has to come back as our term
+        sheet; the supplier then agrees and we close on it. 54 % of all alternatives were cheaper for us."""
+        t = neg.threads[sid]
+        primary_id, primary = t.standing
+        best_id, best = neg.best_offer(sid)
+        if not best_id or best_id == primary_id or best_id in plan.alternatives_taken or not self._may_push(neg, sid):
+            return None
+        best_c = neg.cost(sid, best)
+        if best_c >= neg.cost(sid, primary) * (1 - 0.002):
+            return None
+        # only when we would close anyway - in round 1 its alternative is an opening, not a deal (P18 dry run)
+        closing = (
+            t.status == "final_offer"
+            or reply_signals(t.latest.get("body", ""))["firm"]
+            or plan.stalls >= 1
+            or best_c <= plan.upper_c
+            or self._round_budget(neg, sid) - t.rounds_used <= 2
+        )
+        if not closing:
+            return None
+        std = t.standard_terms
+        sheet = complete_offer(
+            neg.case, {**{k: v for k, v in std.items() if k in neg.case["negotiable"]}, **primary, **best}
+        )
+        if not neg.keeps_must_haves(sid, sheet) or neg.cost(sid, sheet) >= neg.c_alt:
+            return None
+        plan.alternatives_taken.add(best_id)
+        plan.our_c.append(neg.cost(sid, sheet))
+        plan.last_keys = self._keys([{"terms": sheet}])
+        body = "\n".join(
+            [
+                f"Dear {plan.name} team,",
+                "",
+                "thank you. We accept your alternative as stated below and are ready to place the order on it.",
+                "",
+                f"Our proposal: {describe(neg.case, sheet)}",
+                "",
+                SIGNATURE,
+            ]
+        )
+        return Decision(
+            "message",
+            sid,
+            message={"subject": neg.case.get("title", "Your quote"), "body": body, "term_sheets": [{"terms": sheet}]},
+            rationale={"move": "take its alternative", "alternative": best_id, "c": neg.cost(sid, sheet)},
+        )
+
     def _take_agreed(self, neg: Negotiation, sid: str) -> Decision | None:
         """It agreed to our terms: if no other live thread offers less, close now - holding it while others
         talk cost P05 two timeouts and nearly the deal."""
-        offer_id, terms = neg.best_offer(sid)
+        offer_id, terms = neg.threads[sid].standing
         if not offer_id or accept_problems(neg, sid, offer_id):
             return None
         c = neg.cost(sid, terms)
@@ -690,8 +738,8 @@ class TacticalStrategy(BaselineStrategy):
 
     def _sheets(self, neg, sid, plan, theirs, ask_c, their_c) -> list[dict]:
         """Up to three packages from the full menu, all costing us `ask_c`:
-        A  the structure the supplier takes most readily (its requests answered, closest to its own);
-        B  the structure that costs us least - at equal C it leaves the supplier the highest price;
+        A  the structure that costs us least - at equal C it leaves the supplier the highest price;
+        B  the structure the supplier takes most readily (its requests answered, closest to its own);
         C  the next most acceptable structure of a different kind (another clause, term or payment)."""
         case = neg.case
         menu = priced_menu(case, theirs, lambda terms: self._iso_cost_price(neg, sid, terms, ask_c))
@@ -859,6 +907,9 @@ class TacticalStrategy(BaselineStrategy):
         forecast we share with suppliers, by ID, so it reads as documentation and not as a claim."""
         if "volume_per_year" not in plan.requests or plan.volume_proved or not self.data:
             return None
+        if any(r.startswith("fc:") for r in self.used_refs):
+            plan.volume_proved = True  # a duplicate earns nothing ("we have already taken that data into account")
+            return None
         parts = neg.case.get("parts") or []
         if len(parts) != 1:
             return None
@@ -871,6 +922,7 @@ class TacticalStrategy(BaselineStrategy):
         if change is None or change < 0:
             return None  # a falling forecast is no argument for a better price
         plan.volume_proved = True
+        self.used_refs.add(ids[-1])
         commit = f" and we commit to {volume:,} units a year" if volume else ""
         return (
             f"Our demand forecast for this part, shared with you, rose {change:+.1f}% ({ids[-1]}){commit}.",
@@ -923,7 +975,7 @@ class TacticalStrategy(BaselineStrategy):
         for sid, t in neg.threads.items():
             if t.closed or t.status in ("walked_away", "no_bid"):
                 continue
-            for sheet_id, terms in t.offers:  # its alternatives too: the cheapest for us may not be its first
+            for sheet_id, terms in [t.standing]:  # the arena closes on the primary sheet whatever id we send
                 if problems := accept_problems(neg, sid, sheet_id):
                     rejected[f"{sid} {sheet_id}"] = problems
                     continue
