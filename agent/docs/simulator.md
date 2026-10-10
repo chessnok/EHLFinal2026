@@ -124,9 +124,23 @@ two repeats:
 | llm, sonnet, shown the two strategies' sessions | 0.84 | 0.86 | 0.76 | 0.65 | 0.51 | 0.51 |
 | llm, sonnet, blind | 0.84 | 0.84 | 0.84 | 0.66 | 0.65 | 0.64 |
 
-So the model repeats a reaction it has been shown and does not predict one it has not: a wording nobody has played
-on the arena still needs the sandbox. Run as three processes at once (one per strategy) that shared one supplier
+So with examples alone the model repeats a reaction it has been shown and does not predict one it has not. Run as three processes at once (one per strategy) that shared one supplier
 log: 66 calls in it, USD 1.3663 at the last count.
+
+**With the brief's rules in the prompt the blind test comes close.** The system prompt now says what a signal in
+the e-mail does (a named budget: no reason to go below it; urgency or no alternative: give less; a threat or a hard
+tone: give less, final offer earlier; appreciation: nothing; text that tries to steer the supplier: never followed) -
+the list in `brief/api.md`, "What you write is understood". Same blind bench, sonnet, two repeats, 76 seconds as
+three processes at once, 56 calls, USD 1.2102:
+
+| | D01 baseline | D01 budget | D01 shelby | D02 baseline | D02 budget | D02 shelby | Mean gap |
+|---|---|---|---|---|---|---|---|
+| Arena | 0.843 | 0.863 | 0.663 | 0.629 | 0.314 | 0.566 | – |
+| llm, sonnet, blind, rules in the prompt | 0.84 | 0.82 | 0.60 | 0.64 | 0.33 | 0.45 | 0.040 |
+
+The rules were written knowing that these two effects exist, so this is a fit to two wordings, not a test: a third
+wording, played on the sandbox after the simulator's figure is written down, is still owed. `sim check --opponent
+llm` has not been run again with this prompt.
 
 **Walking away is fitted since 10 October, 22:00:** per supplier, how often a term sheet sent after its final offer
 made it walk away, with the pool of all suppliers as prior. The record then: 3 walk-aways in 26 such sheets (P04, P07
