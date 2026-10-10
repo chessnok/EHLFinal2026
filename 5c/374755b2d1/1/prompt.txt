@@ -1,0 +1,9 @@
+drop dublicating. run on sonnet or haiky and gimme most common (all) rejections.
+
+---
+
+lets do some quick setting in config or somewhere where we tell what we use like key from .env or key from claude. explain how you spent four cents and whether this is a good option. am i understading right that i have 100$ subscription and this 4c is just and equivalent of tokens i burned to do this task.
+
+---
+
+come on
