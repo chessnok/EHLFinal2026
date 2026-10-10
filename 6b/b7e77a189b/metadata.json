@@ -3,8 +3,14 @@
   "checkpoint_id": "6bb7e77a189b",
   "strategy": "manual-commit",
   "branch": "fix/timeout-moves",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/README.md",
+    "agent/src/negotiator/runner.py",
+    "agent/src/negotiator/session.py",
+    "agent/tests/fake_arena.py",
+    "agent/tests/test_timeouts.py"
+  ],
   "sessions": [
     {
       "metadata": "/6b/b7e77a189b/0/metadata.json",
@@ -12,13 +18,20 @@
       "compact_transcript": "/6b/b7e77a189b/0/transcript.jsonl",
       "content_hash": "/6b/b7e77a189b/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/6b/b7e77a189b/1/metadata.json",
+      "transcript": "/6b/b7e77a189b/1/full.jsonl",
+      "compact_transcript": "/6b/b7e77a189b/1/transcript.jsonl",
+      "content_hash": "/6b/b7e77a189b/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 278,
-    "cache_creation_tokens": 371774,
-    "cache_read_tokens": 32509582,
-    "output_tokens": 155895,
-    "api_call_count": 135
+    "input_tokens": 286,
+    "cache_creation_tokens": 383632,
+    "cache_read_tokens": 33292638,
+    "output_tokens": 161704,
+    "api_call_count": 139
   }
 }
