@@ -1,0 +1,171 @@
+Погоди, пока не пиши, ждем пока скачается модель, я запущу jev и там уже будем смотреть чего как
+
+---
+
+Сделай таблицу - все текущий алгоритмы, их логика с описанием, скором, прогонами и тд
+
+---
+
+Да
+
+---
+
+Результаты: локальный симулятор (скриптовый поставщик) тут вообще нахуя метрика, это же ну, бред, очевидно так не работает
+
+---
+
+Это считай просто e2e тесты
+
+---
+
+Обнови, да, только переведи все что на русском на англ перед этим
+
+---
+
+как там модель, докачалась?
+
+---
+
+Send me the report in a short form like
+
+---
+
+Send me the report in a short form like idea: .... \n result: ... or "in progress"
+
+---
+
+Мы пытаемся сделать цены выше или ниже
+
+---
+
+модель докачалась?
+
+---
+
+Какие параметры есть у сделок и какая формула? Она всегда одинаковая?
+
+---
+
+Сохрани это в файл все
+
+---
+
+Нене, на русском пока
+
+---
+
+И на английском тоже напиши
+
+---
+
+Сделай следующую вариацию: несколько предложений от нас разной степени агрессивности, и OPENAI Decicion API выбирает между ними. Я сейчас добавлю в .env апи ключик
+
+---
+
+<task-notification>
+<task-id>b6al2feha</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/b6al2feha.output</output-file>
+<status>completed</status>
+<summary>Background command "Pull qwen3 30b-a3b in background" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+Нет, это Public Preview https://developers.openai.com/api/docs/guides/decisions
+
+---
+
+Добавь там телементрию, что бы понимать какие confidence и тд, можно через доп поля например и тд. Провайдер - openai
+
+---
+
+Добавь там телементрию, что бы понимать какие confidence и тд, можно через доп поля например и тд. Провайдер llm - openai тоже, с какой нибудь нормальной моделью, по типу sol
+
+---
+
+<task-notification>
+<task-id>bf4ebv9vt</task-id>
+<tool-use-id>toolu_01354BPuV4ouU3WqhCaxhkZH</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/bf4ebv9vt.output</output-file>
+<status>completed</status>
+<summary>Background command "Run decided strategy on sandbox" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+А там же кстати моделька скачалась, да?
+
+---
+
+<task-notification>
+<task-id>bdj4twfud</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/bdj4twfud.output</output-file>
+<status>completed</status>
+<summary>Background command "Run decided and llm-sol on sandbox" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bml4h8fr5</task-id>
+<tool-use-id>toolu_01PGbP4cGycobWE6z7JsBX8X</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/bml4h8fr5.output</output-file>
+<status>completed</status>
+<summary>Background command "Rerun decided to verify extra signals" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+Давай поднимем агрессивновность всех вариантов тогда, прям сильно, что бы Decisions API выбирал разное
+
+---
+
+Давай еще в decion api докидывать параметр того, сколько нам принесет такая сделка по скору, ну т.е. сколько это в деньгах(надо объяснить что меньше лучше и тд)
+
+---
+
+Так там же не только цена supplier, а по формуле, мы же разбирались, всякие там покрытие оставки и тд
+
+---
+
+<task-notification>
+<task-id>bxdrxeuyp</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/bxdrxeuyp.output</output-file>
+<status>completed</status>
+<summary>Background command "Run decided with aggressive levels on sandbox" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>biq0h22ea</task-id>
+<tool-use-id>toolu_016UohayoZN7vhfuJC155Qq2</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/biq0h22ea.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait for run, then show results" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+А еще добавь в agents.md жесткое правило всегда перед прогоном который тратит квоту - жестко подтверждать с человеком, предупредив и указав текущий остаток
+
+---
+
+<task-notification>
+<task-id>b3o5mrslz</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/b3o5mrslz.output</output-file>
+<status>completed</status>
+<summary>Background command "Run decided with money framing on sandbox" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+Нет, у нас потратилось 40 попыток уже
+
+---
+
+Запуль изменения, там прислали трейсы запросов с прода что бы понять какие где проблемы, проанализируй где какие траблы(на тех местах где плохие скоры и как там улучшать) а также сделай со всеми результатами коммит

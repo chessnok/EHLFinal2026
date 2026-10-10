@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "055378c4d749",
+  "session_id": "16e44bb6-93ff-43e6-bb57-47d067f3ad74",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-10T15:21:22.495414Z",
+  "branch": "main",
+  "checkpoints_count": 21,
+  "save_step_count": 1,
+  "files_touched": [
+    "agent/README.md",
+    "agent/src/negotiator/llm.py"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "3cfe35b3c8c8",
+  "token_usage": {
+    "input_tokens": 742,
+    "cache_creation_tokens": 798330,
+    "cache_read_tokens": 184320806,
+    "output_tokens": 333930,
+    "api_call_count": 373
+  },
+  "session_metrics": {
+    "turn_count": 38
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-10T15:21:22.4065Z",
+    "agent_lines": 11,
+    "agent_removed": 8,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 11,
+    "total_lines_changed": 19,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
