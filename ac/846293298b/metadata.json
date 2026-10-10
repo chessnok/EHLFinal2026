@@ -3,8 +3,11 @@
   "checkpoint_id": "ac846293298b",
   "strategy": "manual-commit",
   "branch": "feat/tactic-experiments",
-  "checkpoints_count": 3,
-  "files_touched": null,
+  "checkpoints_count": 4,
+  "files_touched": [
+    ".env.example",
+    "README.md"
+  ],
   "sessions": [
     {
       "metadata": "/ac/846293298b/0/metadata.json",
@@ -12,6 +15,13 @@
       "compact_transcript": "/ac/846293298b/0/transcript.jsonl",
       "content_hash": "/ac/846293298b/0/content_hash.txt",
       "prompt": "/ac/846293298b/0/prompt.txt"
+    },
+    {
+      "metadata": "/ac/846293298b/1/metadata.json",
+      "transcript": "/ac/846293298b/1/full.jsonl",
+      "compact_transcript": "/ac/846293298b/1/transcript.jsonl",
+      "content_hash": "/ac/846293298b/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
