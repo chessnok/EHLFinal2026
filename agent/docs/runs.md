@@ -31,14 +31,16 @@ suppliers, leverage).
 | P-7 | 15:07 | *likely* `cfad9d9` | `tactical` | P02, P08 | *likely* DavidtheRavinger | retry | P02 0.156, P08 0.000 (no deal) | – |
 | P-8 | 15:10 | *likely* `cfad9d9` | `tactical` | P02, P08, P18 | *likely* DavidtheRavinger | retry after calibration | P02 0.156, P08 0.538, P18 0.319 | best P08 (index clause with 5 % deadband) and best P18 so far |
 | P-9 | 16:03 | *likely* `cfad9d9` or later | `tactical` (P11, P10, P05, P18), `llm` (P02) | P02, P05, P10, P11, P18 | *likely* DavidtheRavinger / Vector | pass over the weak cases | P02 0.293 (llm), P05 0.712, P10 0.562, P11 0.147, P18 0.252 | new team bests on P05, P10 (tactical) and P02 (llm); tactical weak on P11 |
+| P-10 | 16:36 | *likely* `243b294` (tactical unchanged on `feat/tactic-experiments`) | `tactical` | P02, P11, P18 | *likely* Vector | tactical after the teammate's menu, ground-truth and counter-step changes | P02 0.366, P11 0.441, P18 0.467 | new bests on P11 and P18 (index clause, final offer accepted) |
+| P-11 | 16:51 | *likely* `243b294` | `tactical` | all 10 hosted cases | *likely* Vector | full tactical pass | P01 0.856, P02 0.686, P03 0.903, P04 0.860, P05 0.824, P07 0.702, P08 0.603, P10 0.555, P11 0.545, P18 0.000 (walked away) · mean 0.653 | best full pass so far; P18 walked after a 2-cent push on a final offer that said "bridge the remaining gap"; options B/C repeated unchanged; P02 varies (0.366 vs 0.686 on the same code) |
 
-**Team best per case** (what the practice board counts), as of P-9:
+**Team best per case** (what the practice board counts), as of P-11:
 
 | P01 | P02 | P03 | P04 | P05 | P07 | P08 | P10 | P11 | P18 | Mean ×100 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0.858 (llm) | 0.293 (llm) | 0.762 (llm) | 0.860 (llm) | 0.712 (tactical) | 0.695 (llm) | 0.538 (tactical) | 0.562 (tactical) | 0.398 (llm) | 0.319 (tactical) | 59.97 |
+| 0.858 (llm) | 0.686 (tactical) | 0.903 (tactical) | 0.860 | 0.824 (tactical) | 0.702 (tactical) | 0.603 (tactical) | 0.562 (tactical) | 0.545 (tactical) | 0.467 (tactical) | 70.10 |
 
-Quota after P-9: 47 of 200 used, 153 left, resetting 2026-10-11 12:47 UTC.
+Quota after P-11: 60 used of a limit raised to 650, resetting 2026-10-11 12:47 UTC.
 
 ## Sandbox runs (free)
 
@@ -56,4 +58,5 @@ Quota after P-9: 47 of 200 used, 153 left, resetting 2026-10-11 12:47 UTC.
 | S-10 | 15:01 | uncommitted → `ea0cd5c` | `decided` | + extra questions (near_floor, walk_risk, firmness) | Mikhail Fadin | telemetry check | 0.773 / 0.564 · 0.668 | the model reads suppliers as far from their floor (near_floor ≈ 0.2) |
 | S-11 | 15:08 | uncommitted → `ea0cd5c` | `decided` | levels firm / hard / very_hard | Mikhail Fadin | stronger, always distinct levels | 0.740 / 0.553 · 0.646 | the API now picks different levels (firm 6, hard 3) |
 | S-12 | 15:12 | uncommitted → `ea0cd5c` | `decided` | + C and its parts per candidate | Mikhail Fadin | money framing | 0.756 / 0.553 · 0.655 | with money shown, the model always picks the softest level |
-| S-13 | 16:10 | uncommitted (not yet pushed) | `llm` v3 (practice feedback in the prompts) | `--llm claude-code:haiku` | Mikhail Fadin | sandbox check before practice | 0.763 / not played (429: 10 open sessions on the team key) | coordinate runs: the key allows 10 open sessions for the whole team |
+| S-13 | 16:10 | uncommitted → `653398b` | `llm` v3 (practice feedback in the prompts) | `--llm claude-code:haiku` | Mikhail Fadin | sandbox check before practice | 0.763 / not played (429: 10 open sessions on the team key) | coordinate runs: the key allows 10 open sessions for the whole team |
+| S-14 | 19:11 | uncommitted → this commit | `llm` v3 on tactical mechanics | `--llm claude-code:opus` | Mikhail Fadin | llm now inherits tactical (ground truth, full equal-C menu, counter-steps, best sheet, written price, guarded close); no probe of a last word inside the upper bound; every option moves each round | **0.969** / 0.615 · 0.792 | D01 best ever (tactical 0.909); 15 model calls, 0 fallbacks, cost $0.502 (measured) |
