@@ -58,6 +58,11 @@ class Metrics:
         with self._lock:
             self.timings[name].append(seconds)
 
+    def mean(self, name: str) -> float | None:
+        with self._lock:
+            values = self.timings.get(name) or []
+            return sum(values) / len(values) if values else None
+
     @contextmanager
     def timer(self, name: str):
         start = time.perf_counter()

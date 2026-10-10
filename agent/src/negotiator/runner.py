@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from negotiator.client import ArenaClient, ArenaError
 from negotiator.data import WorldData
-from negotiator.session import Negotiation
+from negotiator.session import GuardRefused, Negotiation
 from negotiator.strategy.base import Decision, Strategy
 from negotiator.telemetry import Recorder, log
 
@@ -126,7 +126,11 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
 def _apply(neg: Negotiation, decision: Decision) -> None:
     if decision.kind == "accept":
         log.info("%s: accept %s %s", neg.case_id, decision.supplier_id, decision.term_sheet_id)
-        neg.accept(decision.supplier_id, decision.term_sheet_id, decision.rationale)
+        try:
+            neg.accept(decision.supplier_id, decision.term_sheet_id, decision.rationale)
+        except GuardRefused as e:  # never close on a sheet that scores 0: the alternative is safer
+            log.error("%s: accept refused (%s) - walking away", neg.case_id, e)
+            neg.walk_away(decision.supplier_id, {**decision.rationale, "why": f"accept refused: {e}"})
     else:
         log.info("%s: walk away (%s)", neg.case_id, decision.rationale.get("why"))
         neg.walk_away(decision.supplier_id, decision.rationale)

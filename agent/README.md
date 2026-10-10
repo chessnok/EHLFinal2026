@@ -26,10 +26,11 @@ uv run negotiator me
 | `negotiator attachment <sid> <attachment_id> -o FILE` | a supplier document |
 | `negotiator board` | leaderboard (for people; refused in final mode) |
 | `negotiator data` | download package v1 and the Sunday release into `agent/data/` |
-| `negotiator play <case_id> [--strategy baseline]` | play one case, with telemetry and a report |
+| `negotiator play <case_id> [--strategy tactical\|baseline]` | play one case, with telemetry and a report |
 | `negotiator run --set sandbox\|practice [--cases …] [--parallel N]` | many cases in parallel (default: every hosted case of the set) |
 | `negotiator final [--parallel 10]` | the Live Final: waits for each wave, plays its cases within the cap |
 | `negotiator report [run_id\|latest]` · `stats` | rebuild a run's report · best/mean score per case across all runs |
+| `negotiator lessons [run_id\|latest]` | per case, worst first: score, cost blocks, the supplier's reasons per round, argument checks (also written as `lessons.md` after every run) |
 
 Global options: `--url` (e.g. a local `arena-sim`), `--key`, `--json`, `-v`.
 
@@ -61,6 +62,9 @@ config.py      settings from env / .env (ARENA_API_KEY, ARENA_URL, NEGOTIATOR_FI
 client.py      every endpoint; paced < 10 calls/s; safe retries with X-Move-Id; final-mode guard
 telemetry.py   Recorder: events, HTTP log, metrics, transcripts, logging
 data.py        data package in SQLite + facts.json; checkable Evidence (index moves, scorecard, notice, …)
+profile.py     supplier traits from notes, letters, news, history (cash-short, approval ladder, hedged, …)
+guards.py      hard rules before every send and accept: must-haves, alternative, valid sheets and IDs
+lessons.py     lessons.md: what each case taught
 session.py     Negotiation: threads, documents, costs (kit's C), send/accept/walk away, transcript
 strategy/      Strategy protocol (prepare, decide, conclude, keepalive) and the baseline
 runner.py      play_case (one worker per thread, keepalive, deadline), play_many, play_final
@@ -70,6 +74,17 @@ cli.py         the `negotiator` command
 
 A strategy only decides; `Negotiation` performs and records. To add one, implement `prepare / decide / conclude /
 keepalive` (see `strategy/base.py`) and register it in `strategy/__init__.py`.
+
+**Tactical (default):** the category goal sets the policy (anchor depth, Boulware beta, reciprocity, which
+levers to trade); the supplier's profile adjusts it. Concessions are counted in C: Boulware over the rounds the
+round limit and the clock leave, capped tit-for-tat by the supplier's last move (no move from it, no move from us;
+a half step after two stalls; the third settles the thread). Each round sends up to three sheets of equal C: our
+C-optimal terms, a trade the supplier values (early payment for the cash-short, a long commitment for those who want
+volume), a pure price move. Arguments are chosen by profile; irrelevant or contradicted kinds are dropped. A final
+offer is probed once only when walking would cost little. The guards (`guards.py`) refuse any accept that breaks a
+must-have (read on the quote PDF's standard terms; unknown counts as broken) or loses to the alternative. The tactics
+are inspired by ASTRA (Kwon et al., [DSincerity/ASTRA-NegoAgent](https://github.com/DSincerity/ASTRA-NegoAgent)):
+opponent modelling, an optimiser over the cost function, offers of equal value, tit-for-tat - no code taken.
 
 **Baseline:** a target price from the lower of opening and current price minus an anchor per category goal
 (floored at should-cost, plus the sustainable margin where squeezing the supplier costs C); up to three

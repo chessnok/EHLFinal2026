@@ -2,10 +2,11 @@
 
   negotiator me | health | cases | case <id> | sessions | session <sid> | thread <sid> <supplier>
   negotiator backoffice <sid> | attachment <sid> <attachment_id> -o FILE | board | data
-  negotiator play <case_id> [--strategy baseline]       one case, full telemetry, report at the end
+  negotiator play <case_id> [--strategy tactical]       one case, full telemetry, report at the end
   negotiator run --set practice|sandbox [--cases ...]    many cases in parallel
   negotiator final                                       the Live Final (NEGOTIATOR_FINAL=1)
   negotiator report [run_id|latest] | stats              reports and statistics across runs
+  negotiator lessons [run_id|latest]                     what each case taught: scores, costs, supplier reasons
 Global: --url (e.g. http://127.0.0.1:8000 for arena-sim), --key, --json.
 """
 
@@ -23,6 +24,7 @@ from rich.table import Table
 from negotiator.client import ArenaClient, ArenaError
 from negotiator.config import Settings
 from negotiator.data import WorldData
+from negotiator.lessons import write_lessons
 from negotiator.report import history, write_report
 from negotiator.runner import play_case, play_final, play_many
 from negotiator.strategy import STRATEGIES
@@ -64,6 +66,7 @@ def _strategy_factory(name: str, data: WorldData | None):
 def _finish(recorder: Recorder, outcomes: list[dict]) -> None:
     recorder.close()
     summary = write_report(recorder.dir, outcomes)
+    write_lessons(recorder.dir)
     table = Table(title=f"run {recorder.run_id}")
     for col in ("case", "deal", "score", "C_open", "C_deal", "C_best", "rounds", "end", "replay"):
         table.add_column(col)
@@ -239,6 +242,14 @@ def cmd_report(args, settings: Settings) -> None:
         _print(args, summary)
 
 
+def cmd_lessons(args, settings: Settings) -> None:
+    runs = sorted(p for p in settings.runs_dir.iterdir() if p.is_dir()) if settings.runs_dir.is_dir() else []
+    if not runs:
+        raise SystemExit("no runs yet")
+    run = runs[-1] if args.run in (None, "latest") else settings.runs_dir / args.run
+    console.print(write_lessons(run).read_text(encoding="utf-8"))
+
+
 def cmd_stats(args, settings: Settings) -> None:
     stats = history(settings.runs_dir)
     table = Table(title="all runs")
@@ -317,18 +328,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("play", cmd_play, "play one case with telemetry and a report", needs_client=False)
     p.add_argument("case_id")
-    p.add_argument("--strategy", default="baseline", choices=list(STRATEGIES))
+    p.add_argument("--strategy", default="tactical", choices=list(STRATEGIES))
     p = add("run", cmd_run, "play many cases in parallel", needs_client=False)
     p.add_argument("--set", default="sandbox", choices=["practice", "sandbox"])
     p.add_argument("--cases", nargs="*", help="case ids (default: every hosted case of the set)")
-    p.add_argument("--strategy", default="baseline", choices=list(STRATEGIES))
+    p.add_argument("--strategy", default="tactical", choices=list(STRATEGIES))
     p.add_argument("--parallel", type=int, default=4)
     p = add("final", cmd_final, "the Live Final: waves, in parallel", needs_client=False)
-    p.add_argument("--strategy", default="baseline", choices=list(STRATEGIES))
+    p.add_argument("--strategy", default="tactical", choices=list(STRATEGIES))
     p.add_argument("--parallel", type=int, default=10)
     add("report", cmd_report, "rebuild and show a run's report", needs_client=False).add_argument(
         "run", nargs="?", default="latest"
     )
+    add(
+        "lessons", cmd_lessons, "per case: score, cost blocks, the supplier's reasons", needs_client=False
+    ).add_argument("run", nargs="?", default="latest")
     add("stats", cmd_stats, "scores across all runs", needs_client=False)
     return ap
 

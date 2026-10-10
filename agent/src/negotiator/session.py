@@ -16,10 +16,15 @@ from arena_kit.docs import quote_terms, read_document
 
 from negotiator.client import ArenaClient, ArenaError
 from negotiator.data import WorldData
+from negotiator.guards import accept_problems, clean_message
 from negotiator.telemetry import Recorder, log, safe_name, utc_now
 
 ENDED_STATUSES = {"walked_away", "no_bid"}
 MOVE_LIMIT_S = 60.0
+
+
+class GuardRefused(Exception):
+    """A move the hard rules (guards.py) refuse: it would break a must-have or lose to the alternative."""
 
 
 @dataclass
@@ -250,6 +255,11 @@ class Negotiation:
     def send(self, supplier_id: str, message: dict, rationale: dict | None = None) -> dict | None:
         """Send one e-mail; returns the supplier's reply (None if the case ended meanwhile)."""
         t = self.threads[supplier_id]
+        message, removed = clean_message(self, supplier_id, message)
+        if removed:
+            self.recorder.metrics.incr("guards.removed", len(removed))
+            self.recorder.event("guard_cleaned", session_id=self.session_id, supplier_id=supplier_id, removed=removed)
+            log.warning("%s: guard removed %s", supplier_id, removed)
         waited = t.seconds_since_reply()
         if waited > MOVE_LIMIT_S * 0.8:
             log.warning("%s: answering %.0fs after its reply (limit %.0fs)", supplier_id, waited, MOVE_LIMIT_S)
@@ -359,6 +369,10 @@ class Negotiation:
             self.recorder.metrics.incr("moves.timeouts")
 
     def accept(self, supplier_id: str, term_sheet_id: str, rationale: dict | None = None) -> dict:
+        if problems := accept_problems(self, supplier_id, term_sheet_id):
+            self.recorder.metrics.incr("guards.accept_refused")
+            self.recorder.event("guard_refused", session_id=self.session_id, supplier_id=supplier_id, problems=problems)
+            raise GuardRefused(f"{supplier_id} {term_sheet_id}: {'; '.join(problems)}")
         terms = self.threads[supplier_id].standing[1]
         self._decision(
             "accept",
