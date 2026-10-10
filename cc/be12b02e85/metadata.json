@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "ccbe12b02e85",
+  "strategy": "manual-commit",
+  "branch": "feat/tactic-experiments",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "AGENTS.md",
+    "agent/.gitignore",
+    "agent/README.md",
+    "agent/src/negotiator/cli.py",
+    "agent/src/negotiator/sim/cli.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cc/be12b02e85/0/metadata.json",
+      "transcript": "/cc/be12b02e85/0/full.jsonl",
+      "compact_transcript": "/cc/be12b02e85/0/transcript.jsonl",
+      "content_hash": "/cc/be12b02e85/0/content_hash.txt",
+      "prompt": "/cc/be12b02e85/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 130,
+    "cache_creation_tokens": 135164,
+    "cache_read_tokens": 6699795,
+    "output_tokens": 44530,
+    "api_call_count": 54
+  }
+}
