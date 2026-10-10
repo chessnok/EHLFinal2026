@@ -3,7 +3,7 @@
   "checkpoint_id": "5041f7ae7068",
   "strategy": "manual-commit",
   "branch": "feat/tactic-experiments",
-  "checkpoints_count": 3,
+  "checkpoints_count": 4,
   "files_touched": [
     "AGENTS.md"
   ],
@@ -14,6 +14,13 @@
       "compact_transcript": "/50/41f7ae7068/0/transcript.jsonl",
       "content_hash": "/50/41f7ae7068/0/content_hash.txt",
       "prompt": "/50/41f7ae7068/0/prompt.txt"
+    },
+    {
+      "metadata": "/50/41f7ae7068/1/metadata.json",
+      "transcript": "/50/41f7ae7068/1/full.jsonl",
+      "compact_transcript": "/50/41f7ae7068/1/transcript.jsonl",
+      "content_hash": "/50/41f7ae7068/1/content_hash.txt",
+      "prompt": "/50/41f7ae7068/1/prompt.txt"
     }
   ],
   "token_usage": {
