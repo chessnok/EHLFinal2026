@@ -16,6 +16,9 @@ an open question in every later e-mail, a warmer opener, terms optimised at the 
 single sheet instead of a menu, a deeper opening with halving steps, and citing case IDs without a figure.
 
 Everything else - arguments, concession schedule, reciprocity, holding and closing - is the baseline's.
+
+An experiment, not a strategy for the final: on the 10 practice cases the closing offer made three suppliers walk
+away (0.376 against tactical's 0.695, same record).
 """
 
 import math

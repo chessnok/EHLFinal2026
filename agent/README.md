@@ -149,7 +149,8 @@ beats the alternative.
 **Playbook** (`strategy/playbook.py`): the baseline plus the rules of
 [`docs/knowledge/get-best-price-guide.md`](docs/knowledge/get-best-price-guide.md) that held up on the sandbox - a deeper
 anchor, a cash sheet that pays sooner than the supplier's own term, one open question in the first e-mail, and one
-closing offer after a final offer (`playbook-noprobe` leaves the closing offer out: a pushed supplier may walk away).
+closing offer after a final offer (`playbook-noprobe` leaves the closing offer out). An experiment: the closing offer
+gained on the sandbox and made three of ten practice suppliers walk away.
 
 **Experiments** (`strategy/experiments.py`): the baseline with exactly one tactic changed each - `lowball` (a deeper
 anchor), `questions` (three questions per e-mail), `polite` / `shelby` (tone), `budget` (a ceiling "set by

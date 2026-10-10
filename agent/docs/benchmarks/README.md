@@ -20,8 +20,8 @@ repository's `AGENTS.md`. This page is the overview; the records hold the runs, 
 
 Scores are means over one to four plays of each case. Cost of all runs: 0 practice sessions, 0 LLM tokens.
 
-- **One tactic clearly helps:** a closing offer after the supplier's final offer (`playbook`). Its risk, a supplier
-  walking away, did not show on the sandbox and is not measured; see the record.
+- **One tactic helps on the sandbox and loses on practice:** a closing offer after the supplier's final offer
+  (`playbook`). No demo supplier walked away from it; three of ten practice suppliers did (see below).
 - **Two tactics clearly hurt:** naming a budget ceiling (the supplier aims at it) and the hard tone (the family
   foundry closes a round earlier, at a dearer price).
 - **One helps a little:** the deeper anchor. Neither bot punished it.
@@ -29,3 +29,13 @@ Scores are means over one to four plays of each case. Cost of all runs: 0 practi
 - **Repetitions of a no-LLM strategy are nearly identical** on the sandbox (the same e-mails get the same replies), so
   one run per strategy is enough there. The differences above are real for these two cases - and only for them:
   two demo cases and three suppliers say little about the ten practice cases.
+
+## 2026-10-10 · practice (10 hosted cases) · no LLM
+
+| Strategy | Mean | Deals | Record |
+|---|---|---|---|
+| tactical (`96f7545`) | **0.695** | 10 of 10 | [record](2026-10-10-tactical-none.md) |
+| playbook | 0.376 | 7 of 10 | [record](2026-10-10-playbook-none.md) |
+
+One run each, 20 practice sessions in total. Playbook's closing offer made three suppliers walk away (P04, P07, P18);
+scored at the suppliers' final offers the same run gives 0.539, still behind tactical.

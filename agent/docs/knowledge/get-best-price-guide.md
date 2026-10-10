@@ -211,7 +211,7 @@ three suppliers; one run per variant, and a change below about 0.05 on one case 
 
 | Rule | Result |
 |---|---|
-| 9, 4.6: do not take the final offer as final; make one closing offer | **Confirmed, the largest effect.** Accepting the supplier's terms and offering to sign today one step lower moved the leading supplier five times out of five (D01 0.869 → 0.943). No supplier walked away; that risk is not measured. |
+| 9, 4.6: do not take the final offer as final; make one closing offer | **Confirmed on the sandbox, contradicted on practice.** On D01 and D02 it moved the leading supplier five times out of five and none walked away. On the 10 practice cases three suppliers walked away, three gave a further step and two held: mean 0.376 with it, 0.539 at the final offers. |
 | 2, 4.1: a deeper anchor | Confirmed as harmless and slightly positive (the earlier `lowball` runs). An opening 10 % deeper again changed nothing: the foundry ended at the same final offer. |
 | 5: a menu of equal-cost sheets | Confirmed. One sheet instead of the menu lowered D01 from 0.803 to 0.777. |
 | 4.3: lead with payment days for a supplier that wants cash | Not confirmed. The job shop took 14 days and kept the price it gave for 30. |
@@ -221,5 +221,9 @@ three suppliers; one run per variant, and a change below about 0.05 on one case 
 | 4.2: shrinking concessions | No effect seen. The suppliers call a final offer in reply 3 or 4 whatever our steps are. |
 | 3: index clause, hypotheses 3 to 5 | Not testable on the sandbox: no index clause, no supplier dossier, no data arguments. |
 
-The pattern behind these results: the suppliers concede on their own schedule and stop after three or four replies.
-What we send changes the outcome in two places only - a verified rival quote early, and a closing offer at the end.
+The pattern on the sandbox: the suppliers concede on their own schedule and stop after three or four replies. What
+we send changes the outcome in two places only - a verified rival quote early, and a closing offer at the end.
+
+**Practice run, the same evening** (10 hosted cases, one run each): `playbook` 0.376 with 7 of 10 deals, `tactical`
+0.695 with 10 of 10. A final offer is final for some practice suppliers, and the sandbox did not show which. Push
+past one only with a fallback, as `tactical` does.

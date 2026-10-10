@@ -62,3 +62,40 @@ What the runs showed about the bots: the foundry's price path closes about half 
 (52.90 → 51.60 → 50.90 → 50.50, floor near 50.1) and it calls the offer final in round 3, whatever we send. Most
 suppliers in our recorded sessions call a final offer in reply 3 or 4. The rounds before it are few; what moves the
 price in them is a verified rival quote, and after it a closing offer.
+
+## Practice: the 10 hosted cases
+
+| Run | Variant | Mean | Deals | Rounds |
+|---|---|---|---|---|
+| `20261010-212101-practice-playbook` | `playbook` | **0.376** | 7 of 10 | 38 |
+
+Run cost: 10 practice sessions, 0 LLM tokens, about 2 minutes wall time. Same parameters as above, on commit
+`96f7545`. Reference of the same hour: `tactical` 0.695, 10 of 10 deals ([record](2026-10-10-tactical-none.md)).
+
+| Case | Type, goal | Score | C_deal (EUR) | C_open | C_best | Deal | Score at the supplier's final offer, before the closing offer |
+|---|---|---|---|---|---|---|---|
+| P01 | price_increase, stabilise | 0.917 | 1,101,536 | 1,153,780 | 1,096,816 | yes | 0.941 |
+| P02 | price_increase, stabilise | 0.385 | 2,264,634 | 2,282,867 | 2,235,514 | yes | 0.387 |
+| P03 | renewal, stabilise | 0.762 | 3,989,244 | 4,246,314 | 3,909,043 | yes | 0.762 |
+| P04 | renewal, routine | 0.000 | – | 198,846 | 196,529 | no | 0.860 |
+| P05 | rfq, leverage | 0.295 | 281,351 | 305,545 | 223,424 | yes | 0.295 |
+| P07 | bundling, routine | 0.121 | – | 391,027 | 299,241 | no | 0.676 |
+| P08 | raw_material, leverage | 0.316 | 1,080,355 | 1,135,887 | 960,309 | yes | 0.261 |
+| P10 | capacity, secure_supply | 0.568 | 1,589,712 | 1,932,492 | 1,328,927 | yes | 0.555 |
+| P11 | quality, quality_first | 0.398 | 779,736 | 817,578 | 722,500 | yes | 0.398 |
+| P18 | raw_material, leverage | 0.000 | – | 295,173 | 222,651 | no | 0.252 |
+| **Mean** | | **0.376** | | | | 7 of 10 | 0.539 |
+
+The last column is computed from the same run: the C of the cheapest standing offer when the first supplier called
+its offer final (the `c` of that `reply` event), or the alternative where it is cheaper, scored with the case's
+C_open and C_best. It was not played as a separate run.
+
+- **The closing offer loses on practice.** Three suppliers walked away from it: P04 (4.94 final), P07 (5.52 final)
+  and P18 (5.70 final). Three others gave a further step (P01 135.10 → 134.42, P08 5.61 → 5.56, P10 33.80 → 33.63);
+  in P05 and P11 the final offer stood. The mean is 0.376 with the closing offer and 0.539 at the final offers.
+- **This contradicts the sandbox,** where no supplier walked away in about ten closing offers. Three demo
+  suppliers did not show the behaviour.
+- **In P01 the lower price did not lower C:** the score at the final offer is 0.941, after the closing offer 0.917.
+  It is a `stabilise` case, where a price that leaves the supplier below a sustainable margin costs C.
+- **Without the closing offer playbook is still behind tactical** (0.539 against 0.695): P02, P05, P08, P11 and P18
+  are all 0.15 or more lower. It has no supplier profile, no guards and no search over the term menu.
