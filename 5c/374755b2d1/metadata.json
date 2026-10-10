@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "5c374755b2d1",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/src/negotiator/cli.py",
+    "agent/src/negotiator/llm.py",
+    "agent/src/negotiator/report.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/5c/374755b2d1/0/metadata.json",
+      "transcript": "/5c/374755b2d1/0/full.jsonl",
+      "compact_transcript": "/5c/374755b2d1/0/transcript.jsonl",
+      "content_hash": "/5c/374755b2d1/0/content_hash.txt",
+      "prompt": "/5c/374755b2d1/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 60,
+    "cache_creation_tokens": 98818,
+    "cache_read_tokens": 2758139,
+    "output_tokens": 21412,
+    "api_call_count": 27
+  }
+}
