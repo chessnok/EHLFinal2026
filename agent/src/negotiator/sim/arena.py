@@ -25,9 +25,9 @@ from pathlib import Path
 import arena_kit.sim as kit
 from arena_kit.cost import closing_terms, cost_breakdown, must_haves_ok, score, total_cost
 
-from negotiator.sim.calibrate import _moves, as_objects, calibrate, estimate
+from negotiator.sim.calibrate import _moves, as_objects, best_cost, calibrate, estimate
 from negotiator.sim.pricing import value_of
-from negotiator.sim.supplier import Profile, Thread
+from negotiator.sim.supplier import PERSONAS, Profile, Thread
 
 CLAIM_TYPES = {
     "idx": "index_change",
@@ -56,14 +56,36 @@ def price_cap(case: dict, ref: dict, c_best: float):
     return cap
 
 
-def new_thread(model: dict, case: dict, sup: str, rng: random.Random, stranger: bool = False) -> Thread:
-    profile: Profile = model["profiles"][f"{case['case_id']}|{sup}"]
-    if stranger:  # the same economics, the habits of another supplier
-        donor = rng.choice(sorted(model["profiles"]))
-        d = model["profiles"][donor]
-        profile = Profile(**{**profile.__dict__, "steps": d.steps, "finals": d.finals, "convinced": d.convinced})
-    cap = price_cap(case, profile.ref, model["results"][case["case_id"]]["c_best"])
-    return Thread(profile, model["pool"], rng, cap=cap)
+JITTER = 0.3  # with --jitter a floor moves by up to this share of the supplier's room, either way
+
+
+def session_profiles(model: dict, case: dict, rng: random.Random, strangers: bool, jitter: bool) -> tuple[dict, float]:
+    """The suppliers of one session and the c_best that goes with them. Unchanged, that is the arena's own figure;
+    with moved floors it moves by as much as the model's best package does."""
+    known = model["results"][case["case_id"]]
+    profiles = {sup: model["profiles"][f"{case['case_id']}|{sup}"] for sup in case["suppliers"]}
+    before = min(best_cost(case, p) for p in profiles.values()) if jitter else 0.0
+    for sup, p in list(profiles.items()):
+        changes = {}
+        if strangers:  # the same economics, the habits of another supplier
+            d = model["profiles"][rng.choice(sorted(model["profiles"]))]
+            changes.update(steps=d.steps, finals=d.finals, convinced=d.convinced)
+        if jitter:
+            changes["floor"] = p.floor + rng.uniform(-JITTER, JITTER) * (p.opening_value - p.floor)
+        if changes:
+            profiles[sup] = Profile(**{**p.__dict__, **changes})
+    c_best = known["c_best"]
+    if jitter:
+        c_best += min(best_cost(case, p) for p in profiles.values()) - before
+        c_best = min(c_best, known["c_open"] - 0.02 * abs(known["c_open"]))  # there is always room to negotiate
+    return profiles, c_best
+
+
+def new_thread(model: dict, case: dict, sup: str, rng: random.Random, profile: Profile | None = None,
+               c_best: float | None = None, persona: str = "fitted") -> Thread:  # fmt: skip
+    profile = profile or model["profiles"][f"{case['case_id']}|{sup}"]
+    c_best = model["results"][case["case_id"]]["c_best"] if c_best is None else c_best
+    return Thread(profile, model["pool"], rng, cap=price_cap(case, profile.ref, c_best), persona=PERSONAS[persona])
 
 
 def _text(value):
@@ -78,9 +100,10 @@ def _text(value):
 class CalibratedSim(kit.Sim):
     """The kit's simulator with fitted suppliers, the arena's yardstick and no practice quota."""
 
-    def __init__(self, model: dict, facts=None, seed: int = 0, strangers: bool = False, no_clock: bool = True):
+    def __init__(self, model: dict, facts=None, seed: int = 0, strangers: bool = False, no_clock: bool = True,
+                 persona: str = "fitted", jitter: bool = False):  # fmt: skip
         super().__init__(model["cases"], facts, no_clock=no_clock)
-        self.model, self.seed, self.strangers = model, seed, strangers
+        self.model, self.seed, self.strangers, self.persona, self.jitter = model, seed, strangers, persona, jitter
         self.opened = defaultdict(int)
 
     def practice(self, team):
@@ -98,9 +121,11 @@ class CalibratedSim(kit.Sim):
              "files": {}, "offers": {}, "used": set(), "result": None, "trace": [], "moves": [],
              "created_at": self.clock(), "late": set()}  # fmt: skip
         fixed = case.get("fixed_terms", {})
+        world = random.Random(f"{self.seed}/{case_id}/{self.opened[case_id]}")
+        profiles, s["c_best"] = session_profiles(self.model, case, world, self.strangers, self.jitter)
         for sup in case["suppliers"]:
             rng = random.Random(f"{self.seed}/{case_id}/{self.opened[case_id]}/{sup}")
-            sim = new_thread(self.model, case, sup, rng, self.strangers)
+            sim = new_thread(self.model, case, sup, rng, profiles[sup], s["c_best"], self.persona)
             p = sim.profile
             standard = {k: v for k, v in p.ref.items() if k not in fixed and k != "unit_price"}
             th = s["threads"][sup] = {"key": sup.split(":", 1)[1], "round": 0, "n": 0, "timeouts": 0,
@@ -168,8 +193,8 @@ class CalibratedSim(kit.Sim):
         alt = case["buyer"].get("alternative") or {}
         c_alt = total_cost(case, alt["terms"]) if (alt.get("terms") or {}).get("unit_price") else None
         r = {"ended": True, "deal": False, "supplier_id": None, "offer_id": None, "terms": None,
-             "c_open": known["c_open"], "c_deal": None, "c_alt": c_alt, "c_best": known["c_best"],
-             "score": score(known["c_open"], c_alt, known["c_best"]) if c_alt else 0.0,
+             "c_open": known["c_open"], "c_deal": None, "c_alt": c_alt, "c_best": s["c_best"],
+             "score": score(known["c_open"], c_alt, s["c_best"]) if c_alt else 0.0,
              "must_haves_ok": None, "cost_breakdown": None, "trace": []}  # fmt: skip
         if sup:
             t = closing_terms(case, ths[sup]["stated"], ths[sup]["standard"])
@@ -326,9 +351,10 @@ def arena_scores(sessions: list[dict]) -> dict:
 
 
 def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str], reps: int, runs_dir: Path,
-          strangers: bool = False, parallel: int = 8, llm=None) -> dict:  # fmt: skip
-    """Play each strategy `reps` times on every case; rep i meets the same supplier seed for every strategy.
-    Returns (strategy, case) -> scores, and the run folders under `runs_dir`."""
+          strangers: bool = False, parallel: int = 8, llm=None, opponents: tuple[str, ...] = ("fitted",),
+          jitter: bool = False) -> dict:  # fmt: skip
+    """Play each strategy `reps` times on every case against every opponent; rep i meets the same supplier seed
+    for every strategy. Returns (strategy, case) -> scores, (strategy, opponent) -> outcomes, and the run folders."""
     from negotiator.client import ArenaClient, _Pacer
     from negotiator.config import Settings
     from negotiator.report import write_report
@@ -336,21 +362,24 @@ def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str
     from negotiator.strategy import STRATEGIES
     from negotiator.telemetry import Recorder
 
-    scores, runs = defaultdict(list), []
-    for rep in range(reps):
-        url, key, server = serve(CalibratedSim(model, getattr(data, "facts", None), seed=rep, strangers=strangers))
-        local = Settings(**{**settings.__dict__, "arena_url": url, "api_key": key, "runs_dir": runs_dir,
-                            "final_mode": False})  # fmt: skip
-        for name in strategies:
-            recorder = Recorder(runs_dir, f"sim-{name}-s{rep}", logging.ERROR)
-            client = ArenaClient(local, recorder)
-            client.pacer = _Pacer(1000.0)
-            outcomes = play_many(client, recorder, case_ids, lambda n=name: STRATEGIES[n](data, llm), data,
-                                 parallel=parallel, cases=model["cases"])  # fmt: skip
-            recorder.close()
-            write_report(recorder.dir, outcomes)
-            runs.append(recorder.dir.name)
-            for o in outcomes:
-                scores[(name, o["case_id"])].append(o.get("score") or 0.0)
-        server.should_exit = True
-    return {"scores": scores, "runs": runs}
+    scores, by_opponent, runs = defaultdict(list), defaultdict(list), []
+    for opponent in opponents:
+        for rep in range(reps):
+            sim = CalibratedSim(model, getattr(data, "facts", None), rep, strangers, persona=opponent, jitter=jitter)
+            url, key, server = serve(sim)
+            local = Settings(**{**settings.__dict__, "arena_url": url, "api_key": key, "runs_dir": runs_dir,
+                                "final_mode": False})  # fmt: skip
+            for name in strategies:
+                recorder = Recorder(runs_dir, f"sim-{name}-{opponent}-s{rep}", logging.ERROR)
+                client = ArenaClient(local, recorder)
+                client.pacer = _Pacer(1000.0)
+                outcomes = play_many(client, recorder, case_ids, lambda n=name: STRATEGIES[n](data, llm), data,
+                                     parallel=parallel, cases=model["cases"])  # fmt: skip
+                recorder.close()
+                write_report(recorder.dir, outcomes)
+                runs.append(recorder.dir.name)
+                for o in outcomes:
+                    scores[(name, o["case_id"])].append(o.get("score") or 0.0)
+                    by_opponent[(name, opponent)].append({"score": o.get("score") or 0.0, "deal": bool(o.get("deal"))})
+            server.should_exit = True
+    return {"scores": scores, "by_opponent": by_opponent, "runs": runs}

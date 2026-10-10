@@ -9,6 +9,8 @@ from rich.table import Table
 from negotiator.config import PACKAGE_ROOT, Settings
 from negotiator.sim.arena import CalibratedSim, arena_scores, bench, check, serve
 from negotiator.sim.calibrate import calibrate, load_model, load_sessions
+from negotiator.sim.supplier import PERSONAS
+from negotiator.tracing import enabled as tracing_enabled
 
 console = Console()
 MODEL = PACKAGE_ROOT / "data" / "sim" / "model.json"  # git-ignored: fitted from replays, never committed
@@ -57,14 +59,50 @@ def cmd_check(args, settings: Settings) -> None:
     console.print("The buyer's recorded e-mails are replayed; the score is of the offer standing when it accepted.")
 
 
+def _pool_table(by_opponent: dict, strategies: list[str], opponents: tuple[str, ...]) -> None:
+    """Per opponent: mean score / worst session / share of sessions that closed. Then, against the first strategy,
+    on how many opponents each other one is ahead - a change should win on most of them, not on the average."""
+    table = Table(title="per opponent: mean / worst / deals")
+    table.add_column("opponent", no_wrap=True)
+    for name in strategies:
+        table.add_column(name, no_wrap=True)
+    means = {}
+    for opponent in opponents:
+        cells = []
+        for name in strategies:
+            rows = by_opponent[(name, opponent)]
+            scores = [r["score"] for r in rows]
+            means[(name, opponent)] = statistics.mean(scores)
+            deals = sum(r["deal"] for r in rows) / len(rows)
+            cells.append(f"{means[(name, opponent)]:.2f} / {min(scores):.2f} / {deals:.0%}")
+        table.add_row(opponent, *cells)
+    console.print(table)
+    for opponent in opponents:
+        console.print(f"  {opponent}: {PERSONAS[opponent].about}")
+    base = strategies[0]
+    for name in strategies[1:]:
+        ahead = sum(means[(name, o)] > means[(base, o)] for o in opponents)
+        console.print(f"{name} is ahead of {base} on {ahead} of {len(opponents)} opponents")
+    console.print("The opponent types other than `fitted` are invented, not fitted: read them as a stress test.")
+
+
 def cmd_bench(args, settings: Settings) -> None:
     from negotiator.data import WorldData
+
+    if not tracing_enabled():
+        raise SystemExit("no LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY in .env: AGENTS.md forbids a run without them")
 
     model = _model(settings, refit=args.refit)
     data = WorldData(settings.data_dir, settings.release_dir)
     case_ids = args.cases or sorted(model["cases"])
     console.print(f"{len(args.strategies)} strategies x {len(case_ids)} cases x {args.reps} repeats on the simulator")
-    out = bench(model, settings, data, args.strategies, case_ids, args.reps, SIM_RUNS, strangers=args.strangers)
+    opponents = tuple(PERSONAS) if "all" in args.opponents else tuple(args.opponents)
+    out = bench(model, settings, data, args.strategies, case_ids, args.reps, SIM_RUNS, strangers=args.strangers,
+                opponents=opponents, jitter=args.jitter)  # fmt: skip
+    if len(opponents) > 1 or args.jitter:
+        _pool_table(out["by_opponent"], args.strategies, opponents)
+        console.print(f"runs under {SIM_RUNS}")
+        return
     arena = arena_scores(load_sessions(settings.runs_dir))
     table = Table(title="simulator mean (arena mean)" + (" - strangers" if args.strangers else ""))
     table.add_column("case", no_wrap=True)
@@ -116,6 +154,9 @@ def add_parser(add) -> None:
     b.add_argument("--reps", type=int, default=5)
     b.add_argument("--strangers", action="store_true", help="each supplier behaves like another fitted supplier")
     b.add_argument("--refit", action="store_true", help="calibrate again from runs/ first")
+    b.add_argument("--opponents", nargs="+", default=["fitted"], choices=[*PERSONAS, "all"],
+                   help="opponent types to play against (all: the whole pool)")  # fmt: skip
+    b.add_argument("--jitter", action="store_true", help="move each supplier's floor at random, per session")
     b.add_argument("--json", action="store_true")
     b.set_defaults(sim_func=cmd_bench)
     s = sub.add_parser("serve", help="the simulator as a local arena")

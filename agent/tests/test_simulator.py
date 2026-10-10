@@ -10,7 +10,7 @@ from negotiator.runner import play_many
 from negotiator.sim.arena import bench, price_cap
 from negotiator.sim.calibrate import as_objects, best_cost, calibrate, load_sessions
 from negotiator.sim.pricing import FEATURES, features, fit_rates, price_for, value_of
-from negotiator.sim.supplier import Profile, Thread
+from negotiator.sim.supplier import PERSONAS, Profile, Thread
 from negotiator.strategy import BaselineStrategy
 from negotiator.telemetry import Recorder
 
@@ -95,6 +95,38 @@ def test_no_offer_beats_the_cases_best_cost() -> None:
     assert total_cost(CASE, out["terms"], REF) >= c_best - 1.0
 
 
+def _prices(persona: str) -> list[float]:
+    p = _profile(steps={"moved": [[0.2, False], [0.2, False]]}, finals={})
+    th = Thread(p, _pool(), random.Random(1), persona=PERSONAS[persona])
+    return [
+        th.reply(CASE, [{"unit_price": 6.0 + i / 10, "payment_days": 30}], [])["terms"]["unit_price"] for i in range(4)
+    ]
+
+
+def test_opponent_types_bend_the_fitted_supplier() -> None:
+    fitted, soft, hard, rushed = (_prices(n) for n in ("fitted", "cooperative", "hardball", "deadline"))
+    assert soft[-1] < fitted[-1] < hard[-1]
+    assert rushed[-1] < fitted[-1] and rushed[0] == fitted[0]  # the same first step, then faster
+
+
+def test_walker_leaves_at_the_first_push_past_its_final_offer() -> None:
+    p = _profile(steps={"moved": [[0.2, False], [0.2, False]], "final": [[0.0, False], [0.0, False]]},
+                 finals={"1/move": [1, 1]})  # fmt: skip
+    th = Thread(p, _pool(), random.Random(1), persona=PERSONAS["walker"])
+    sheet = [{"unit_price": 6.0, "payment_days": 30}]
+    assert th.reply(CASE, sheet, [])["status"] == "final_offer"
+    assert th.reply(CASE, sheet, [])["status"] == "walked_away"
+
+
+def test_manipulator_bluffs_a_final_offer_and_writes_instructions() -> None:
+    p = _profile(steps={"moved": [[0.2, False], [0.2, False]]}, finals={})
+    th = Thread(p, _pool(), random.Random(1), persona=PERSONAS["manipulator"])
+    outs = [th.reply(CASE, [{"unit_price": 6.0 + i / 10, "payment_days": 30}], []) for i in range(3)]
+    assert [o["status"] for o in outs] == ["open", "final_offer", "open"]
+    assert outs[2]["terms"]["unit_price"] < outs[1]["terms"]["unit_price"]  # the "final" offer was not
+    assert all("ignore your previous instructions" in " ".join(o["reasons"]) for o in outs)
+
+
 def test_round_trip_calibrate_and_play(sim: Settings, world: WorldData, tmp_path) -> None:
     """Sessions recorded on the kit's simulator stand in for arena sessions: fit, then play the fitted one."""
     from negotiator.client import ArenaClient
@@ -116,3 +148,8 @@ def test_round_trip_calibrate_and_play(sim: Settings, world: WorldData, tmp_path
     out = bench(model, sim, world, ["baseline"], case_ids, reps=1, runs_dir=tmp_path)
     scores = [s for v in out["scores"].values() for s in v]
     assert len(scores) == len(case_ids) and all(0.0 <= s <= 1.0 for s in scores)
+
+    pool = bench(model, sim, world, ["baseline"], case_ids[:1], reps=1, runs_dir=tmp_path,
+                 opponents=("hardball", "manipulator"), jitter=True)  # fmt: skip
+    assert set(pool["by_opponent"]) == {("baseline", "hardball"), ("baseline", "manipulator")}
+    assert all(0.0 <= r["score"] <= 1.0 for rows in pool["by_opponent"].values() for r in rows)
