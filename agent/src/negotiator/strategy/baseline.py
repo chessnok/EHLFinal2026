@@ -28,14 +28,21 @@ from negotiator.session import Negotiation
 from negotiator.strategy.base import Decision
 from negotiator.telemetry import log
 
+# Opening anchor below the lower of opening and current price, by category goal. Practice showed the
+# bots' floors sit far below their openings (C_best often 15-25 % under C_open in leverage cases).
 GOAL_ANCHOR = {
-    "leverage": 0.10,
-    "routine": 0.07,
-    "stabilise": 0.04,
-    "secure_supply": 0.03,
-    "quality_first": 0.04,
+    "leverage": 0.18,
+    "routine": 0.12,
+    "stabilise": 0.08,
+    "secure_supply": 0.05,
+    "quality_first": 0.06,
 }
-CONCESSION = [0.0, 0.30, 0.50, 0.65, 0.78, 0.88, 0.95]  # share of the gap to the supplier we give by round
+# Share of the gap between our target and the supplier's price we may have given by each round - a
+# ceiling; reciprocity (below) usually keeps us under it.
+CONCESSION = [0.0, 0.15, 0.28, 0.40, 0.52, 0.63, 0.73, 0.82]
+RECIPROCITY = 1.0  # our step, in % of our price, at most this times the supplier's last step in %
+MIN_STEP = 0.004  # ... but at least 0.4 %, so a stalled supplier still sees movement
+SANE_PRICE = 0.6  # never put a price below 60 % of the supplier's in front of it, even if C would allow
 CLOSE_ENOUGH = 0.005  # within 0.5 % of the supplier's price: take it
 MAX_CLAIMS = 3  # the arena checks at most 3 arguments per message
 SIGNATURE = "Kind regards\nHollerau Pumpenwerke GmbH, Purchasing"
@@ -50,6 +57,7 @@ class SupplierPlan:
     floor_price: float | None
     evidence: list[Evidence] = field(default_factory=list)
     asked_cost_breakdown: bool = False
+    offered: dict[str, float] = field(default_factory=dict)  # non-price terms -> highest price we offered
 
 
 class BaselineStrategy:
@@ -179,8 +187,8 @@ class BaselineStrategy:
         if len(our_path) >= 2 and len(their_path) >= 3 and len(set(their_path[-3:])) == 1:
             return Decision.hold(supplier_id, "the supplier stopped moving", price=their_path[-1])
 
-        price = self._next_price(plan, theirs["unit_price"], our_path, t.rounds_used)
-        if price >= theirs["unit_price"] * (1 - CLOSE_ENOUGH):
+        price = self._next_price(plan, theirs["unit_price"], our_path, t.rounds_used, their_path)
+        if self._close_enough(neg, supplier_id, theirs, price):
             return Decision.hold(supplier_id, "close enough", ours=price, theirs=theirs["unit_price"])
         sheets = self._term_sheets(neg, supplier_id, theirs, price)
         if not sheets:
@@ -203,36 +211,70 @@ class BaselineStrategy:
             },
         )
 
-    def _next_price(self, plan: SupplierPlan, theirs: float, ours: list[float], round_index: int) -> float:
+    def _next_price(
+        self,
+        plan: SupplierPlan,
+        theirs: float,
+        ours: list[float],
+        round_index: int,
+        their_path: list[float] | None = None,
+    ) -> float:
+        """Price of our C-optimal sheet this round: the concession schedule as a ceiling, and never a bigger
+        step (in %) than the supplier's own last step - it moves, we move; it stands, we barely move."""
         share = CONCESSION[min(round_index, len(CONCESSION) - 1)]
         price = plan.target_price + (theirs - plan.target_price) * share
         if ours:
+            their_step = 0.0
+            if their_path and len(their_path) >= 2 and their_path[-2]:
+                their_step = (their_path[-2] - their_path[-1]) / their_path[-2]
+            step_cap = ours[-1] * max(their_step * RECIPROCITY, MIN_STEP)
+            price = min(price, ours[-1] + step_cap)
             price = max(price, ours[-1])  # never go back on an offer
         return round(min(price, theirs), 2)
 
     def _term_sheets(self, neg: Negotiation, sid: str, theirs: dict, price: float) -> list[dict]:
-        case = neg.case
+        """A menu of equal cost to us (MESO): A is the C-optimal structure at `price`; B is the supplier's own
+        structure and C a shorter-payment variant, each priced so that its C equals A's. The supplier picks
+        what suits it; whatever it picks costs us the same. Each structure's price only ever rises."""
+        case, plan = neg.case, self.plans[sid]
         c_theirs = neg.cost(sid, theirs)
         ideal = complete_offer(case, self._optimise(neg, sid, {**theirs, "unit_price": price}))
-        plain = complete_offer(case, {**theirs, "unit_price": round(price * 1.01, 2)})
-        candidates = [ideal, plain]
+        c_target = neg.cost(sid, ideal)
+        candidates = [ideal]
+        own = complete_offer(case, {**theirs, "unit_price": price})
+        own["unit_price"] = self._iso_cost_price(neg, sid, own, c_target)
+        candidates.append(own)
         if "payment_days" in case["negotiable"]:
             options = sorted(o for o in case.get("term_options", {}).get("payment_days", []) if o is not None)
             shorter = [o for o in options if o < ideal.get("payment_days", 0)]
             if shorter:
                 cash = {**ideal, "payment_days": shorter[len(shorter) // 2]}
-                cash["unit_price"] = self._iso_cost_price(neg, sid, cash, neg.cost(sid, ideal))
+                cash["unit_price"] = self._iso_cost_price(neg, sid, cash, c_target)
                 candidates.append(complete_offer(case, cash))
         out, seen = [], set()
         for terms in candidates:
-            key = repr(sorted(terms.items(), key=lambda kv: kv[0]))
+            key = structure_key(terms)
+            terms["unit_price"] = round(max(terms["unit_price"], plan.offered.get(key, 0.0)), 2)
             if key in seen or not neg.keeps_must_haves(sid, terms):
+                continue
+            if terms["unit_price"] < theirs["unit_price"] * SANE_PRICE:
                 continue
             if neg.cost(sid, terms) >= c_theirs:  # never offer something dearer than what is on the table
                 continue
             seen.add(key)
             out.append({"terms": terms})
+        for sheet in out[:3]:
+            key = structure_key(sheet["terms"])
+            plan.offered[key] = max(plan.offered.get(key, 0.0), sheet["terms"]["unit_price"])
         return out[:3]
+
+    def _close_enough(self, neg: Negotiation, sid: str, theirs: dict, price: float) -> bool:
+        """Hold only when the standing offer costs us no more than our best structure at its price would:
+        close in price on a worse structure (e.g. a shorter contract) is not close in C."""
+        if price < theirs["unit_price"] * (1 - CLOSE_ENOUGH):
+            return False
+        best_at_theirs = complete_offer(neg.case, self._optimise(neg, sid, dict(theirs)))
+        return neg.cost(sid, theirs) <= neg.cost(sid, best_at_theirs) * (1 + CLOSE_ENOUGH)
 
     def _optimise(self, neg: Negotiation, sid: str, terms: dict) -> dict:
         """Coordinate descent over the non-price options: each field set to what minimises C."""
@@ -384,6 +426,11 @@ class BaselineStrategy:
             "body": f"Dear {self.plans[supplier_id].name} team,\n\nthank you. While we complete our evaluation: "
             f"could you confirm your delivery capacity for our annual volume?\n\n{SIGNATURE}",
         }
+
+
+def structure_key(terms: dict) -> str:
+    """The non-price terms of a sheet: offers with the same structure must never get cheaper."""
+    return repr(sorted((k, v) for k, v in terms.items() if k != "unit_price"))
 
 
 def describe(case: dict, terms: dict) -> str:

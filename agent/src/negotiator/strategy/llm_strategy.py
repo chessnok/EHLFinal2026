@@ -27,13 +27,19 @@ from negotiator.data import Evidence, WorldData
 from negotiator.llm import LLM, LLMError
 from negotiator.session import Negotiation
 from negotiator.strategy.base import Decision
-from negotiator.strategy.baseline import CLOSE_ENOUGH, MAX_CLAIMS, SIGNATURE, BaselineStrategy, describe
+from negotiator.strategy.baseline import (
+    MAX_CLAIMS,
+    SANE_PRICE,
+    SIGNATURE,
+    BaselineStrategy,
+    describe,
+    structure_key,
+)
 from negotiator.telemetry import log
 
 ID_RE = re.compile(r"\b(?:idx|quote|offer|sc|qn|po|cost|fc|news|doc|ctr|rfq|sup|part|gr|inv):[\w.:@#/-]*\w")
 STANCES = {"push", "trade", "hold", "accept"}
 DECIDE_TIMEOUT_S = 30.0  # the e-mail must reach the arena within 60 s of the supplier's reply
-LEVER_DISCOUNT_MAX = 0.02  # a traded lever may lower our asked price by at most 2 %
 # Sentences with money or percentages: the model must not state figures (term sheets and checked
 # arguments carry them); a stray number contradicts the sheets or reads as an unbacked claim.
 FIGURE_RE = re.compile(r"(€|\bEUR\b|\beuros?\b|\d[\d.,]*\s?%|\b\d+[.,]\d{2}\b|\bpercent\b)", re.I)
@@ -71,9 +77,11 @@ Decide:
 - question: one short question to the supplier, or "".
 - message: the e-mail body WITHOUT greeting, signature, prices, percentages, data IDs or term sheets (code
   adds all of these). 40-120 words, polite, firm, specific to what the supplier wrote. Never reveal urgency,
-  a budget, a missing alternative or our target. Do not claim market benchmarks, competitor prices or any
-  fact that is not in the arguments list - the supplier asks for proof and trusts us less. Refer to "the
-  options below" instead of naming prices or terms.
+  a budget, a missing alternative or our target. State no fact that is not in the arguments list: no market
+  benchmarks, competitor prices, other bids, volume growth, volume tiers, forecasts or new projects - the
+  supplier asks for proof and trusts us less. Do not promise volume we have not offered in the options.
+  Refer to "the options below" instead of naming prices or terms; the options are equal value to us, so
+  invite the supplier to pick the one that suits it.
 
 Return JSON: {"stance": "...", "concession": 0.0, "lever": "...", "evidence": [], "ask_cost_breakdown": false,
 "question": "...", "message": "...", "reason": "<one sentence: why>"}"""
@@ -164,7 +172,7 @@ class LLMStrategy(BaselineStrategy):
 
     def _ask(self, neg: Negotiation, sid: str, theirs: dict) -> dict:
         t, plan = neg.threads[sid], self.plans[sid]
-        scheduled = self._next_price(plan, theirs["unit_price"], t.our_price_path(), t.rounds_used)
+        scheduled = self._next_price(plan, theirs["unit_price"], t.our_price_path(), t.rounds_used, t.price_path())
         pool = self._pool(neg, sid)
         lines = [
             f"CASE: {neg.case.get('title')} | type {neg.case.get('type')} | goal {neg.buyer.get('category_goal')} | "
@@ -224,7 +232,7 @@ class LLMStrategy(BaselineStrategy):
         price = round(min(base + (choice["_scheduled"] - base) * concession, theirs["unit_price"]), 2)
         if ours:
             price = max(price, ours[-1])
-        if price >= theirs["unit_price"] * (1 - CLOSE_ENOUGH):
+        if self._close_enough(neg, sid, theirs, price):
             return Decision.hold(sid, "close enough", **rationale)
 
         sheets = self._term_sheets(neg, sid, theirs, price)
@@ -262,14 +270,17 @@ class LLMStrategy(BaselineStrategy):
         if lever not in theirs or theirs[lever] == ideal.get(lever):
             return None
         traded = {**ideal, lever: theirs[lever]}
-        # We concede the lever instead of price: same price, or slightly lower where the lever is cheap for
-        # us - never the "equal C" price, which can fall far below any sane anchor (e.g. a shorter contract
-        # leaves need uncovered at the fallback price).
-        iso = self._iso_cost_price(neg, sid, traded, neg.cost(sid, ideal))
-        traded["unit_price"] = round(max(iso, price * (1 - LEVER_DISCOUNT_MAX)), 2)
+        # Equal cost to us (like the rest of the menu): the supplier gets its value on the lever and pays for
+        # it in price - by exactly what the lever is worth to us.
+        traded["unit_price"] = self._iso_cost_price(neg, sid, traded, neg.cost(sid, ideal))
         traded = complete_offer(neg.case, traded)
+        key = structure_key(traded)
+        traded["unit_price"] = round(max(traded["unit_price"], self.plans[sid].offered.get(key, 0.0)), 2)
+        if traded["unit_price"] < theirs["unit_price"] * SANE_PRICE:
+            return None
         if not neg.keeps_must_haves(sid, traded) or neg.cost(sid, traded) >= neg.cost(sid, theirs):
             return None
+        self.plans[sid].offered[key] = traded["unit_price"]
         return {"terms": traded}
 
     def _compose(self, neg: Negotiation, sid: str, plan, sheets, claims, choice, first) -> dict:
