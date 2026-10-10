@@ -1,0 +1,49 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "08746009dae2",
+  "session_id": "a11516cb-b9ab-4f94-b7ba-983b5e97b58f",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-10T21:41:32.904628916Z",
+  "branch": "feat/sim-llm-supplier",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "62e4c0816853",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 272,
+    "cache_creation_tokens": 365224,
+    "cache_read_tokens": 31317003,
+    "output_tokens": 148726,
+    "api_call_count": 132,
+    "subagent_tokens": {
+      "input_tokens": 38,
+      "cache_creation_tokens": 75443,
+      "cache_read_tokens": 3374156,
+      "output_tokens": 7199,
+      "api_call_count": 19
+    }
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 639,
+      "user_lines_removed": 1,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "agent/src/negotiator/data.py": 3,
+        "conversations/2026-10-10-supplier-simulator.jsonl": 337,
+        "conversations/2026-10-10-supplier-simulator.md": 299
+      },
+      "user_removed_per_file": {
+        "agent/src/negotiator/data.py": 1
+      }
+    }
+  ]
+}
