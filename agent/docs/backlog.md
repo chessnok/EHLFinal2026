@@ -122,7 +122,7 @@ did not fire.
 
 ## 3a. Done on 10-11 October (runs.md P-16 to P-27)
 
-State after it: `tactical` on `6bb73d1`, full pass `20261011-010300-practice-tactical`, mean 0.746, 10 of 10 deals
+State after it: `tactical` on `6bb73d1`, full pass `20261011-010356-practice-tactical`, mean 0.746, 10 of 10 deals
 (0.695 in the run this backlog was written from).
 
 | Item | What was done | Measured |

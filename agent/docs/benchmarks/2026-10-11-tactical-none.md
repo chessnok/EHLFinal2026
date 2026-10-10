@@ -55,7 +55,7 @@ Set practice, the 10 hosted cases: `20261011-001629-practice-tactical`. Partial 
 
 | Run | Mean | Deals | P01 | P02 | P03 | P04 | P05 | P07 | P08 | P10 | P11 | P18 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `20261011-010300-practice-tactical` | **0.746** | 10 of 10 | 0.969 | 0.733 | 0.923 | 0.860 | 0.742 | 0.740 | 0.550 | 0.647 | 0.672 | 0.618 |
+| `20261011-010356-practice-tactical` | **0.746** | 10 of 10 | 0.969 | 0.733 | 0.923 | 0.860 | 0.742 | 0.740 | 0.550 | 0.647 | 0.672 | 0.618 |
 
 Run cost: 10 practice sessions, 0 LLM tokens, about 3 minutes wall time. Added since `7143676`: main's `b3f06da`
 (options of one message within 0.5 % of each other's C; one more ask under an open offer), `ANCHOR_ROUTINE` 0.13
