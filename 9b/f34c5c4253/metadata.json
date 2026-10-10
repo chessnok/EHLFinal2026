@@ -3,7 +3,7 @@
   "checkpoint_id": "9bf34c5c4253",
   "strategy": "manual-commit",
   "branch": "docs/team-review",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "agent/docs/team-review-2026-10-10.md"
   ],
@@ -13,6 +13,12 @@
       "transcript": "/9b/f34c5c4253/0/full.jsonl",
       "content_hash": "/9b/f34c5c4253/0/content_hash.txt",
       "prompt": "/9b/f34c5c4253/0/prompt.txt"
+    },
+    {
+      "metadata": "/9b/f34c5c4253/1/metadata.json",
+      "transcript": "/9b/f34c5c4253/1/full.jsonl",
+      "content_hash": "/9b/f34c5c4253/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
