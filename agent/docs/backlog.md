@@ -120,7 +120,7 @@ did not fire.
 | 5 | Drop the price-history argument from the first e-mail; never cite one ID twice | all | 2.4 |
 | 6 | ~~In `stabilise` and `secure_supply` cases, estimate the supplier's cost before pushing the price down, and stop where the relationship charge outweighs the price~~ - done, see 3a | P02, P01, P03, P10 | 2.7 |
 
-## 3a. Done on 10-11 October (runs.md P-16 to P-27)
+## 3a. Done tasks (10-11 October, runs.md P-16 to P-27)
 
 State after it: `tactical` on `6bb73d1`, full pass `20261011-010356-practice-tactical`, mean 0.746, 10 of 10 deals
 (0.695 in the run this backlog was written from).
