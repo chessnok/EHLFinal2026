@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer
 
 from negotiator.data import Evidence, WorldData
+from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
 from negotiator.profile import SupplierProfile, build_profile
 from negotiator.session import Negotiation
@@ -67,6 +68,7 @@ DEFAULT_POLICY = POLICIES["routine"]
 STALL_EPS = 0.0005  # a C move below 0.05 % is no move
 DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
 MAX_ANCHOR = 0.15  # the first ask never lies more than 15 % below the supplier's quote
+UNDER_FLOOR = 0.02  # the first ask sits this far under the supplier's estimated floor
 EVIDENCE_FIRST = {  # profile trait / goal -> evidence kinds to put first
     "not_tracking_costs": ["index"],
     "open_book": ["should_cost"],
@@ -84,6 +86,9 @@ class Plan:
     target_c: float
     floor_price: float | None
     full_cost: float | None
+    gt: GroundTruth | None = None
+    lower_c: float = -math.inf  # C at the supplier's estimated floor: take it at once
+    upper_c: float = math.inf  # the most we accept when the deal is at risk - never said, never asked for
     evidence: list[Evidence] = field(default_factory=list)
     banned_kinds: set[str] = field(default_factory=set)
     our_c: list[float] = field(default_factory=list)  # the C we asked for, per round
@@ -91,6 +96,7 @@ class Plan:
     seen_replies: int = 0
     stalls: int = 0
     probed_final: bool = False
+    price_matched: bool = False
     asked_breakdown: bool = False
     breakdown_read: bool = False
 
@@ -117,11 +123,17 @@ class TacticalStrategy(BaselineStrategy):
             self._estimate_supplier(neg, sid, full_cost, profile)
             floor = self._floor(neg, full_cost, policy)
             open_c = neg.cost(sid, terms)
-            target_c = self._target_c(neg, sid, terms, policy, profile, floor, current)
-            plan = Plan(sid, self._name(sid), policy, profile, open_c, target_c, floor, full_cost)
+            gt = estimate(self.data, neg.case, sid, terms.get("unit_price"), tuple(profile.traits))
+            if gt.lower and goal not in RELATIONSHIP_GOALS:
+                floor = gt.lower  # one floor: the ground truth's (it knows below-cost sellers and countries)
+            target_c = self._target_c(neg, sid, terms, policy, profile, floor, current, gt)
+            plan = Plan(sid, self._name(sid), policy, profile, open_c, target_c, floor, full_cost, gt)
+            plan.lower_c, plan.upper_c = self._bounds_c(neg, sid, terms, gt, target_c, open_c)
             plan.evidence = self._evidence(neg, sid, terms.get("unit_price"), current) if terms else []
             if profile.has("hedged"):
                 plan.banned_kinds.add("index")  # "not our reality" until its hedge runs out
+            if gt.market_supports_ask:
+                plan.banned_kinds.add("index")  # the indices back its ask: citing them helps it, not us
             self.tplans[sid] = plan
             neg.recorder.event(
                 "plan",
@@ -136,19 +148,26 @@ class TacticalStrategy(BaselineStrategy):
                 open_price=terms.get("unit_price"),
                 open_c=open_c,
                 target_c=target_c,
+                lower_c=plan.lower_c,
+                upper_c=plan.upper_c,
+                ground_truth=gt.summary(),
                 c_alt=neg.c_alt,
                 floor_price=floor,
                 full_cost=full_cost,
                 evidence=[{"kind": e.kind, "refs": e.refs, "sentence": e.sentence} for e in plan.evidence],
             )
             log.info(
-                "%s plan [%s %s]: C open %s target %s floor %s",
+                "%s plan [%s %s]: price open %s lower %s upper %s (asked %s%%, justified %s%%) | C target %s upper %s",
                 sid,
                 goal,
                 ",".join(sorted(profile.traits)) or "-",
-                _k(open_c),
+                terms.get("unit_price"),
+                gt.lower,
+                gt.upper,
+                gt.asked_pct,
+                gt.justified_pct,
                 _k(target_c),
-                floor,
+                _k(plan.upper_c),
             )
 
     def _policy(self, goal: str, p: SupplierProfile) -> Policy:
@@ -210,22 +229,36 @@ class TacticalStrategy(BaselineStrategy):
             return round(full_cost / (1 - margin / 100), 2)
         return round(full_cost * (1 + policy.markup), 2)
 
-    def _target_c(self, neg, sid, terms, policy, profile, floor, current) -> float:
-        """The C of our first ask: the deepest credible price on our C-optimal terms."""
+    def _target_c(self, neg, sid, terms, policy, profile, floor, current, gt: GroundTruth | None = None) -> float:
+        """The C of our first ask: the deepest credible price on our C-optimal terms - just under the
+        supplier's estimated floor when we have one, else an anchor below the reference price."""
         open_price = terms.get("unit_price")
         if open_price is None:
             return math.inf
         ref = min(open_price, current) if current else open_price
-        candidates = [ref * (1 - policy.anchor)]
+        candidates = [gt.lower * (1 - UNDER_FLOOR)] if gt and gt.lower else [ref * (1 - policy.anchor)]
         alt_price = ((neg.buyer.get("alternative") or {}).get("terms") or {}).get("unit_price")
         if alt_price and alt_price < open_price:
             candidates.append(alt_price * 0.98)
         price = max(min(candidates), open_price * (1 - MAX_ANCHOR))  # deeper reads as an insult, not an ask
-        if floor:
-            price = max(price, floor)
+        if floor and neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+            price = max(price, floor)  # below its sustainable margin the deal costs us C
         price = min(price, open_price)
         ideal = complete_offer(neg.case, self._optimise(neg, sid, {**terms, "unit_price": round(price, 2)}))
         return min(neg.cost(sid, ideal), neg.cost(sid, terms))
+
+    def _bounds_c(self, neg, sid, terms, gt: GroundTruth, target_c: float, open_c: float) -> tuple[float, float]:
+        """The bounds in C, on our C-optimal terms: a fair price on poor terms (a short contract that
+        leaves need uncovered, early payment, dear freight) must not pass as a good deal."""
+        lower_c, upper_c = -math.inf, min(open_c, neg.c_alt)
+        if gt.lower:
+            lower_c = neg.cost(sid, self._ideal(neg, sid, terms, gt.lower))
+        if gt.upper:
+            upper_c = min(upper_c, neg.cost(sid, self._ideal(neg, sid, terms, gt.upper)))
+        return lower_c, max(upper_c, target_c)
+
+    def _ideal(self, neg, sid, terms: dict, price: float) -> dict:
+        return complete_offer(neg.case, self._optimise(neg, sid, {**terms, "unit_price": round(price, 2)}))
 
     # ------------------------------------------------------------------ per thread
     def decide(self, neg: Negotiation, supplier_id: str) -> Decision:
@@ -245,9 +278,15 @@ class TacticalStrategy(BaselineStrategy):
             return Decision.hold(supplier_id, "the deadline is near")
 
         their_c = neg.cost(supplier_id, theirs)
+        if their_c <= plan.lower_c:
+            return Decision.hold(supplier_id, "at the supplier's estimated floor", their_c=their_c)
+        if match := self._price_match(neg, supplier_id, plan, theirs, their_c):
+            return match
         if t.status == "final_offer":
+            if their_c <= plan.upper_c:
+                return Decision.hold(supplier_id, "final offer within our upper bound", their_c=their_c)
             if plan.probed_final or not self._may_probe(neg, supplier_id, their_c):
-                return Decision.hold(supplier_id, "final offer")
+                return Decision.hold(supplier_id, "final offer above our upper bound", their_c=their_c)
             plan.probed_final = True
             ask_c = their_c - 0.35 * max(0.0, their_c - (plan.our_c[-1] if plan.our_c else plan.target_c))
             return self._offer(neg, supplier_id, plan, theirs, ask_c, their_c, probe=True)
@@ -321,7 +360,7 @@ class TacticalStrategy(BaselineStrategy):
             step = by_time * 0.5  # break the deadlock once, gently
         else:
             step = min(plan.policy.reciprocity * max(their_move, 0.0), max(by_time, 0.3 * max(their_move, 0.0)))
-        return min(last + step, their_c)
+        return min(last + step, their_c, plan.upper_c)  # the upper bound is never asked for beyond
 
     def _round_budget(self, neg: Negotiation, sid: str) -> int:
         """Messages we can still expect to play in this thread: the round limit, or the clock."""
@@ -351,9 +390,66 @@ class TacticalStrategy(BaselineStrategy):
         for other, ot in neg.threads.items():
             if other != sid and ot.live and ot.standing[0] and not accept_problems(neg, other, ot.standing[0]):
                 return True  # a rival offer we could take instead
-        return math.isfinite(neg.c_alt) and neg.c_alt <= their_c * 1.01
+        if math.isfinite(neg.c_alt) and neg.c_alt <= their_c * 1.01:
+            return True
+        return their_c > self.tplans[sid].upper_c * 1.02  # clearly above what the data supports: one push
 
     # ------------------------------------------------------------------ the offer
+    def _price_match(self, neg, sid, plan: Plan, theirs: dict, their_c: float) -> Decision | None:
+        """Its price is within our upper bound but its other terms cost us: take the price, fix the terms.
+
+        Easy for the supplier to say yes to (it keeps its price) and it recovers what the terms cost -
+        e.g. a 12-month sheet in a 24-month need, or early payment. Once per thread."""
+        gt = plan.gt
+        price = theirs.get("unit_price")
+        if plan.price_matched or not gt or not gt.upper or price is None or price > gt.upper:
+            return None
+        t = neg.threads[sid]
+        at_risk = (
+            t.status == "final_offer"
+            or plan.stalls >= 2
+            or self._round_budget(neg, sid) - t.rounds_used <= 2
+            or (gt.lower is not None and price <= gt.lower * (1 + UNDER_FLOOR))  # it is at its floor already
+        )
+        if not at_risk:
+            return None  # the upper bound is our emergency line, not an early yes
+        matched = self._ideal(neg, sid, theirs, price)
+        if not neg.keeps_must_haves(sid, matched) or neg.cost(sid, matched) >= their_c * (1 - 0.005):
+            return None  # its terms are already as good as ours
+        plan.price_matched = True
+        sheets = [{"terms": matched}]
+        trade = self._trade_terms(neg, sid, plan, matched)
+        if trade:
+            trade = complete_offer(
+                neg.case, {**trade, "unit_price": self._iso_cost_price(neg, sid, trade, neg.cost(sid, matched))}
+            )
+            if neg.keeps_must_haves(sid, trade) and trade["unit_price"] >= price * 0.97 and trade != matched:
+                sheets.append({"terms": trade})
+        plan.our_c.append(neg.cost(sid, matched))
+        lines = [
+            f"Dear {plan.name} team,",
+            "",
+            f"thank you. We can accept your price of EUR {price:,.2f} - on the terms below, which complete the "
+            "agreement for our full requirement.",
+            "",
+            "We can award on any of these options:" if len(sheets) > 1 else "Our proposal:",
+        ]
+        lines += [f"Option {chr(65 + i)}: {describe(neg.case, sh['terms'])}" for i, sh in enumerate(sheets)]
+        lines += ["", SIGNATURE]
+        return Decision(
+            "message",
+            sid,
+            message={"subject": neg.case.get("title", "Your quote"), "body": "\n".join(lines), "term_sheets": sheets},
+            rationale={
+                "round": neg.threads[sid].rounds_used + 1,
+                "move": "price match: its price, our terms",
+                "their_price": price,
+                "upper_price": gt.upper,
+                "their_c": round(their_c, 2),
+                "c_sheets": [neg.cost(sid, sh["terms"]) for sh in sheets],
+            },
+        )
+
     def _offer(self, neg, sid, plan, theirs, ask_c, their_c, probe: bool = False) -> Decision:
         sheets = self._sheets(neg, sid, plan, theirs, ask_c, their_c)
         if not sheets:
@@ -390,19 +486,20 @@ class TacticalStrategy(BaselineStrategy):
         if trade:
             variants.append(trade)
         variants.append(complete_offer(case, dict(theirs)))  # its own terms: a pure price move
-        out, seen = [], set()
+        out, seen, under_floor = [], set(), []
         for terms in variants:
             priced = complete_offer(case, {**terms, "unit_price": self._iso_cost_price(neg, sid, terms, ask_c)})
             key = repr(sorted(priced.items(), key=lambda kv: kv[0]))
             if key in seen or not priced.get("unit_price") or not neg.keeps_must_haves(sid, priced):
                 continue
-            if plan.floor_price and priced["unit_price"] < plan.floor_price * 0.97:
-                continue  # below what it can sell at: an insult, not an offer
             if neg.cost(sid, priced) >= their_c:
                 continue
             seen.add(key)
+            if plan.floor_price and priced["unit_price"] < plan.floor_price * (1 - UNDER_FLOOR - 0.01):
+                under_floor.append({"terms": priced})  # far below what it can sell at: an insult
+                continue
             out.append({"terms": priced})
-        return out[:3]
+        return (out or under_floor)[:3]  # never go silent: an offer under its floor beats none
 
     def _trade_terms(self, neg, sid, plan, ideal: dict) -> dict | None:
         """Our terms with the levers the supplier values given to it (the price pays for them)."""
@@ -477,6 +574,12 @@ class TacticalStrategy(BaselineStrategy):
         else:
             lines.append("thank you for your reply and the step towards us. We move as well.")
         lines += [c.sentence for c in claims]
+        gt = plan.gt
+        if first and gt and gt.asked_pct and gt.justified_pct is not None and not gt.market_supports_ask:
+            lines.append(
+                f"Weighted by the cost drivers of this part, the market moved {gt.justified_pct:+.1f}% over the last "
+                f"twelve months - not the {gt.asked_pct:.1f}% you ask for."
+            )
         if not plan.asked_breakdown and (first or p.has("open_book")) and not plan.breakdown_read:
             lines.append("Could you send us a cost breakdown for this part?")
             plan.asked_breakdown = True

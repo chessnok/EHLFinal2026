@@ -4,7 +4,8 @@ send and every accept, whatever the strategy decided.
 Accept:  the sheet is the supplier's current standing offer; it keeps every must-have on the terms
          it would really close on (sheet, then the supplier's standard terms from its quote PDF) -
          and a must-have field we cannot read from either counts as broken; C is finite and beats
-         the alternative.
+         the alternative - and, when there is one, the cheapest opening too (else the alternative
+         scores at least as much).
 Send:    every term sheet carries exactly the negotiable fields with allowed values and keeps the
          must-haves (a supplier may agree to any sheet we send, and we must be able to accept it);
          every cited ID exists in the data, the case's facts or this session's offers; at most 3
@@ -52,6 +53,9 @@ def accept_problems(neg, supplier_id: str, term_sheet_id: str | None) -> list[st
         problems.append("C is not finite")
     elif c >= neg.c_alt:
         problems.append(f"C {c:,.0f} does not beat the alternative {neg.c_alt:,.0f}")
+    elif math.isfinite(neg.c_alt) and c >= neg.c_open:
+        # a deal no better than the cheapest opening scores 0; the alternative scores at least that
+        problems.append(f"C {c:,.0f} is not better than the opening {neg.c_open:,.0f}")
     return problems
 
 

@@ -229,6 +229,16 @@ class Negotiation:
         terms = alt.get("terms") or {}
         return total_cost(self.case, terms) if terms.get("unit_price") is not None else math.inf
 
+    @property
+    def c_open(self) -> float:
+        """Our estimate of C_open: the cheapest opening quote that keeps the must-haves."""
+        best = math.inf
+        for sid, t in self.threads.items():
+            first = next((m for m in t.supplier_messages if m.get("term_sheets")), None)
+            if first and self.keeps_must_haves(sid, first["term_sheets"][0]["terms"]):
+                best = min(best, self.cost(sid, first["term_sheets"][0]["terms"]))
+        return best
+
     def cost(self, supplier_id: str, terms: dict) -> float:
         if not terms or terms.get("unit_price") is None:
             return math.inf

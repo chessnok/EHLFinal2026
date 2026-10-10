@@ -167,3 +167,47 @@ def test_tactical_closes_every_sim_case_fast_and_clean(sim: Settings, world: Wor
     decide = recorder.metrics.snapshot()["timings"]["strategy.decide"]
     assert decide["max"] < 2.0  # the 60 s clock: deciding must never be the slow part
     assert lessons.is_file()
+
+
+# ---------------------------------------------------------------- ground truth
+def test_ground_truth_p01_squeezes_an_unjustified_increase(world) -> None:
+    from negotiator.groundtruth import estimate
+
+    case_ = {"parts": ["part:310010"], "trigger_doc": "doc:20260911-70110-P01", "buyer": {"current_unit_price": 126.53}}
+    gt = estimate(world, case_, "sup:70110", 138.55, ("below_cost",))
+    assert gt.asked_pct == 9.5 and round(gt.justified_pct, 1) == 2.3
+    assert gt.full_cost_source == "own plant"
+    assert gt.lower <= gt.upper <= 138.55
+    assert gt.upper <= 126.53 * 1.03  # the market supports ~2.3 %, not 9.5 %
+    assert not gt.market_supports_ask
+
+
+def test_ground_truth_p02_keeps_index_arguments_out(world) -> None:
+    """Copper rose 48 %: the cost drivers support more than Nordmark asks - citing them would hurt us."""
+    from negotiator.groundtruth import estimate
+
+    case_ = {"parts": ["part:350011"], "trigger_doc": "doc:20260914-70510-P02", "buyer": {"current_unit_price": 348.32}}
+    gt = estimate(world, case_, "sup:70510", 370.96)
+    assert gt.justified_pct > gt.asked_pct and gt.market_supports_ask
+    assert gt.lower <= gt.upper <= 370.96
+
+
+def test_ground_truth_bounds_hold_without_data() -> None:
+    from negotiator.groundtruth import estimate
+
+    gt = estimate(None, {"parts": ["part:x"], "buyer": {"current_unit_price": 10.0}}, "sup:x", 11.0)
+    assert gt.lower is not None and gt.lower <= gt.upper <= 11.0
+
+
+def test_accept_guard_refuses_worse_than_opening_when_walking_is_safe(tmp_path, world) -> None:
+    c = case(alternative={"kind": "quote", "ref": None, "terms": {"unit_price": 30.0, "payment_days": 60}})
+    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 16.0, "payment_days": 60})
+    t = neg.threads[sid]
+    t.messages.append(
+        {
+            "from": f"sales@{sid}",
+            "status": "final_offer",
+            "term_sheets": [{"term_sheet_id": "offer:x-1", "terms": {"unit_price": 17.0, "payment_days": 60}}],
+        }
+    )
+    assert any("opening" in p for p in accept_problems(neg, sid, "offer:x-1"))
