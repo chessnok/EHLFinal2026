@@ -9,8 +9,9 @@ costs no practice session and no token: use it to rank strategy changes before a
     negotiator sim bench a b c        play strategies on the simulator, next to their arena scores
     negotiator sim serve              the simulator as a local arena, for `negotiator --url ...`
 
-What it cannot tell you: anything about wording. The simulated supplier reads term sheets and cited IDs, not
-the e-mail, so tone, questions, unbacked claims and leaks have no effect here - on the arena they do.
+What the fitted supplier cannot tell you: anything about wording. It reads term sheets and cited IDs, not the
+e-mail, so tone, questions, unbacked claims and leaks have no effect on it - on the arena they do. The opponent
+`llm` (`llm_supplier.py`) reads the e-mail: a model answers as the supplier did in our replays, for tokens.
 """
 
 import logging
@@ -26,6 +27,7 @@ import arena_kit.sim as kit
 from arena_kit.cost import closing_terms, cost_breakdown, must_haves_ok, score, total_cost
 
 from negotiator.sim.calibrate import _moves, as_objects, best_cost, calibrate, estimate
+from negotiator.sim.llm_supplier import LLMThread
 from negotiator.sim.pricing import value_of
 from negotiator.sim.supplier import PERSONAS, Profile, Thread
 
@@ -83,10 +85,13 @@ def session_profiles(model: dict, case: dict, rng: random.Random, strangers: boo
 
 
 def new_thread(model: dict, case: dict, sup: str, rng: random.Random, profile: Profile | None = None,
-               c_best: float | None = None, persona: str = "fitted") -> Thread:  # fmt: skip
+               c_best: float | None = None, persona: str = "fitted", llm=None) -> Thread:  # fmt: skip
     profile = profile or model["profiles"][f"{case['case_id']}|{sup}"]
     c_best = model["results"][case["case_id"]]["c_best"] if c_best is None else c_best
-    return Thread(profile, model["pool"], rng, cap=price_cap(case, profile.ref, c_best), persona=PERSONAS[persona])
+    cap = price_cap(case, profile.ref, c_best)
+    if PERSONAS[persona].llm:  # the fitted supplier's money, a model's decisions and words
+        return LLMThread(profile, model["pool"], rng, cap=cap, llm=llm)
+    return Thread(profile, model["pool"], rng, cap=cap, persona=PERSONAS[persona])
 
 
 def _text(value):
@@ -102,9 +107,12 @@ class CalibratedSim(kit.Sim):
     """The kit's simulator with fitted suppliers, the arena's yardstick and no practice quota."""
 
     def __init__(self, model: dict, facts=None, seed: int = 0, strangers: bool = False, no_clock: bool = True,
-                 persona: str = "fitted", jitter: bool = False):  # fmt: skip
+                 persona: str = "fitted", jitter: bool = False, llm=None):  # fmt: skip
         super().__init__(model["cases"], facts, no_clock=no_clock)
         self.model, self.seed, self.strangers, self.persona, self.jitter = model, seed, strangers, persona, jitter
+        self.llm = llm  # the model behind the opponent `llm`
+        if PERSONAS[persona].llm and llm is None:
+            raise ValueError("the llm opponent needs a model")
         self.opened = defaultdict(int)
 
     def practice(self, team):
@@ -126,7 +134,7 @@ class CalibratedSim(kit.Sim):
         profiles, s["c_best"] = session_profiles(self.model, case, world, self.strangers, self.jitter)
         for sup in case["suppliers"]:
             rng = random.Random(f"{self.seed}/{case_id}/{self.opened[case_id]}/{sup}")
-            sim = new_thread(self.model, case, sup, rng, profiles[sup], s["c_best"], self.persona)
+            sim = new_thread(self.model, case, sup, rng, profiles[sup], s["c_best"], self.persona, self.llm)
             p = sim.profile
             standard = {k: v for k, v in p.ref.items() if k not in fixed and k != "unit_price"}
             th = s["threads"][sup] = {"key": sup.split(":", 1)[1], "round": 0, "n": 0, "timeouts": 0,
@@ -142,9 +150,9 @@ class CalibratedSim(kit.Sim):
             "threads": {k: list(th["messages"]) for k, th in s["threads"].items()},
         }
 
-    def _claims(self, s, th, msg) -> tuple[list[dict], list[str], set[str]]:
+    def _claims(self, s, th, msg) -> tuple[list[dict], list[str], set[str], list[str]]:
         """The cited IDs as arguments: one per kind, checked for a known ID and a first use, as the kit does;
-        a rival quote above the supplier's own price is true but cannot convince."""
+        a rival quote above the supplier's own price is true but cannot convince. Last: the kind of each result."""
         refs = list(dict.fromkeys(msg.get("refs", []) + kit.ID_RE.findall(msg.get("body", ""))))
         groups: dict[str, list[str]] = {}
         for ref in refs:
@@ -168,11 +176,20 @@ class CalibratedSim(kit.Sim):
                     prices = [(s["offers"].get(r) or self.facts.get(r) or {}).get("unit_price") for r in ids]
                     if not any(p is not None and p < th["stated"]["unit_price"] for p in prices):
                         weak.add(kind)
-        return results, verified, weak
+        return results, verified, weak, list(groups)[:MAX_CLAIMS]
 
     def _answer(self, s, th, msg, sheets):
-        results, verified, weak = self._claims(s, th, msg)
-        out = th["sim"].reply(s["case"], sheets, verified, frozenset(weak))
+        results, verified, weak, kinds = self._claims(s, th, msg)
+        if isinstance(th["sim"], LLMThread):
+            checked = [{"type": k, "result": r["result"]} for k, r in zip(kinds, results, strict=True)]
+            mail = {"body": msg.get("body", ""), "claims": checked}
+            self.lock.release()  # the model takes seconds: other sessions go on (one buyer e-mail per thread at a time)
+            try:
+                out = th["sim"].reply(s["case"], sheets, verified, frozenset(weak), mail)
+            finally:
+                self.lock.acquire()
+        else:
+            out = th["sim"].reply(s["case"], sheets, verified, frozenset(weak))
         files = ["quote.pdf"] if out["status"] in ("agreed", "final_offer") else []
         if out["status"] == "walked_away":
             th["closed"] = "walked_away"
@@ -234,16 +251,18 @@ class CalibratedSim(kit.Sim):
 # -- check: does the fit predict sessions it has not seen? ---------------------------------------------
 
 
-def replay(model: dict, t: dict, seed: int) -> dict | None:
+def replay(model: dict, t: dict, seed: int, llm=None) -> dict | None:
     """Feed one recorded session's buyer e-mails to the simulated suppliers. Returns the simulated and the
-    recorded score of the deal the buyer closed (the same supplier, at what stood when it accepted)."""
+    recorded score of the deal the buyer closed (the same supplier, at what stood when it accepted), and in how
+    many replies the simulated status was the recorded one. With `llm` the model answers, reading the e-mails."""
     case, o = t["case"], t["outcome"]
     sup = o.get("supplier_id")
     key = f"{case['case_id']}|{sup}"
     if not o.get("deal") or key not in model["profiles"]:
         return None
-    th = new_thread(model, case, sup, random.Random(f"{seed}/{t['_id']}"))
+    th = new_thread(model, case, sup, random.Random(f"{seed}/{t['_id']}"), persona="llm" if llm else "fitted", llm=llm)
     p, real_value, standing = th.profile, th.value, dict(th.terms)
+    same = replies = 0
     for buyer, m, _ in _moves(t, sup):
         if buyer is None or m["terms"].get("unit_price") is None:
             continue
@@ -255,7 +274,14 @@ def replay(model: dict, t: dict, seed: int) -> dict | None:
                 and min((c.get("asserted") or {}).values(), default=0) >= standing.get("unit_price", 0)}  # fmt: skip
         if th.status in ("agreed", "walked_away"):
             break
-        standing = th.reply(case, sheets, [c["type"] for c in claims], frozenset(weak))["terms"]
+        args = [case, sheets, [c["type"] for c in claims], frozenset(weak)]
+        if llm:
+            said = (buyer.get("interpreted") or {}).get("claims") or []
+            checked = [{"type": c["type"], "result": results.get(i, "unchecked")} for i, c in enumerate(said)]
+            args.append({"body": buyer.get("body") or "", "claims": checked})
+        out = th.reply(*args)
+        standing = out["terms"]
+        same, replies = same + (out["status"] == m["status"]), replies + 1
         real_value = value_of(case, p.rates, p.ref, m["terms"])
     r = model["results"][case["case_id"]]
     c_sim = total_cost(case, closing_terms(case, standing, p.ref), supplier=estimate(p))
@@ -266,23 +292,36 @@ def replay(model: dict, t: dict, seed: int) -> dict | None:
         "real": o["score"],
         "sim": score(r["c_open"], c_sim, r["c_best"]),
         "value_error": (th.value - real_value) / gap,  # in shares of the supplier's whole room to move
+        "same_status": same,
+        "replies": replies,
+        "fallbacks": getattr(th, "fallbacks", 0),
     }
 
 
-def check(sessions: list[dict], seeds: int = 20) -> dict:
+def check(sessions: list[dict], seeds: int = 20, llm=None, only: set[str] | None = None, parallel: int = 4) -> dict:
     """Leave one session out: fit on the others, replay it, compare. Per case and overall: the error of the
-    simulated score, next to how much the arena's own score varies between repeats of one strategy."""
-    rows = []
-    for i, t in enumerate(sessions):
+    simulated score, next to how much the arena's own score varies between repeats of one strategy. `only`: the
+    sessions (`_id`) to replay - each one costs model calls when `llm` answers."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(i: int) -> dict | None:
+        t = sessions[i]
         rest = sessions[:i] + sessions[i + 1 :]
         if not any(x["case"]["case_id"] == t["case"]["case_id"] for x in rest):
-            continue  # nothing else recorded for this case: no fit to test
+            return None  # nothing else recorded for this case: no fit to test
         model = as_objects(calibrate(rest))
-        got = [r for seed in range(seeds) if (r := replay(model, t, seed))]
-        if got:
-            rows.append({**got[0], "sim": statistics.mean(g["sim"] for g in got),
-                         "sim_sd": statistics.pstdev(g["sim"] for g in got),
-                         "value_error": statistics.mean(g["value_error"] for g in got)})  # fmt: skip
+        got = [r for seed in range(seeds) if (r := replay(model, t, seed, llm))]
+        if not got:
+            return None
+        return {**got[0], "session": t["_id"], "sim": statistics.mean(g["sim"] for g in got),
+                "sim_sd": statistics.pstdev(g["sim"] for g in got),
+                "value_error": statistics.mean(g["value_error"] for g in got),
+                "same_status": sum(g["same_status"] for g in got), "replies": sum(g["replies"] for g in got),
+                "fallbacks": sum(g["fallbacks"] for g in got)}  # fmt: skip
+
+    picked = [i for i, t in enumerate(sessions) if only is None or t["_id"] in only]
+    with ThreadPoolExecutor(parallel if llm else 1) as pool:
+        rows = [r for r in pool.map(one, picked) if r]
     by_case = defaultdict(list)
     for r in rows:
         by_case[r["case_id"]].append(r)
@@ -299,11 +338,15 @@ def check(sessions: list[dict], seeds: int = 20) -> dict:
             "sim": statistics.mean(r["sim"] for r in rs),
             "bias": statistics.mean(r["sim"] - r["real"] for r in rs),
             "abs_error": statistics.mean(abs(r["sim"] - r["real"]) for r in rs),
+            "same_status": sum(r["same_status"] for r in rs) / max(1, sum(r["replies"] for r in rs)),
             "arena_sd": statistics.mean(sds) if sds else None,
         })  # fmt: skip
     return {
         "cases": out,
         "sessions": len(rows),
+        "same_status": sum(r["same_status"] for r in rows) / max(1, sum(r["replies"] for r in rows)),
+        "replies": sum(r["replies"] for r in rows),
+        "fallbacks": sum(r["fallbacks"] for r in rows),
         "bias": statistics.mean(r["sim"] - r["real"] for r in rows) if rows else None,
         "abs_error": statistics.mean(abs(r["sim"] - r["real"]) for r in rows) if rows else None,
         "rows": rows,
@@ -355,9 +398,10 @@ def arena_scores(sessions: list[dict]) -> dict:
 
 def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str], reps: int, runs_dir: Path,
           strangers: bool = False, parallel: int = 8, llm=None, opponents: tuple[str, ...] = ("fitted",),
-          jitter: bool = False) -> dict:  # fmt: skip
+          jitter: bool = False, supplier_llm=None) -> dict:  # fmt: skip
     """Play each strategy `reps` times on every case against every opponent; rep i meets the same supplier seed
-    for every strategy. Returns (strategy, case) -> scores, (strategy, opponent) -> outcomes, and the run folders."""
+    for every strategy. Returns (strategy, case) -> scores, (strategy, opponent) -> outcomes, and the run folders.
+    `supplier_llm`: the model of the opponent `llm`."""
     from negotiator.client import ArenaClient, _Pacer
     from negotiator.config import Settings
     from negotiator.report import write_report
@@ -366,9 +410,11 @@ def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str
     from negotiator.telemetry import Recorder
 
     scores, by_opponent, runs = defaultdict(list), defaultdict(list), []
+    model_replies = {"calls": 0, "fallbacks": 0}  # of the opponent `llm`
     for opponent in opponents:
         for rep in range(reps):
-            sim = CalibratedSim(model, getattr(data, "facts", None), rep, strangers, persona=opponent, jitter=jitter)
+            sim = CalibratedSim(model, getattr(data, "facts", None), rep, strangers, persona=opponent, jitter=jitter,
+                                llm=supplier_llm)  # fmt: skip
             url, key, server = serve(sim)
             local = Settings(**{**settings.__dict__, "arena_url": url, "api_key": key, "runs_dir": runs_dir,
                                 "final_mode": False})  # fmt: skip
@@ -386,4 +432,7 @@ def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str
                     scores[(name, o["case_id"])].append(o.get("score") or 0.0)
                     by_opponent[(name, opponent)].append({"score": o.get("score") or 0.0, "deal": bool(o.get("deal"))})
             server.should_exit = True
-    return {"scores": scores, "by_opponent": by_opponent, "runs": runs}
+            for th in (th for s in sim.sessions.values() for th in s["threads"].values()):
+                model_replies["calls"] += getattr(th["sim"], "calls", 0)
+                model_replies["fallbacks"] += getattr(th["sim"], "fallbacks", 0)
+    return {"scores": scores, "by_opponent": by_opponent, "runs": runs, "model_replies": model_replies}

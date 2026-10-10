@@ -94,8 +94,8 @@ an error or a slow call sends tactical's template. `tactical-llm+reader` adds a 
 
 | Setting | Default | What |
 |---|---|---|
-| `LLM_MESSAGE_BUDGET_S` | 30 | wall clock for all model calls of one e-mail together (reader, writer, queueing); it also ends 45 s after the supplier's reply came in. Then the template goes out |
-| `WRITER_TIMEOUT_S` · `READER_TIMEOUT_S` | 20 · 8 | one call, never more than what is left of the budget |
+| `LLM_MESSAGE_BUDGET_S` | 10 | wall clock for all model calls of one e-mail together (reader, writer, queueing); it also ends 45 s after the supplier's reply came in. Then the template goes out |
+| `WRITER_TIMEOUT_S` · `READER_TIMEOUT_S` | 8 · 4 | one call, never more than what is left of the budget |
 | `WRITER_TEMPERATURE` | 0.2 | where the provider takes one (`claude-code` and `openai` do not) |
 
 Telemetry: counters `writer.calls`, `writer.used`, `writer.fallback` and `writer.fallback.<validator|guard|error|

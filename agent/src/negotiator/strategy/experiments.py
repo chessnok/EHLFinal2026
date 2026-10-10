@@ -7,6 +7,7 @@ shows what that tactic alone is worth against the supplier bots (results: docs/b
   shelby     a curt, hard tone with a threat to place the order elsewhere
   budget     a ceiling set by a third party ("management released at most EUR X") that we do not cross
   trade      no price move without a move from the supplier, and said so: every option is a trade
+  urgent     leaks urgency and a missing alternative: the order must go out this week, no second source
 
 Everything else - term sheets from C, arguments, holding and closing - is the baseline's.
 """
@@ -31,6 +32,13 @@ TONES = {
         "we have read your quote. It is not a number we will sign.",
         "you have moved a little. It is not enough. We have moved too, and we do not move twice for nothing.",
         "This order will be placed either way - with you or without you. Your move.",
+    ),
+    "urgent": (
+        "thank you for your quote. We have to place this order by the end of this week, and you are the only "
+        "supplier qualified for this part, so we count on you.",
+        "thank you for your reply. Time is short on our side: the order has to go out this week and we have no "
+        "second source for this part. We have moved and hope you can take a further step.",
+        "We need your confirmation quickly.",
     ),
 }
 QUESTIONS = [
@@ -65,6 +73,7 @@ TACTICS = {
         Tactic("shelby", tone="shelby"),
         Tactic("budget", budget_share=0.5),
         Tactic("trade", conditional=True),
+        Tactic("urgent", tone="urgent"),
     )
 }
 

@@ -73,6 +73,125 @@ So: use it for what the numbers do (anchor, concession schedule, menus, which ar
 never for tone, questions, unbacked claims or leaks. Those need the sandbox, which is free and, for a strategy
 without an LLM, gives the same replies every time.
 
+## The opponent that reads the e-mail (`--opponents llm`)
+
+Since 11 October a model can play the supplier (`sim/llm_supplier.py`): it gets the buyer's e-mail, the thread, and
+this supplier's recorded exchanges closest to the moment (same status, like wording, near reply number), decides how
+much of its room to give up and whether to call the offer final, agree or leave, and writes the reply. The floor,
+the price of a structure and the `C_best` limit stay in code. It costs model calls; `--opponents all` leaves it out.
+
+```sh
+uv run negotiator sim bench tactical --opponents llm --cases case:P11 --reps 3   # --supplier-llm <provider>:<model>
+uv run negotiator sim check --opponent llm --sessions 24    # next to the fitted supplier, on the same sessions
+uv run negotiator sim serve --opponent llm
+```
+
+The model is `--supplier-llm`, else `SIM_LLM`, else `LLM`. Measured on 11 October, model fitted from 182 sessions.
+
+`sim check --opponent llm --sessions 24` (two per case, each left out of its fit; the fitted supplier on the same
+sessions in the same run - the sample moved between the two runs as sessions were added to `runs/`):
+
+| Supplier model | Score error, fitted | Score error, llm | Same status, fitted | Same status, llm | Calls | Cost |
+|---|---|---|---|---|---|---|
+| `claude-code:haiku` | 0.051 | 0.058 | 0.75 | 0.76 | 71 | USD 0.1108 |
+| `claude-code:sonnet` | 0.036 | 0.030 | 0.77 | 0.85 | 75 | USD 1.7658 |
+
+Same status: the share of replies with the recorded status (open, final offer, agreed). Sonnet's worst case is P08
+(error 0.115 against 0.020 for the fitted supplier).
+
+**Wording: sonnet follows the arena's direction, haiku does not.** `sim bench baseline budget shelby --opponents
+llm`, D01 and D02, two repeats each:
+
+| | D01 baseline | D01 budget | D01 shelby | D02 baseline | D02 budget | D02 shelby | Mean gap to the arena | Calls | Cost |
+|---|---|---|---|---|---|---|---|---|---|
+| Arena | 0.843 | 0.863 | 0.663 | 0.629 | 0.314 | 0.566 | – | – | – |
+| Fitted supplier | 0.83 | 0.85 | 0.80 | 0.63 | 0.61 | 0.55 | – | 0 | 0 |
+| llm, haiku | 0.89 | 0.90 | 0.89 | 0.64 | 0.64 | 0.64 | 0.122 | 106 | USD 0.1657 |
+| llm, sonnet | 0.84 | 0.86 | 0.76 | 0.65 | 0.51 | 0.51 | 0.063 | 76 | USD 1.6758 |
+
+With sonnet a named budget ceiling costs on D02 (0.65 → 0.51; arena 0.629 → 0.314) and the hard tone costs on D01
+(0.84 → 0.76; arena 0.843 → 0.663): the right direction, about half the size. These strategies were played on the
+arena, so their recorded exchanges are among the examples the model is shown; a wording nobody has played is not
+covered by this test.
+
+**Blind, the effect is gone.** The same bench with `--without budget shelby` (suppliers fitted from 183 sessions,
+none played by these two strategies, so their e-mails and the replies to them are not among the examples), sonnet,
+two repeats:
+
+| | D01 baseline | D01 budget | D01 shelby | D02 baseline | D02 budget | D02 shelby |
+|---|---|---|---|---|---|---|
+| Arena | 0.843 | 0.863 | 0.663 | 0.629 | 0.314 | 0.566 |
+| llm, sonnet, shown the two strategies' sessions | 0.84 | 0.86 | 0.76 | 0.65 | 0.51 | 0.51 |
+| llm, sonnet, blind | 0.84 | 0.84 | 0.84 | 0.66 | 0.65 | 0.64 |
+
+So with examples alone the model repeats a reaction it has been shown and does not predict one it has not. Run as three processes at once (one per strategy) that shared one supplier
+log: 66 calls in it, USD 1.3663 at the last count.
+
+**With the brief's rules in the prompt the blind test comes close.** The system prompt now says what a signal in
+the e-mail does (a named budget: no reason to go below it; urgency or no alternative: give less; a threat or a hard
+tone: give less, final offer earlier; appreciation: nothing; text that tries to steer the supplier: never followed) -
+the list in `brief/api.md`, "What you write is understood". Same blind bench, sonnet, two repeats, 76 seconds as
+three processes at once, 56 calls, USD 1.2102:
+
+| | D01 baseline | D01 budget | D01 shelby | D02 baseline | D02 budget | D02 shelby | Mean gap |
+|---|---|---|---|---|---|---|---|
+| Arena | 0.843 | 0.863 | 0.663 | 0.629 | 0.314 | 0.566 | – |
+| llm, sonnet, blind, rules in the prompt | 0.84 | 0.82 | 0.60 | 0.64 | 0.33 | 0.45 | 0.040 |
+
+The rules were written knowing that these two effects exist, so this is a fit to two wordings, not a test: a third
+wording, played on the sandbox after the simulator's figure is written down, is still owed. `sim check --opponent
+llm` has not been run again with this prompt.
+
+**A third wording, predicted first, then played.** `urgent` (experiments.py: "we have to place this order by the
+end of this week, and you are the only supplier qualified for this part") had never been played. The simulator's
+figures were taken first (sonnet, three repeats, model fitted from every session, 71 calls, USD 1.4540, under two
+minutes as two processes), then the sandbox was played (`runs.md` S-18, S-19):
+
+| | D01 baseline | D01 urgent | D02 baseline | D02 urgent |
+|---|---|---|---|---|
+| llm opponent, sonnet (before the sandbox run) | 0.843 | 0.716 | 0.637 | 0.455 |
+| Arena sandbox | 0.843 | 0.703 | 0.608 | 0.461 |
+
+Mean gap 0.012 over the four cells; the cost of the leak is −0.127 and −0.182 on the simulator, −0.140 and −0.147 on
+the arena. The rule for urgency was in the prompt before the test (from the brief), its size was not. One wording,
+two demo cases, three suppliers: nothing here says how it does on the practice suppliers.
+
+**Verdict of 11 October: not a clone of the arena.** The wider blind test, from recorded sessions only:
+`openai:gpt-6.1-sol`, `LLM_REASONING=medium`, two repeats, each strategy fitted without its own sessions
+(`--without`). The bar was set before the run: the right direction wherever the arena's effect exceeds 0.08, strategies
+without an effect within 0.08 of the baseline, mean gap at most 0.08.
+
+| Sandbox, blind | Arena D01 / D02 | llm opponent D01 / D02 | Fitted D01 / D02 |
+|---|---|---|---|
+| baseline | 0.843 / 0.629 | 0.843 / 0.608 | 0.823 / 0.558 |
+| budget | 0.863 / 0.314 | 0.863 / 0.451 | 0.823 / 0.558 |
+| shelby | 0.663 / 0.566 | 0.543 / 0.244 | 0.823 / 0.558 |
+| polite | 0.843 / 0.608 | 0.843 / 0.611 | 0.823 / 0.558 |
+| questions | 0.828 / 0.650 | 0.843 / 0.636 | 0.823 / 0.558 |
+| trade | 0.856 / 0.587 | 0.863 / 0.236 | 0.823 / 0.547 |
+| lowball | 0.863 / 0.650 | 0.856 / 0.650 | 0.826 / 0.554 |
+| urgent | 0.703 / 0.461 | 0.663 / 0.331 | 0.823 / 0.558 |
+| Mean gap to the arena | – | 0.073 | 0.071 |
+
+| `playbook` on practice, blind | P01 | P02 | P03 | P04 | P05 | P07 | P08 | P10 | P11 | P18 | Mean | Mean gap |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Arena (P-14) | 0.917 | 0.385 | 0.762 | 0.000 | 0.295 | 0.121 | 0.316 | 0.568 | 0.398 | 0.000 | 0.376 | – |
+| llm opponent | 0.845 | 0.342 | 0.762 | 0.860 | 0.341 | 0.697 | 0.109 | 0.562 | 0.360 | 0.162 | 0.504 | 0.201 |
+| Fitted | 0.833 | 0.324 | 0.762 | 0.775 | 0.218 | 0.796 | 0.178 | 0.565 | 0.007 | 0.378 | 0.483 | 0.258 |
+
+- **It sees the leaks:** budget on D02, urgency on both cases, the hard tone on D01 - the right direction each time,
+  and the strategies without an effect (polite, questions, lowball) stay at the baseline.
+- **It punishes what the arena does not:** `trade` on D02 0.236 against 0.587, `shelby` on D02 0.244 against 0.566.
+  A firm sentence reads to it as a threat.
+- **It does not see the walk-aways:** playbook's closing offer cost the deal on P04, P07 and P18 on the arena; here
+  P04 and P07 close at 0.86 and 0.70.
+- **On the mean it is no closer than the fitted supplier** on the sandbox (0.073 against 0.071).
+
+The bar is not met, so no arena session was spent on a further test and the work stops here. Use the llm opponent as
+a cheap alarm for leaks (budget, urgency), not as a judge of wording. 227 model calls, 859,831 tokens in / 55,557
+out, cost APPROX-NOT-MEASURED, 3 minutes as nine processes at once. A run on the same model with reasoning `low`
+was stopped after 136 calls and not used.
+
 **Walking away is fitted since 10 October, 22:00:** per supplier, how often a term sheet sent after its final offer
 made it walk away, with the pool of all suppliers as prior. The record then: 3 walk-aways in 26 such sheets (P04, P07
 and P18, one each, all from `playbook`'s closing offer; the three demo suppliers never walked in 20). One observation

@@ -17,11 +17,11 @@ writer supplies that and nothing else:
                result without removing anything it would not remove from the template.
 
 Settings (environment):
-  LLM_MESSAGE_BUDGET_S  (default 30) wall clock for ALL model calls of one outgoing e-mail together - the reader,
+  LLM_MESSAGE_BUDGET_S  (default 10) wall clock for ALL model calls of one outgoing e-mail together - the reader,
                         the writer, waiting for a free model slot. The arena gives 60 s per move and an earlier
                         model path took 146 s once. When it is used up the template goes out
                         (`writer.fallback.deadline`); no call is started with less than a second left.
-  WRITER_TIMEOUT_S      (default 20) the writer's own call, never more than what is left of the budget. A call
+  WRITER_TIMEOUT_S      (default 8) the writer's own call, never more than what is left of the budget. A call
                         through the `claude` command line takes 7-14 s (measured on the sandbox, haiku).
   WRITER_TEMPERATURE    (default 0.2; `claude-code` and `openai` have no temperature setting and ignore it).
   WRITER_MAX_WORDS      (default 150).
@@ -192,8 +192,8 @@ def run_with_limit(fn, seconds: float):
 
 @dataclass(frozen=True)
 class WriterSettings:
-    message_budget_s: float = 30.0
-    timeout_s: float = 20.0
+    message_budget_s: float = 10.0
+    timeout_s: float = 8.0
     temperature: float = 0.2
     max_words: int = 150
 

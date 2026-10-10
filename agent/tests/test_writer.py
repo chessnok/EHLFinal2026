@@ -261,4 +261,4 @@ def test_the_writers_own_timeout_counts_apart_from_the_deadline(sim: Settings, w
 def test_without_a_model_it_is_tactical() -> None:
     strategy = STRATEGIES["tactical-llm"](None, None)
     assert strategy.writer is None and strategy.reader is None and isinstance(strategy, TacticalStrategy)
-    assert Writer(object()).settings.message_budget_s == 30.0
+    assert Writer(object()).settings.message_budget_s == 10.0
