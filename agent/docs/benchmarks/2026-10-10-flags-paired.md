@@ -63,3 +63,28 @@ P07 −0.007 (round-2 ask capped at 4 % of C_open: `big_steps`), P05 −0.057 (t
 Next candidates (agent/data/analysis/konzept-analyse.md, zuarbeit-t1t2-t3t4.md, antwort-fehler.md): three fresh
 verified arguments every round and new sources, the supplier's alternative as structure information (P10), an answer
 to "Which figures …?", the volume answer from the case's need.
+
+## Night of 10/11 Oct: candidate flags, measured on practice, none adopted
+
+Kept in the code as switchable candidates (`tactical+<flag>`, `tactical+yes` = alt_structure + answers,
+`tactical+intense` = yes + persistent), all off by default. Practice against the default (run 20261010-233812, 0.743):
+
+| Case | default | fresh_claims | intense | yes |
+|---|---|---|---|---|
+| P01 | 0.946 | 0.814 | 0.864 | 0.864 |
+| P02 | 0.731 | - | 0.731 | 0.731 |
+| P03 | 0.903 | **0.933** | 0.905 | 0.905 |
+| P04 | 0.860 | 0.860 | 0.860 | 0.860 |
+| P05 | 0.742 | 0.742 | 0.742 | 0.742 |
+| P07 | 0.663 | 0.721 | 0.708 | 0.656 |
+| P08 | 0.626 | 0.515 | 0.427 | 0.604 |
+| P10 | 0.601 | 0.625 | 0.625 | **0.679** |
+| P11 | 0.672 | 0.626 | **0.710** | 0.672 |
+| P18 | 0.685 | 0.654 | 0.587 | 0.618 |
+| mean | 0.743 | (9 cases) | 0.716 | 0.733 |
+
+- `fresh_claims`: a second complaint on the same part reads as "duplicate" of the quality record. More arguments of
+  one kind do not help; one per kind and case.
+- `alt_structure`: the structure of its alternative in our menu won P10 (+0.078). Taking its alternative's price at our
+  stop estimate lost P18 (−0.067), the same early close `patient` had removed.
+- `persistent`: smaller steady steps won P07 (+0.052) and P11 (+0.038) but lost P08 (−0.177).
