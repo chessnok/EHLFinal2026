@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "52cf012973ac",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 21,
+  "files_touched": [
+    "AGENTS.md",
+    "agent/docs/cost-model.md",
+    "agent/docs/cost-model.ru.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/52/cf012973ac/0/metadata.json",
+      "transcript": "/52/cf012973ac/0/full.jsonl",
+      "content_hash": "/52/cf012973ac/0/content_hash.txt",
+      "prompt": "/52/cf012973ac/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 742,
+    "cache_creation_tokens": 798330,
+    "cache_read_tokens": 184320806,
+    "output_tokens": 333930,
+    "api_call_count": 373
+  }
+}
