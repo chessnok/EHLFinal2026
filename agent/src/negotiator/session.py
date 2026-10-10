@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from arena_kit.cost import cost_breakdown, must_haves_ok, total_cost
 from arena_kit.docs import quote_terms, read_document
 
+from negotiator.chats import write_session_chat
 from negotiator.client import ArenaClient, ArenaError
 from negotiator.data import WorldData
 from negotiator.guards import accept_problems, clean_message
@@ -476,9 +477,11 @@ class Negotiation:
             t.messages = [
                 self._with_documents(m, supplier_id) if m.get("from") != "buyer" else m
                 for m in thread.get("messages", [])
-            ]
+            ] + timeout_messages(thread, supplier_id)
             t.closed = thread.get("closed")
-        return t.standing[0]
+            t.timeouts = len(thread.get("timeouts") or [])
+        # the arena's own word on the standing offer: answers to late moves sit in `timeouts`, not `messages`
+        return thread.get("offer_id") or t.standing[0]
 
     def _decision(self, kind: str, supplier_id: str, rationale: dict | None, **extra) -> None:
         entry = {
@@ -511,27 +514,29 @@ class Negotiation:
         m.observe("case.seconds", duration)
         m.incr("cases.deal" if result.get("deal") else "cases.no_deal")
         self.recorder.event("result", **outcome)
-        self.recorder.save_json(
-            f"sessions/{safe_name(self.session_id)}.json",
-            {
-                "outcome": outcome,
-                "case": self.case,
-                "threads": {
-                    sid: {
-                        "messages": t.messages,
-                        "closed": t.closed,
-                        "timeouts": t.timeouts,
-                        "standard_terms": t.standard_terms,
-                    }
-                    for sid, t in self.threads.items()
-                },
-                "decisions": self.decisions,
-                "result": result,
-                "trace": state.get("trace") or result.get("trace"),
-                "backoffice": backoffice,
-                "state": {k: v for k, v in state.items() if k not in ("result", "trace", "threads")},
+        saved = {
+            "outcome": outcome,
+            "case": self.case,
+            "threads": {
+                sid: {
+                    "messages": t.messages,
+                    "closed": t.closed,
+                    "timeouts": t.timeouts,
+                    "standard_terms": t.standard_terms,
+                }
+                for sid, t in self.threads.items()
             },
-        )
+            "decisions": self.decisions,
+            "result": result,
+            "trace": state.get("trace") or result.get("trace"),
+            "backoffice": backoffice,
+            "state": {k: v for k, v in state.items() if k not in ("result", "trace", "threads")},
+        }
+        self.recorder.save_json(f"sessions/{safe_name(self.session_id)}.json", saved)
+        try:  # the chat to read right after the case; never worth failing a case over
+            write_session_chat(self.recorder.dir, saved)
+        except Exception as e:  # noqa: BLE001
+            log.warning("chat transcript: %s", e)
         log.info(
             "%s ended (%s): deal=%s score=%s C_deal=%s C_open=%s C_best=%s  %s",
             self.case_id,
@@ -634,3 +639,35 @@ def _eur(value) -> str:
     if isinstance(value, float) and math.isinf(value):
         return "inf"
     return f"{value:,.2f}"
+
+
+def timeout_messages(thread: dict, supplier_id: str) -> list[dict]:
+    """The supplier's answers to our late moves, as messages: case:P05 lost track of an agreed offer because
+    its standing sheet (offer:70210-5) existed only in the thread's `timeouts` list."""
+    rounds = [_round_of(m) for m in thread.get("messages", []) if m.get("from") != "buyer"]
+    last = max((r for r in rounds if r is not None), default=-1)
+    out = []
+    for answer in sorted(thread.get("timeouts") or [], key=lambda a: a.get("round") or 0):
+        if (answer.get("round") or 0) <= last:
+            continue  # a regular reply came after it: that one stands
+        out.append(
+            {
+                "from": f"timeout@{supplier_id}",
+                "status": answer.get("status"),
+                "term_sheets": [{"term_sheet_id": answer.get("offer_id"), "terms": answer.get("terms") or {}}],
+                "missing_fields": answer.get("missing_fields") or [],
+                "claim_results": answer.get("claim_results") or [],
+                "signals": answer.get("signals"),
+                "body": answer.get("text") or "",
+            }
+        )
+    return out
+
+
+def _round_of(message: dict) -> int | None:
+    """The round of a supplier message from its id (msg:<supplier>-<round>-<n>)."""
+    parts = (message.get("message_id") or "").rsplit("-", 2)
+    try:
+        return int(parts[-2])
+    except (IndexError, ValueError):
+        return None

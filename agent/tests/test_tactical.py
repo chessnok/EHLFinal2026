@@ -4,6 +4,7 @@ import json
 import time
 from pathlib import Path
 
+from negotiator.chats import write_chats
 from negotiator.client import ArenaClient
 from negotiator.config import REPO_ROOT, Settings
 from negotiator.data import WorldData
@@ -158,28 +159,48 @@ def test_tactical_closes_every_sim_case_fast_and_clean(sim: Settings, world: Wor
     recorder.close()
     summary = write_report(recorder.dir, outcomes)
     lessons = write_lessons(recorder.dir)
+    chats = write_chats(recorder.dir)
 
-    assert summary["cases"] == len(case_ids) and not summary["failed"]
-    assert all(o["deal"] and o["must_haves_ok"] is not False for o in summary["outcomes"])
+    assert summary["cases"] == len(case_ids) and not summary["failed"], summary["failed"]
+    assert all(o["deal"] and o["must_haves_ok"] is not False for o in summary["outcomes"]), [
+        (o["case_id"], o["deal"], o["end_reason"], o["score"]) for o in summary["outcomes"]
+    ]
     assert all(o["score"] is not None and o["score"] > 0 for o in summary["outcomes"])
     assert summary["claims"].get("contradicted", 0) == 0
     assert time.time() - start < 120
     decide = recorder.metrics.snapshot()["timings"]["strategy.decide"]
     assert decide["max"] < 2.0  # the 60 s clock: deciding must never be the slow part
     assert lessons.is_file()
+    assert "supplier's reasons" in chats.read_text(encoding="utf-8")
+    assert len(list((recorder.dir / "sessions").glob("*.md"))) == len(case_ids)  # one chat per case
 
 
 # ---------------------------------------------------------------- ground truth
-def test_ground_truth_p01_squeezes_an_unjustified_increase(world) -> None:
+def test_ground_truth_p01_floor_follows_the_case_type(world) -> None:
+    """Calibrated on practice C_best: a price increase barely moves (P01's floor ~ its quote)."""
     from negotiator.groundtruth import estimate
 
-    case_ = {"parts": ["part:310010"], "trigger_doc": "doc:20260911-70110-P01", "buyer": {"current_unit_price": 126.53}}
+    case_ = {
+        "type": "price_increase",
+        "parts": ["part:310010"],
+        "suppliers": ["sup:70110"],
+        "trigger_doc": "doc:20260911-70110-P01",
+        "buyer": {"current_unit_price": 126.53, "category_goal": "stabilise"},
+    }
     gt = estimate(world, case_, "sup:70110", 138.55, ("below_cost",))
-    assert gt.asked_pct == 9.5 and round(gt.justified_pct, 1) == 2.3
+    assert gt.asked_pct == 9.5 and round(gt.justified_pct, 1) == 2.3  # still an argument for the e-mail
     assert gt.full_cost_source == "own plant"
     assert gt.lower <= gt.upper <= 138.55
-    assert gt.upper <= 126.53 * 1.03  # the market supports ~2.3 %, not 9.5 %
+    assert 136 <= gt.lower <= 138  # practice: the price that reached C_best was 138.20
     assert not gt.market_supports_ask
+
+
+def test_ground_truth_rfq_floor_sits_far_under_the_quotes(world) -> None:
+    from negotiator.groundtruth import estimate
+
+    case_ = {"type": "rfq", "parts": ["part:320070"], "suppliers": ["sup:70210", "sup:70240"], "buyer": {}}
+    gt = estimate(world, case_, "sup:70210", 36.0)
+    assert gt.lower < 36.0 * 0.85  # practice P05: C_best came at 0.69-0.85 of the quotes
 
 
 def test_ground_truth_p02_keeps_index_arguments_out(world) -> None:
@@ -221,3 +242,19 @@ def test_reply_signals_tell_room_from_a_last_word() -> None:
     assert reply_signals(soft) == {"room": True, "firm": False}
     assert reply_signals(firm)["firm"] and not reply_signals(firm)["room"]
     assert reply_signals("We have free capacity for your parts.")["room"]
+
+
+def test_timeout_answers_become_the_standing_offer() -> None:
+    """case:P05: the agreed sheet existed only in `timeouts`; accepting the stale id failed with a 422."""
+    from negotiator.session import timeout_messages
+
+    thread = {
+        "messages": [{"from": "sales@x", "message_id": "msg:x-3-6", "term_sheets": [{"term_sheet_id": "offer:x-3"}]}],
+        "timeouts": [
+            {"offer_id": "offer:x-4", "round": 4, "status": "agreed", "terms": {"unit_price": 29.09}},
+            {"offer_id": "offer:x-2", "round": 2, "status": "open", "terms": {"unit_price": 30.0}},
+        ],
+    }
+    out = timeout_messages(thread, "sup:x")
+    assert [m["term_sheets"][0]["term_sheet_id"] for m in out] == ["offer:x-4"]
+    assert out[0]["status"] == "agreed"

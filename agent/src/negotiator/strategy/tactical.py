@@ -455,6 +455,9 @@ class TacticalStrategy(BaselineStrategy):
         if neg.case.get("round_limit", 10) - t.rounds_used < 2 or neg.seconds_to_deadline() < 180:
             return False
         for other, ot in neg.threads.items():
+            if other != sid and self.tplans[other].probed_final and ot.live:
+                return False  # one rival is already being pushed: this one stays our safe fallback
+        for other, ot in neg.threads.items():
             if other != sid and ot.live and ot.standing[0] and not accept_problems(neg, other, ot.standing[0]):
                 return True  # a rival offer we could take instead
         if math.isfinite(neg.c_alt) and neg.c_alt <= their_c * 1.01:
