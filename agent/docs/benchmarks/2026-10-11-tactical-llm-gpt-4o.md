@@ -4,7 +4,7 @@
 
 | Run | Strategy and model | E-mail budget | D01 | D02 | Mean | Texts used | Seconds per e-mail (mean / max) |
 |---|---|---|---|---|---|---|---|
-| `20261011-014212-sandbox-tactical` | `tactical` (control) | – | 0.649 | 0.587 | 0.618 | – | – |
+| `20261011-014350-sandbox-tactical` | `tactical` (control) | – | 0.649 | 0.587 | 0.618 | – | – |
 | `20261011-014635-sandbox-tactical-llm` | `tactical-llm`, `claude-code:haiku` | 10 s | 0.649 | 0.587 | 0.618 | 0 of 9 (8 timeouts, 1 validator) | 8.0 / 8.8 |
 | `20261011-014826-sandbox-tactical-llm` | `tactical-llm`, `claude-code:haiku` | 40 s | 0.649 | 0.587 | 0.618 | 8 of 9 (1 validator) | 11.4 / 14.5 |
 | `20261011-020324-sandbox-tactical-llm` | `tactical-llm`, `compat:gpt-4o-mini` | 10 s | 0.649 | 0.587 | 0.618 | 6 of 9 (3 validator) | 2.8 / 5.3 |
