@@ -186,6 +186,13 @@ def test_tactical_closes_every_sim_case_fast_and_clean(sim: Settings, world: Wor
     assert lessons.is_file()
     assert "supplier's reasons" in chats.read_text(encoding="utf-8")
     assert len(list((recorder.dir / "sessions").glob("*.md"))) == len(case_ids)  # one chat per case
+    asks: dict[tuple, list[float]] = {}
+    for line in (recorder.dir / "events.jsonl").read_text(encoding="utf-8").splitlines():
+        e = json.loads(line)
+        if e.get("kind") == "decision" and e.get("action") == "message" and "ask_c" in e.get("rationale", {}):
+            asks.setdefault((e["session_id"], e["supplier_id"]), []).append(e["rationale"]["ask_c"])
+    backwards = {k: a for k, a in asks.items() if any(b < x for x, b in zip(a, a[1:], strict=False))}
+    assert not backwards, backwards  # a step back below our own last ask reads as reneging
 
 
 # ---------------------------------------------------------------- ground truth

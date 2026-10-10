@@ -84,6 +84,9 @@ alternative costs 0.14 on both cases.
 
 | Strategy | Mean | Deals | Record |
 |---|---|---|---|
+| tactical+rival_rest (`a252253`), P05 only: 0.824 against 0.742 | – | 1 of 1 | [record](2026-10-11-tactical-none.md) |
+| tactical+band_steps (`3a6471d`), six non-strategic cases: P18 −0.133, P08 −0.022, rest equal | – | 6 of 6 | [record](2026-10-11-tactical-none.md) |
+| tactical (`17fc8ad`, re-anchor never below our last ask) | **0.746** | 10 of 10 | [record](2026-10-11-tactical-none.md) |
 | tactical (`6bb73d1`, merged with main, routine cap, should-cost argument) | **0.746** | 10 of 10 | [record](2026-10-11-tactical-none.md) |
 | tactical (`7143676`, margin charge in C) | **0.736** | 10 of 10 | [record](2026-10-11-tactical-none.md) |
 

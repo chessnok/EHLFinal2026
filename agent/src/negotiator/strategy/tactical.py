@@ -524,8 +524,11 @@ class TacticalStrategy(BaselineStrategy):
         # the lower bound is where we anchor, not where we stop: below it we keep asking - the supplier
         # ends it with a stall or a final offer, and only it knows its real floor
         closing_word = t.status == "final_offer" or (signals["firm"] and t.rounds_used > 0)
-        if not closing_word and (
-            their_c <= plan.lower_c or self._undercut_after_big_step(neg, supplier_id, plan, theirs)
+        rest_pending = self._rest_pending(neg, supplier_id, plan)
+        if (
+            not closing_word
+            and not rest_pending
+            and (their_c <= plan.lower_c or self._undercut_after_big_step(neg, supplier_id, plan, theirs))
         ):
             if reanchor := self._reanchor(neg, supplier_id, plan, theirs, their_c):
                 return reanchor
@@ -546,7 +549,7 @@ class TacticalStrategy(BaselineStrategy):
                 ask_c = last + 0.5 * max(0.0, their_c - last)  # not capped: a crumb reads as a refusal (P18)
                 return self._offer(neg, supplier_id, plan, theirs, ask_c, their_c, probe=True)
             return Decision.hold(supplier_id, "last word: take it", their_c=their_c)
-        if match := self._price_match(neg, supplier_id, plan, theirs, their_c):
+        if not rest_pending and (match := self._price_match(neg, supplier_id, plan, theirs, their_c)):
             return match
 
         if plan.stalls >= 2 and their_c <= plan.upper_c:
@@ -668,6 +671,8 @@ class TacticalStrategy(BaselineStrategy):
         their_move = theirs_path[-2] - theirs_path[-1] if len(theirs_path) >= 2 else 0.0
         min_step = MIN_STEP * last
         gap = max(0.0, their_c - last)
+        if self._rest_pending(neg, sid, plan):
+            return min(last + min_step, their_c, plan.upper_c)
         if APPROVAL_PENDING.search(t.latest.get("body", "")):
             # "we need to clarify this internally" / "more than my band allows": its boss approves the next
             # step anyway (8 of 8 in the back office) - hold, with the smallest visible move
@@ -692,6 +697,21 @@ class TacticalStrategy(BaselineStrategy):
             room = max(0.0, plan.open_c - plan.target_c)
             step = max(RELATIONSHIP_STEP * step, min(min_step, RELATIONSHIP_MIN_STEP * room))
         return min(last + step, their_c, plan.upper_c)  # the upper bound is never asked for beyond
+
+    def _rest_pending(self, neg: Negotiation, sid: str, plan: Plan) -> bool:
+        """It just answered a rival quote we cited with a big step. "I give half the step now and check
+        the rest" - "Checked: give the rest of the step" (P05 back office, 47 of 50): the rest comes in its next
+        reply whatever we send, so a step of ours now - or a re-anchor's halfway ask - only pays for it (P05: 28.79
+        agreed at once; holding gave 0.742 -> 0.824, runs.md P-31). The same back-office rule ran for four
+        suppliers in two cases (P05, D02), so it is the arena's, not one supplier's (docs/bot-mechanics.md)."""
+        if not plan.our_c:
+            return False
+        path = self._their_c_path(neg, sid)
+        return (
+            any(c.kind == "rival_offer" for c in plan.last_claims)
+            and len(path) >= 2
+            and path[-2] - path[-1] >= BIG_STEP * path[-2]
+        )
 
     def _supplier_done(self, neg: Negotiation, sid: str, plan: Plan) -> bool:
         """The supplier itself says it is at its end: a final offer, firm words, a stall - or the rounds run out."""
@@ -892,6 +912,10 @@ class TacticalStrategy(BaselineStrategy):
         neg.recorder.event("reanchor", session_id=neg.session_id, supplier_id=sid, price=round(price, 2))
         log.info("%s: undercut our guessed floor - re-anchoring at %.2f", sid, price)
         ask_c = new_target + 0.5 * (their_c - new_target)  # meet halfway to the new anchor: credible, not greedy
+        if plan.our_c:
+            # never below our own last ask: where the first ask was capped (strategic suppliers) the halfway point
+            # sat under it, and the step back read as reneging - D01 "we cannot accept a reduction", taken at R2
+            ask_c = max(ask_c, plan.our_c[-1] * (1 + MIN_STEP))
         return self._offer(neg, sid, plan, theirs, ask_c, their_c)
 
     def _price_match(self, neg, sid, plan: Plan, theirs: dict, their_c: float) -> Decision | None:
