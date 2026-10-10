@@ -37,7 +37,7 @@ from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
 from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
-from negotiator.ledger import data_facts, reply_facts
+from negotiator.ledger import CITED_DRIVER, data_facts, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
 from negotiator.profile import SupplierProfile, build_profile
 from negotiator.session import Negotiation
@@ -72,6 +72,7 @@ DEFAULT_POLICY = POLICIES["routine"]
 STALL_EPS = 0.0005  # a C move below 0.05 % is no move
 DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
 ANCHOR_WITH_LEVERS = 0.25  # first ask 25 % under the quote where competition, material or capacity give a lever
+ANCHOR_DATA_EXTRA = 0.05  # how much deeper the data may take the first ask
 ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
 MAX_ANCHOR = 0.15  # (kept for the experiments that import it)
 MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D02, P05, P18), but a deeper first
@@ -149,6 +150,8 @@ class Plan:
     alternatives_taken: set = field(default_factory=set)
     counters: list = field(default_factory=list)  # facts from its own e-mails that answer it - spent first
     used_sentences: set = field(default_factory=set)
+    lever_turn: bool = False  # this round our step goes into a structure we have not offered yet
+    pressures: list = field(default_factory=list)  # cost drivers it says weigh on it
     request_counts: dict = field(default_factory=dict)  # lever -> replies that asked for it
     reanchored: bool = False
     asked_breakdown: bool = False
@@ -347,7 +350,8 @@ class TacticalStrategy(BaselineStrategy):
         alt_price = ((neg.buyer.get("alternative") or {}).get("terms") or {}).get("unit_price")
         if alt_price and alt_price < open_price:
             candidates.append(alt_price * 0.98)
-        price = max(min(candidates), open_price * (1 - depth))
+        # the data may take it deeper - a cheaper alternative, a low grounded floor - but not past 5 points more
+        price = max(min(candidates), open_price * (1 - depth - ANCHOR_DATA_EXTRA))
         # no hard floor for strategic suppliers: the relationship term already prices a squeeze in C, and
         # our cost estimate can sit above its real one (P02: should-cost 380 over a 371 quote, C_best ~364)
         price = min(price, open_price)
@@ -446,6 +450,9 @@ class TacticalStrategy(BaselineStrategy):
             for r in asked:
                 plan.request_counts[r] = plan.request_counts.get(r, 0) + 1
             plan.requests |= asked
+            for series in CITED_DRIVER.findall(reply.get("body", "")):
+                if series[0] not in plan.pressures:
+                    plan.pressures.append(series[0])
             for fact in reply_facts(self.data, reply.get("body", "")):
                 if fact.sentence not in plan.used_sentences and all(fact.sentence != c.sentence for c in plan.counters):
                     plan.counters.append(fact)
@@ -524,7 +531,9 @@ class TacticalStrategy(BaselineStrategy):
             # step anyway (8 of 8 in the back office) - hold, with the smallest visible move
             return min(last + min_step, their_c, plan.upper_c)
         if plan.stalls == 1:
-            step = max(min_step, 0.15 * gap)  # no move from it: a visible step, not a "small bump"
+            # no move from it: a visible step - a new structure carries it too (holding cost D02 0.608 -> 0.587)
+            step = max(min_step, 0.15 * gap)
+            plan.lever_turn = True
         elif plan.stalls >= 2:
             step = max(by_time * 0.5, 0.25 * gap)  # break the deadlock
         else:
@@ -850,6 +859,11 @@ class TacticalStrategy(BaselineStrategy):
         top = max(t["unit_price"] for t in pool)
         pool = [t for t in pool if t["unit_price"] >= top * (1 - MAX_SPREAD)]
         picked = [max(pool, key=lambda t: t["unit_price"]), max(pool, key=rank)]
+        if plan.lever_turn:  # a structure it has not seen yet carries our step
+            new = [t for t in pool if structure_key(t) not in plan.offered]
+            if new:
+                picked[1] = max(new, key=rank)
+            plan.lever_turn = False
         lead, before = picked[0], plan.offered.get(structure_key(picked[0]))
         if before is not None and lead["unit_price"] <= before:  # "your proposal remains unchanged"
             bumped = round(before * (1 + MIN_STEP), 2)
@@ -948,7 +962,13 @@ class TacticalStrategy(BaselineStrategy):
         elif probe:
             lines.append("thank you - we are close. One last step from your side and we can sign.")
         elif plan.stalls:
-            lines.append("thank you for your reply. We see no movement yet, so we propose a different structure.")
+            pressure = (
+                f"{plan.pressures[-1]} weighs on your costs" if plan.pressures else "your costs are under pressure"
+            )
+            lines.append(
+                f"thank you for your reply. We understand that {pressure}; to meet you, we propose a different "
+                "structure."
+            )
         else:
             lines.append("thank you for your reply and the step towards us. We move as well.")
         lines += [c.sentence for c in claims]
@@ -976,7 +996,8 @@ class TacticalStrategy(BaselineStrategy):
             lines.append(volume[0])
         lines += ["", "We can award on any of these options:" if len(sheets) > 1 else "Our proposal:"]
         for i, sheet in enumerate(sheets):
-            lines.append(f"Option {chr(65 + i)}: {describe(case, sheet['terms'])}")
+            note = trade_note(case, sheets[0]["terms"], sheet["terms"])
+            lines.append(f"Option {chr(65 + i)}: {describe(case, sheet['terms'])}{note}")
         lines += ["", SIGNATURE]
         return {
             "subject": case.get("title", "Your quote"),
@@ -1077,6 +1098,27 @@ class TacticalStrategy(BaselineStrategy):
             next(iter(neg.threads)),
             rationale={"c_alt": neg.c_alt, "rejected": rejected, "why": "no sheet passes the guards"},
         )
+
+
+TRADE_WORDS = {
+    "payment_days": lambda v: f"payment at {v} days",
+    "contract_months": lambda v: f"a {v}-month commitment",
+    "volume_per_year": lambda v: f"{v:,} units a year",
+    "lead_time_days": lambda v: f"{v} days lead time",
+    "incoterm": lambda v: f"delivery {v}",
+    "index_clause": lambda v: "an index clause" if v else "a fixed price",
+    "ppm_commitment": lambda v: f"{v} ppm",
+    "chargeback_eur_per_complaint": lambda v: f"EUR {v} per complaint",
+    "effective_date": lambda v: f"a start on {v}",
+}
+
+
+def trade_note(case: dict, lead: dict, terms: dict) -> str:
+    """How an option differs from option A, said as the trade it is: "- if you prefer payment at 14 days"."""
+    if terms is lead:
+        return ""
+    diffs = [TRADE_WORDS[f](terms[f]) for f in case["negotiable"] if f in TRADE_WORDS and terms.get(f) != lead.get(f)]
+    return f" - our price for {' and '.join(diffs[:2])}" if diffs else ""
 
 
 PRICE_IN_TEXT = re.compile(
