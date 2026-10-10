@@ -79,3 +79,7 @@ What only Langfuse adds:
 ---
 
 how to get neede env variables
+
+---
+
+okay the middleware - how it is implemented? can we launch our local dashboard and like test with ussual commands and it will be just replaced by out middleware instead? that's like a good practice because otherwise if you write a seperate workflow it is not good.
