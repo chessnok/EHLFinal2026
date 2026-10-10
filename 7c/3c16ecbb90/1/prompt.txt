@@ -1,0 +1,29 @@
+drop dublicating. run on sonnet or haiky and gimme most common (all) rejections.
+
+---
+
+lets do some quick setting in config or somewhere where we tell what we use like key from .env or key from claude. explain how you spent four cents and whether this is a good option. am i understading right that i have 100$ subscription and this 4c is just and equivalent of tokens i burned to do this task.
+
+---
+
+come on
+
+---
+
+commit this to main (rejections) and other code as well
+
+---
+
+lets better run with our env and OPENAI
+
+---
+
+The two leftover local branches (feat/claude-code-llm, backup/llm-probe-v1) are no longer needed and can be deleted. - delete if your are sure they are not needed
+
+---
+
+do not say cost if you cannot measure it then(open-ai). you can add this rule in agents.md. always write APPROX-NOT-MEASURED in this case. how much real case submissions are left and what is the command to check how much is left
+
+---
+
+who used this 42 sessions?
