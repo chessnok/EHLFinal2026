@@ -3,7 +3,7 @@
   "checkpoint_id": "a5f5a4c92e96",
   "strategy": "manual-commit",
   "branch": "fix/relationship-charge",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "agent/src/negotiator/strategy/tactical.py"
   ],
@@ -14,13 +14,20 @@
       "compact_transcript": "/a5/f5a4c92e96/0/transcript.jsonl",
       "content_hash": "/a5/f5a4c92e96/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/a5/f5a4c92e96/1/metadata.json",
+      "transcript": "/a5/f5a4c92e96/1/full.jsonl",
+      "compact_transcript": "/a5/f5a4c92e96/1/transcript.jsonl",
+      "content_hash": "/a5/f5a4c92e96/1/content_hash.txt",
+      "prompt": "/a5/f5a4c92e96/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 172,
+    "cache_creation_tokens": 263101,
+    "cache_read_tokens": 15423979,
+    "output_tokens": 103150,
+    "api_call_count": 85
   }
 }
