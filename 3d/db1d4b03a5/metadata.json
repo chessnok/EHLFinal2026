@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "3ddb1d4b03a5",
+  "strategy": "manual-commit",
+  "branch": "feat/tactic-experiments",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "AGENTS.md",
+    "agent/README.md",
+    "agent/docs/benchmarks/2026-10-10-baseline-none.md",
+    "agent/docs/benchmarks/2026-10-10-budget-none.md",
+    "agent/docs/benchmarks/2026-10-10-lowball-none.md",
+    "agent/docs/benchmarks/2026-10-10-polite-none.md",
+    "agent/docs/benchmarks/2026-10-10-questions-none.md",
+    "agent/docs/benchmarks/2026-10-10-shelby-none.md",
+    "agent/docs/benchmarks/2026-10-10-tactical-none.md",
+    "agent/docs/benchmarks/2026-10-10-trade-none.md",
+    "agent/docs/benchmarks/README.md",
+    "agent/src/negotiator/strategy/__init__.py",
+    "agent/src/negotiator/strategy/baseline.py",
+    "agent/tests/test_sim.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/3d/db1d4b03a5/0/metadata.json",
+      "transcript": "/3d/db1d4b03a5/0/full.jsonl",
+      "compact_transcript": "/3d/db1d4b03a5/0/transcript.jsonl",
+      "content_hash": "/3d/db1d4b03a5/0/content_hash.txt",
+      "prompt": "/3d/db1d4b03a5/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 36,
+    "cache_creation_tokens": 22551,
+    "cache_read_tokens": 2298154,
+    "output_tokens": 13056,
+    "api_call_count": 15
+  }
+}
