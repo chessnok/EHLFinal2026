@@ -107,6 +107,9 @@ def _finish(recorder: Recorder, outcomes: list[dict]) -> None:
         f"mean score [bold]{_num(summary['mean_score'], 3)}[/] · deals {summary['deals']}/"
         f"{summary['cases']} · claims {summary['claims']} · report: {recorder.dir / 'report.md'}"
     )
+    if summary.get("llm_calls"):
+        cost = "not priced" if summary["llm_cost_usd"] is None else f"USD {summary['llm_cost_usd']:.4f}"
+        console.print(f"llm: {summary['llm_calls']} calls · {cost}")
 
 
 def _num(value, digits: int = 2) -> str:

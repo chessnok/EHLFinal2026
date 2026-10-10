@@ -7,18 +7,23 @@ any provider; switch with one string, `LLM=<provider>:<model>` in .env or `--llm
   groq:<model> · mistral:<model> · deepseek:<model> · together:<model>    their OpenAI-compatible APIs
   anthropic:claude-haiku-4-5     Anthropic messages API      key: ANTHROPIC_API_KEY
   compat:<model>                 any other OpenAI-compatible endpoint at LLM_BASE_URL
+  claude-code:haiku              the Claude Code CLI on this machine (`claude -p`): no API key, the
+                                 subscription pays; the model is an alias (haiku, sonnet) or a full name
 
 Other settings: LLM_BASE_URL and LLM_API_KEY override the preset; LLM_REASONING (none|low|medium|high)
 is sent as reasoning_effort on OpenAI-protocol calls; LLM_TIMEOUT_S (default 30 - every e-mail must
 reach the arena within 60 s of the supplier's reply); LLM_PARALLEL (default 4 concurrent calls).
 
 Every call is recorded: an `llm_call` event (purpose, model, latency, queue wait, tokens, ok/error,
-output) and metrics (`llm.seconds.<purpose>`, `llm.calls`, `llm.errors`, `llm.tokens.prompt|completion`).
+output; `cost_usd` where the provider reports it - claude-code does) and metrics
+(`llm.seconds.<purpose>`, `llm.calls`, `llm.errors`, `llm.tokens.prompt|completion`).
 """
 
 import json
 import os
 import re
+import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -32,7 +37,7 @@ DEFAULT_SPEC = "ollama:qwen3.6:latest"
 
 @dataclass(frozen=True)
 class Preset:
-    protocol: str  # openai | anthropic
+    protocol: str  # openai | anthropic | claude-code
     base_url: str
     key_env: str | None
     reasoning: str | None = None  # default reasoning_effort
@@ -48,6 +53,7 @@ PRESETS = {
     "together": Preset("openai", "https://api.together.xyz/v1", "TOGETHER_API_KEY"),
     "compat": Preset("openai", "", None),
     "anthropic": Preset("anthropic", "https://api.anthropic.com", "ANTHROPIC_API_KEY"),
+    "claude-code": Preset("claude-code", "claude -p", None),
 }
 
 
@@ -74,6 +80,7 @@ class LLM:
         self.recorder = recorder
         self._slots = threading.Semaphore(int(os.environ.get("LLM_PARALLEL", "4")))
         self.http = httpx.Client(timeout=self.timeout)
+        self._last = threading.local()  # what the last call on this thread cost, if the provider says
 
     def describe(self) -> str:
         return f"{self.provider}:{self.model}"
@@ -110,6 +117,9 @@ class LLM:
 
     def _call(self, system: str, user: str, max_tokens: int, timeout: float) -> tuple[str, tuple]:
         system = system + "\nReply with one JSON object and nothing else."
+        self._last.cost_usd = None
+        if self.protocol == "claude-code":
+            return self._claude_code(system, user, timeout)
         if self.protocol == "anthropic":
             r = self.http.post(
                 f"{self.base_url}/v1/messages",
@@ -144,6 +154,26 @@ class LLM:
         u = data.get("usage") or {}
         return data["choices"][0]["message"].get("content") or "", (u.get("prompt_tokens"), u.get("completion_tokens"))
 
+    def _claude_code(self, system: str, user: str, timeout: float) -> tuple[str, tuple]:
+        # an empty working directory and no setting sources: no project hooks, CLAUDE.md or tools
+        command = ["claude", "-p", "--model", self.model, "--tools", "", "--strict-mcp-config"]
+        command += ["--disable-slash-commands", "--no-session-persistence", "--setting-sources", ""]
+        command += ["--output-format", "json", "--system-prompt", system]
+        try:
+            with tempfile.TemporaryDirectory() as cwd:
+                run = subprocess.run(command, input=user, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            raise LLMError(f"claude -p: {e}") from e
+        if run.returncode != 0:
+            raise LLMError(f"claude -p exited {run.returncode}: {(run.stderr or run.stdout)[:300]}")
+        data = json.loads(run.stdout)
+        if data.get("is_error"):
+            raise LLMError(f"claude -p: {str(data.get('result'))[:300]}")
+        u = data.get("usage") or {}
+        prompt = sum(u.get(k) or 0 for k in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+        self._last.cost_usd = data.get("total_cost_usd")
+        return str(data.get("result") or ""), (prompt, u.get("output_tokens"))
+
     def _record(self, purpose, elapsed, waited, usage, error, prompt_chars, text, context) -> None:
         prompt_tokens, completion_tokens = usage
         if self.recorder:
@@ -168,6 +198,7 @@ class LLM:
                 prompt_chars=prompt_chars,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
+                cost_usd=getattr(self._last, "cost_usd", None),
                 ok=error is None,
                 error=error,
                 output=text[:3000],

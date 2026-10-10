@@ -45,8 +45,11 @@ def build_summary(run_dir: Path, extra: list[dict] | None = None) -> dict:
     for o in outcomes:
         if o.get("score") is not None:
             by_type[o.get("type") or "?"].append(o["score"])
+    llm_costs = [e["cost_usd"] for e in events if e["kind"] == "llm_call" and e.get("cost_usd") is not None]
     return {
         "run_id": run_dir.name,
+        "llm_calls": sum(1 for e in events if e["kind"] == "llm_call"),
+        "llm_cost_usd": round(sum(llm_costs), 4) if llm_costs else None,
         "cases": len(outcomes),
         "failed": failures,
         "deals": sum(1 for o in outcomes if o.get("deal")),
@@ -86,6 +89,11 @@ def render_markdown(summary: dict) -> str:
         f"(**{_fmt(s['total_points'], 1)} points**) · **saved vs. opening:** EUR {_fmt(s['saved_eur'])} · "
         f"**rounds:** {s['rounds']}",
         "",
+        *(
+            [f"**LLM:** {s['llm_calls']} calls · USD {_fmt(s.get('llm_cost_usd'), 4)}", ""]
+            if s.get("llm_calls")
+            else []
+        ),
         "## Cases",
         "",
         "| Case | Type | Goal | Deal | Supplier | Score | C_open | C_deal | C_best | C_alt | Rounds | Claims "
