@@ -21,6 +21,9 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | One closing offer after the supplier's final offer (`playbook`) | sandbox S-15, practice P-14 | failed: sandbox +0.047, practice 0.376 | three of ten practice suppliers walked away (P04, P07, P18); a final offer is final |
 | Deep first ask, 27-34 % under the quote (`playbook`, `lowball`) | sandbox, practice P-14 | mixed: +0.02 on sandbox; worst first counters on P08 (5.71) and P18 (5.70) | P07: a 26 % ask got "not feasible" and a final offer in round 2 (0.585) against 0.721 at 13 % |
 | First ask capped at 13 % under the quote for a `routine` goal | practice P-25 (P07) | worked: 0.663 → 0.740 | at 25 % the supplier answered "not feasible" with a final offer in round 2 (5.54); at 13 % it came down over four replies to 5.42 |
+| Re-anchoring never asks below our own last ask | sandbox S-22, practice P-29 | worked: D01 0.649 → 0.749; practice unchanged on all 10 cases | where the first ask was capped (strategic, 4 %), the re-anchor's halfway ask fell under it; the step back read as reneging ("we cannot accept a reduction") and closed D01 at R1's price |
+| Hold for the rest of a rival-quote step (`rival_rest`, now default) | practice P-31 (P05) | worked: P05 0.742 → 0.824 | the back office: "half the step now, the rest after the check" - the rest came (30.50 → 28.00) while we moved 0.4 %; the same rule ran for four suppliers in P05 and D02 (`bot-mechanics.md`) |
+| Counter-steps of 1-3 % of C outside strategic cases (`band_steps`) | practice P-30 (P04, P05, P07, P08, P11, P18) | failed: P18 0.618 → 0.485, P08 0.550 → 0.528, rest equal | the 1 % floor met the suppliers sooner; the replay correlation (small steps held more often) did not carry over |
 
 ## Wording and arguments
 
@@ -38,6 +41,7 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | The contract's own index clause cited against the supplier's index argument ("the rise is already in the price we pay", `ctr:…#3.2`) | practice P-24 (P08, P18) | failed: P08 0.550 → 0.539, P18 0.618 → 0.485 | the arena did not read it as an argument (no claim result), and it took the first e-mail's slot from one that counts |
 | Own-plant should-cost cited from 3 % under the quote (12 % before) | practice P-26 (P01, P03) | mixed: P03 0.903 → 0.923, P01 0.969 → 0.952 | P03: "below this price we would need facts" - with it the first reply came at 432.15 instead of 432.94. P01: ranked ahead of the forecast it took round 4 and the final offer was 131.80 instead of 131.30; now ranked last |
 | Complaints (`qn:` rows) cited one by one as further quality arguments | practice P-23 (P11) | failed: 0.672, unchanged | the first one came back `duplicate` after the scorecard's ppm figure, and the supplier called its offer final in that round |
+| Answer a supplier's hedge with our term's dates (`hedge_turn`: "21 of our 24 months come after your cover") | practice P-32 (P08) | failed: P08 0.550, the same price path as P-29 | the supplier agreed and turned it into a reason for the index clause ("you correctly note that the index clause will reflect market movements"); only P08's supplier writes about a hedge |
 
 ## LLM
 
@@ -46,6 +50,7 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | LLM writes the e-mail and picks the stance on `baseline` (`llm`) | sandbox S-2 to S-5, practice P-2, P-3, P-6 | failed: below the baseline it runs on; practice 0.459-0.517 | the model concedes more cautiously than the bots need; early versions wrote prices that contradicted the sheets |
 | LLM picks among prepared moves (`decided`) | sandbox S-8 to S-12 | failed: 0.646-0.668 against 0.736 | shown the money, the model always picks the softest level |
 | LLM on `tactical` mechanics (`llm` v3, opus) | sandbox S-14, practice P-12 | mixed: D01 0.969, P11 0.692 (team best); mean 0.549 on six cases | better text on P11; no gain elsewhere |
+| `llm` v4: tactical decides, the model writes each e-mail and may ask for one more round where tactical stops on its estimate while the supplier is open | sandbox, 6 runs (`claude-code:opus`) | no gain: D01 0.649 in 5 of 6 runs (0.689 once, the supervisor's extra round), D02 0.587-0.650, once 0 (a held rival's final offer walked while the model wrote) | wording does not move these suppliers' prices (as `tactical-llm`); not committed |
 
 ## Cost model and tooling
 
@@ -82,3 +87,6 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | P10: accept the alternative sheet by its own ID instead of resending it | the alternative has an ID of its own (54 days) | unknown |
 | P05: offers that arrive after a timeout move are lost | the arena trace shows 14 such offers over 6 P05 sessions; our counter says 0 | unknown |
 | LLM as reader and writer around `tactical` (`tactical-llm`, `tactical-llm+reader`; numbers stay with `tactical`; validator, a 10 s budget per e-mail, template as fallback) | sandbox, 4 runs; practice P-28 (P11, P08) | no gain: sandbox 0.618 in every run, the same as `tactical` to the cent; practice P11 0.672 (same), P08 0.507 against 0.550 | the suppliers' price paths did not change with the wording on D01, D02 and P11; the validator refused 3-4 of 7-9 texts; `claude-code:haiku` needs 11-14 s per e-mail and never fits 10 s, `gpt-4o-mini` and `gpt-4o` take 1-5 s |
+| P08: a narrow deadband (0) sells cheaper | 293 replays (`bot-mechanics.md`) | failed to generalise: P08 deadband 0 deals 0.543 vs 5 0.558; P18 0.386 vs 0.583; P02 0.067 vs 0.670 | P08's 0.626 sessions were one path, not a rule |
+| P08: a structure the supplier values more than we pay (payment, deadband, contract length) | the supplier's own alternatives in 31 P08 replays | failed: none - deadband 0 → 5 +0.12 per unit against 0.122 in our C, payment 90 → 30 days −0.065 against 0.072, 36 months priced like 24 | it prices each structure as our C does; the gap to the best teams is in the price level |
+| Ask beyond the supplier's band so its pricing committee is asked (P02, P03, P10) | back offices of 10 such sessions | failed: approved in 7 of 10, but the price did not fall after (P03 held 432.87 four rounds; P02 rose 367.95 → 372.76) | approval is not a concession |
