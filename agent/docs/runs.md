@@ -33,14 +33,15 @@ suppliers, leverage).
 | P-9 | 16:03 | *likely* `cfad9d9` or later | `tactical` (P11, P10, P05, P18), `llm` (P02) | P02, P05, P10, P11, P18 | *likely* DavidtheRavinger / Vector | pass over the weak cases | P02 0.293 (llm), P05 0.712, P10 0.562, P11 0.147, P18 0.252 | new team bests on P05, P10 (tactical) and P02 (llm); tactical weak on P11 |
 | P-10 | 16:36 | *likely* `243b294` (tactical unchanged on `feat/tactic-experiments`) | `tactical` | P02, P11, P18 | *likely* Vector | tactical after the teammate's menu, ground-truth and counter-step changes | P02 0.366, P11 0.441, P18 0.467 | new bests on P11 and P18 (index clause, final offer accepted) |
 | P-11 | 16:51 | *likely* `243b294` | `tactical` | all 10 hosted cases | *likely* Vector | full tactical pass | P01 0.856, P02 0.686, P03 0.903, P04 0.860, P05 0.824, P07 0.702, P08 0.603, P10 0.555, P11 0.545, P18 0.000 (walked away) · mean 0.653 | best full pass so far; P18 walked after a 2-cent push on a final offer that said "bridge the remaining gap"; options B/C repeated unchanged; P02 varies (0.366 vs 0.686 on the same code) |
+| P-12 | 19:32 | `7613d6d` | `llm` v3 on tactical mechanics | P02, P05, P08, P10, P11, P18, `--llm claude-code:opus`, `--parallel 2` | Mikhail Fadin | first practice check of llm on tactical mechanics | P02 0.366, P05 0.824, P08 0.473, P10 0.539, P11 **0.692**, P18 0.401 · mean 0.549 | new best on P11; no walk-away (P18 took its 5.60 final, R3); P10 and P18 got final offers in R1/R3 and were taken without a probe; P08 and P18 closed above the calibrated upper bound; 28 model calls, 0 fallbacks, $1.194 measured |
 
-**Team best per case** (what the practice board counts), as of P-11:
+**Team best per case** (what the practice board counts), as of P-12:
 
 | P01 | P02 | P03 | P04 | P05 | P07 | P08 | P10 | P11 | P18 | Mean ×100 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0.858 (llm) | 0.686 (tactical) | 0.903 (tactical) | 0.860 | 0.824 (tactical) | 0.702 (tactical) | 0.603 (tactical) | 0.562 (tactical) | 0.545 (tactical) | 0.467 (tactical) | 70.10 |
+| 0.858 (llm) | 0.686 (tactical) | 0.903 (tactical) | 0.860 | 0.824 (tactical) | 0.702 (tactical) | 0.603 (tactical) | 0.562 (tactical) | 0.692 (llm) | 0.467 (tactical) | 71.57 |
 
-Quota after P-11: 60 used of a limit raised to 650, resetting 2026-10-11 12:47 UTC.
+Quota after P-12: 66 used of a limit raised to 650, resetting 2026-10-11 12:47 UTC.
 
 ## Sandbox runs (free)
 
