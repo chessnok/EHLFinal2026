@@ -25,6 +25,37 @@ Arena: the key is `ARENA_API_KEY` in the root `.env`. Practice is limited to 200
 During the Live Final the agent must not read the live feed, leaderboard or results (`NEGOTIATOR_FINAL=1`
 blocks them in the client).
 
+## HARD RULE: confirm before spending practice quota
+
+Practice sessions are a scarce team budget: 200 per team per rolling 24 hours, shared by everyone on the team. A
+coding agent must **never** start anything that spends quota without an explicit "yes" from a human in the
+conversation, for that specific run. No exceptions, no assumed consent, no carrying a previous "yes" over to a new run.
+
+**What spends quota:** every new practice session, which means:
+- `negotiator play <case>` on a practice case (`case:P…`);
+- `negotiator run --set practice`;
+- `make` targets or scripts that call either of these;
+- `POST /v1/sessions` for a practice case.
+
+**What does not spend quota:** `--set sandbox` (cases `case:D…`), the local `arena-sim`, read-only calls
+(`me`, `cases`, `sessions`, `session`, `thread`), and the final.
+
+**Before asking, the agent must:**
+
+1. Run `negotiator me` and read the current balance (`used`, `left`, `resets_at`).
+2. Ask for confirmation, stating:
+   - the exact command;
+   - which cases it plays and how many sessions it will spend;
+   - the balance before and after the run;
+   - when the quota resets.
+3. Wait for an explicit yes. Silence, "ok, continue with the task" or approval of an earlier run do not count. If
+   the answer is anything but a clear yes, do not run it.
+
+Example of the required question:
+
+> This spends practice quota: `uv run negotiator run --set practice --cases case:P01 case:P05 --strategy tactical`
+> → 2 sessions. Balance now 197 / 200 left, after the run 195. Quota resets at 2026-10-11 12:47 UTC. Run it?
+
 ## Rules
 
 Read the file for the area you touch before changing it:
