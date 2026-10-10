@@ -334,8 +334,12 @@ class Negotiation:
         self.recorder.metrics.observe("supplier.reply_seconds", took)
         with t.lock:
             t.messages.append({**message, "from": "buyer", "sent_at": utc_now()})
+            # the supplier's 60 s clock runs from its reply, not from the end of the attachment download (a quote
+            # PDF took 22-42 s to fetch on the sandbox: a keepalive "20 s after the reply" went out at 43 s and
+            # the arena booked a timeout, the supplier walked away - run 20261011-004617-sandbox-tactical-llm)
+            arrived = time.monotonic()
             t.messages.append(self._with_documents(reply, supplier_id))
-            t.last_reply_at = time.monotonic()
+            t.last_reply_at = arrived
         self._log_reply(supplier_id, reply, took, round_no)
         if reply.get("status") in ENDED_STATUSES:
             t.closed = reply["status"]

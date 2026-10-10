@@ -146,6 +146,26 @@ Not done, with what the records say:
 | LLM as reader and writer around `tactical` | in work on `feat/llm-writer`, sandbox only |
 | One push after an early final offer | not supported by the records: the only three such pushes in leverage and routine cases were `playbook`'s and all three suppliers walked away ([`final-offer-stats-2026-10-11.md`](final-offer-stats-2026-10-11.md) on `fix/timeout-moves`) |
 
+## 3b. Todo (as of 11 October, 01:40)
+
+In this order:
+
+1. **Decide which commit plays the final.** `gameplan-2026-10-11.md` names the tag `final-candidate-2026-10-11`
+   (`b3f06da`); main is now `9e64347` with the margin charge in C and other changed defaults.
+2. **Control run of main on practice, all 10 cases** (10 sessions; confirm first). The last full pass (0.746, P-27)
+   was on `6bb73d1`; since then main took `a6ec26c` (flags off by default, changes in `belief.py`, `guards.py`,
+   `data.py` not reviewed) and the reply clock counted from the reply's arrival (`ad5e54f`).
+3. **Timeouts on P05:** review and merge `fix/timeout-moves`, then one P05 practice session - compare
+   `outcome.timeouts` with the arena's trace and check that no e-mail follows a timeout answer without a
+   `move_withdrawn`.
+4. **`tactical-llm`:** sandbox comparison with `tactical` (D01, D02, three repetitions), check that the whole message
+   has a hard deadline of about 30 s and that the template goes out after it; a benchmark record. No practice run
+   before that.
+5. **Final checks:** `NEGOTIATOR_FINAL=1`, the 8-minute wave timing, `negotiator me`, no open sessions.
+
+If time is left: P11 with three sheets at chargeback 0 and ppm 300 / 800 / 1500; a case without an own-plant
+should-cost still has no margin charge in our C (sandbox D01).
+
 ## 4. How to test changes
 
 - **Holdout.** Tune on P01, P04, P05, P07, P08, P10 and P11. Do not look at P02, P03 and P18 until a change is
