@@ -55,8 +55,8 @@ Switch the model with one string - `--llm <provider>:<model>` or `LLM=<provider>
 
 | Spec | Protocol | Key |
 |---|---|---|
-| `ollama:qwen3.6:latest` (default) | OpenAI-compatible, `http://localhost:11434/v1`, thinking off | – |
-| `openai:<model>` | OpenAI | `OPENAI_API_KEY` |
+| `openai:gpt-6.1-sol` (default) | OpenAI, `reasoning_effort` low | `OPENAI_API_KEY` |
+| `ollama:qwen3:30b-a3b` | OpenAI-compatible, `http://localhost:11434/v1`, thinking off | – |
 | `openrouter:<vendor>/<model>` | OpenAI-compatible | `OPENROUTER_API_KEY` |
 | `groq:` · `mistral:` · `deepseek:` · `together:` | OpenAI-compatible | `<PROVIDER>_API_KEY` |
 | `compat:<model>` | any OpenAI-compatible endpoint at `LLM_BASE_URL` | `LLM_API_KEY` |
