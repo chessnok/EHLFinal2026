@@ -83,6 +83,7 @@ SHOULD_COST_SHARE = 0.98
 CASH_SHORT_RATE = 1.2
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
+ANCHOR_ROUTINE = 0.13  # routine goal: a deeper first ask is answered with a final offer
 ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
 MAX_ANCHOR = 0.15  # (kept for the experiments that import it)
 MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D02, P05, P18), but a deeper first
@@ -409,6 +410,10 @@ class TacticalStrategy(BaselineStrategy):
         price_only = bool(gt and gt.lower and gt.lower >= open_price * 0.95)  # the prior says: only the price moves
         depth = ANCHOR_PRICE_ONLY if price_only else ANCHOR_WITH_LEVERS
         extra = ANCHOR_DATA_EXTRA
+        if neg.buyer.get("category_goal") == "routine":
+            # P07 (bundling, routine): a 13 % ask got 5.59 and four rounds (0.721, P-13); 25-26 % got "your
+            # target prices are not feasible", 5.69 and a final offer in round 2 (0.585 P-15, 0.663 P-22)
+            depth, extra = min(depth, ANCHOR_ROUTINE), 0.0
         if neg.supplier_estimates.get(sid):
             # the margin charge is in C: the ask may go as deep as a price-only talk, it stops at the price that
             # costs us least (below). P01 came down to 132.20 after a 10 % ask, to 137.00 after a 3 % one

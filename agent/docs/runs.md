@@ -44,6 +44,10 @@ suppliers, leverage).
 | P-20 | 11 Oct 00:01 | `023d02e` | `tactical` | P01, P02, P03, P10 | Vector (Claude session) | index clause offered at our cost minimum when the supplier argues with that index; no early price match | P01 0.733, P02 0.733, P03 0.903, P10 0.647 | P02: supplier agreed to 362.02 with a 5 % deadband in round 1. P01 took an alternative sheet in round 3 at 134.80: the upper bound had shrunk to the supplier's own offer |
 | P-21 | 11 Oct 00:05 | `cdd288c` | `tactical` | P01, P02 | Vector (Claude session) | upper bound scaled to the room | P01 **0.969**, P02 0.733 | P01: final offer 131.30 after four replies; team best on P01 and P02 |
 | P-22 | 11 Oct 00:16 | `7143676` | `tactical` | all 10 hosted cases, `--parallel 5` | Vector (Claude session) | full pass of the candidate, with the brief-reading fixes | P01 0.969, P02 0.733, P03 0.903, P04 0.860, P05 0.742, P07 0.663, P08 0.550, P10 0.647, P11 0.672, P18 0.618 · mean 0.736 | 10 of 10 deals, no zero; against P-13 (0.695): P01 +0.113, P02 +0.047, P11 +0.127, P18 +0.199, P07 −0.058, P08 −0.020; P07, P08, P11, P18 also carry main's changes since `96f7545`, not separated |
+| P-23 | 11 Oct 00:24 | `9af44f6` | `tactical` | P11 | Vector (Claude session) | complaints (`qn:`) as further arguments in a quality case, one per round | P11 0.672 | no change: the complaint came back `duplicate` in round 4 and the supplier's offer became final; reverted |
+| P-24 | 11 Oct 00:33 | `9f95282` | `tactical` | P08, P18 | Vector (Claude session) | the running contract's index clause cited against the supplier's index argument | P08 0.539, P18 0.485 | worse than P-22 (0.550, 0.618): the clause sentence got no claim result; reverted |
+| P-25 | 11 Oct 00:38 | `cfd6310` | `tactical` | P07 | Vector (Claude session) | first ask at most 13 % under the quote for a `routine` goal (25 % before) | P07 **0.740** | supplier: 5.59 → 5.48 → 5.45 → final 5.42; at 25 % it was 5.69 → final 5.54 (P-22, 0.663); team best on P07 |
+| P-26 | 11 Oct 00:43 | `7742d51` | `tactical` | P01, P03 | Vector (Claude session) | own-plant should-cost cited from 3 % under the quote | P01 0.952, P03 **0.923** | P03: first reply 432.15 (432.94 before), team best; P01: the should-cost took the forecast's place in round 4, final offer 131.80 (131.30 in P-22) - ranked behind the forecast afterwards |
 
 **Team best per case** (what the practice board counts), as of P-12:
 
@@ -81,6 +85,6 @@ above: 73.2 on the practice board. Quota after P-14: 96 used of 650.
 | S-19 | 11 Oct, 00:51 local | uncommitted → `caf3aff` | `tactical` | D02; run `20261011-005141-sandbox-tactical` | Vector (Claude session) | the runner queues a session's calls itself | D02 0.608 | 7 e-mails, no two calls of the session in flight at once, 0 timeouts in the trace and in our count, 27 s |
 | S-20 | 11 Oct, 00:52 local | uncommitted → `caf3aff` | `tactical`, the second decision for DEMO-C1 delayed by 66 s | D02; run `20261011-005236-sandbox-tactical-forced-timeout` | Vector (Claude session) | does the runner read a timeout answer on the arena | D02 0.608 | trace: 1 timeout (DEMO-C1, round 2); ours: 1, read from the session state 3 s after it happened; the e-mail written before it was withdrawn and decided again (`move_withdrawn`), sent as the arena's round 3; DEMO-J1 was kept alive with three questions meanwhile (rounds 4-6) |
 
-After P-22 (11 October, 00:20): 26 practice sessions spent by this series (P-16 to P-22). Team bests from `negotiator
+After P-26 (11 October, 00:45): 32 practice sessions spent by this series (P-16 to P-26). Team bests from `negotiator
 me` then: P01 0.969, P02 0.733, P03 0.905, P04 0.860, P05 0.839, P07 0.721, P08 0.626, P10 0.663, P11 0.692,
 P18 0.618.

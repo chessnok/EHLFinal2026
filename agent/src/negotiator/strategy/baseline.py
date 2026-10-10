@@ -162,7 +162,7 @@ class BaselineStrategy:
         out += d.evidence_scorecard(sid)
         out += d.evidence_forecast(parts)  # low strength: picked when the supplier asks about volume
         if open_price:
-            out += d.evidence_should_cost(parts, open_price)
+            out += d.evidence_should_cost(parts, open_price, sid)
         alt = neg.buyer.get("alternative") or {}
         if alt.get("kind") == "quote" and alt.get("ref"):
             alt_price = (alt.get("terms") or {}).get("unit_price")
