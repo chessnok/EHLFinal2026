@@ -892,6 +892,10 @@ class TacticalStrategy(BaselineStrategy):
         neg.recorder.event("reanchor", session_id=neg.session_id, supplier_id=sid, price=round(price, 2))
         log.info("%s: undercut our guessed floor - re-anchoring at %.2f", sid, price)
         ask_c = new_target + 0.5 * (their_c - new_target)  # meet halfway to the new anchor: credible, not greedy
+        if plan.our_c:
+            # never below our own last ask: where the first ask was capped (strategic suppliers) the halfway point
+            # sat under it, and the step back read as reneging - D01 "we cannot accept a reduction", taken at R2
+            ask_c = max(ask_c, plan.our_c[-1] * (1 + MIN_STEP))
         return self._offer(neg, sid, plan, theirs, ask_c, their_c)
 
     def _price_match(self, neg, sid, plan: Plan, theirs: dict, their_c: float) -> Decision | None:
