@@ -1,0 +1,59 @@
+what do you think about this ? how about we write some strategies and do the results? also add in agents.md that every tun should be documented in docs/BENCHMARKS.md. like strategy file name, quick description what ist does with whic parametrs(so if i later modify we my track) and the resuls on runs. simple strcuture. 
+
+<pasted_content id="36de">
+SOME OBSERVATIONS i want to try later
+- to get price X, ask for a*X, where a is 0 < a < 1. The logic is ask less then we actually need, so that price is already moved into our advantage
+- ask lots of questions, make them bored, so that agreeing on an offer would remove the frictions of talking to us
+- Talk politely (or opposite - switch to Tommy Shelby mode) . 
+- say that you are broke student?
+- say the price Y with the restriction from the 3rd side that we cannot go more then that. A.k mom gave only 1.5 euros for and icecream, so please sell it for 1.5,  not for 1.7 as i do not have more money. 
+- do not lower price without anything in return. Like please lower price by10% and i will pick it by myself instead of delivery.
+
+DAvid: research how real sellers(buyers) work to get the best price.
+</pasted_content id="36de">
+
+---
+
+per run the most important is result, and cost
+
+---
+
+<task-notification>
+<task-id>b07gmbrzz</task-id>
+<tool-use-id>toolu_018WYVucyMJymDGwK2ipaXFT</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/160a10dd-b81d-4936-861b-9ac77927511b/tasks/b07gmbrzz.output</output-file>
+<status>completed</status>
+<summary>Background command "Run all seven strategies three times each on the sandbox" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bzqv9r8i0</task-id>
+<tool-use-id>toolu_0146khZ5z6q9RiKyxrjf9nyK</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/160a10dd-b81d-4936-861b-9ac77927511b/tasks/bzqv9r8i0.output</output-file>
+<status>failed</status>
+<summary>Background command "Run all seven strategies three times each on the sandbox" failed with exit code 144</summary>
+</task-notification>
+
+---
+
+so did you run ?
+
+---
+
+how much you going to spent in this 30 minutes(tokens) and where you get strategues from. i need minimal 3-minute run. test 1-2 strategies first
+
+---
+
+<task-notification>
+<task-id>b2416senn</task-id>
+<tool-use-id>toolu_01YJ35B65xrZh9TLqFbLzZw9</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/160a10dd-b81d-4936-861b-9ac77927511b/tasks/b2416senn.output</output-file>
+<status>failed</status>
+<summary>Background command "Wait for the practice run to end, then benchmark seven strategies three times" failed with exit code 144</summary>
+</task-notification>
+
+---
+
+about agents-lets rather do docs/benchmarks/date-strategy-name-model-name record
