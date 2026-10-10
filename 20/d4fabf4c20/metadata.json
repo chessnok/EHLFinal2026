@@ -3,8 +3,10 @@
   "checkpoint_id": "20d4fabf4c20",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 4,
+  "checkpoints_count": 5,
   "files_touched": [
+    "agent/docs/runs.md",
+    "agent/src/negotiator/strategy/llm_strategy.py",
     "agent/tests/test_llm_strategy.py"
   ],
   "sessions": [
@@ -13,13 +15,19 @@
       "transcript": "/20/d4fabf4c20/0/full.jsonl",
       "content_hash": "/20/d4fabf4c20/0/content_hash.txt",
       "prompt": "/20/d4fabf4c20/0/prompt.txt"
+    },
+    {
+      "metadata": "/20/d4fabf4c20/1/metadata.json",
+      "transcript": "/20/d4fabf4c20/1/full.jsonl",
+      "content_hash": "/20/d4fabf4c20/1/content_hash.txt",
+      "prompt": "/20/d4fabf4c20/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 104,
-    "cache_creation_tokens": 176840,
-    "cache_read_tokens": 11438474,
-    "output_tokens": 43728,
-    "api_call_count": 52
+    "input_tokens": 112,
+    "cache_creation_tokens": 203786,
+    "cache_read_tokens": 11629820,
+    "output_tokens": 44703,
+    "api_call_count": 56
   }
 }
