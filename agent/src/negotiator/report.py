@@ -60,6 +60,7 @@ def build_summary(run_dir: Path, extra: list[dict] | None = None) -> dict:
         "claims": dict(claims),
         "score_by_type": {k: round(statistics.fmean(v), 3) for k, v in sorted(by_type.items())},
         "end_reasons": dict(Counter(o.get("end_reason") for o in outcomes)),
+        "model_decisions": _model_decisions(outcomes, metrics),
         "http": {
             "calls": len(http),
             "errors": dict(Counter(h["status"] for h in http if h["status"] >= 400 or h["status"] == 0)),
@@ -69,6 +70,41 @@ def build_summary(run_dir: Path, extra: list[dict] | None = None) -> dict:
         "events": dict(Counter(e["kind"] for e in events)),
         "metrics": metrics,
         "outcomes": outcomes,
+    }
+
+
+def _model_decisions(outcomes: list[dict], metrics: dict) -> dict:
+    """What the decision model chose (strategy `decided`): per move, and in aggregate."""
+    rows = []
+    for o in outcomes:
+        for d in o.get("model_decisions") or []:
+            sig = d.get("signals") or {}
+            rows.append(
+                {
+                    "case_id": o.get("case_id"),
+                    "supplier_id": d.get("supplier_id"),
+                    "round": d.get("round"),
+                    "level": d.get("level"),
+                    "confidence": d.get("confidence"),
+                    "probabilities": d.get("probabilities"),
+                    "near_floor": (sig.get("near_floor") or {}).get("probability"),
+                    "walk_risk": (sig.get("walk_risk") or {}).get("probability"),
+                    "firmness": (sig.get("firmness") or {}).get("score"),
+                    "fallback": d.get("fallback"),
+                }
+            )
+    confidences = [r["confidence"] for r in rows if r["confidence"] is not None]
+    counters = (metrics or {}).get("counters", {})
+    timings = (metrics or {}).get("timings", {}).get("decisions.seconds", {})
+    return {
+        "moves": len(rows),
+        "levels": dict(Counter(r["level"] for r in rows)),
+        "mean_confidence": round(statistics.fmean(confidences), 3) if confidences else None,
+        "fallbacks": counters.get("decided.fallback", 0),
+        "api_calls": counters.get("decisions.calls", 0),
+        "api_errors": counters.get("decisions.errors", 0),
+        "api_seconds": timings,
+        "rows": rows,
     }
 
 
@@ -130,6 +166,28 @@ def render_markdown(summary: dict) -> str:
         if o.get("cost_breakdown"):
             parts = ", ".join(f"{k} {v:,.0f}" for k, v in o["cost_breakdown"].items() if v)
             lines.append(f"- cost breakdown: {parts}")
+        lines.append("")
+    md = s.get("model_decisions") or {}
+    if md.get("moves") or md.get("api_calls"):
+        lat = md.get("api_seconds") or {}
+        lines += [
+            "## Decision model",
+            "",
+            f"Moves chosen: {md['moves']} · levels {md['levels']} · mean confidence {_fmt(md['mean_confidence'], 2)} · "
+            f"API calls {md['api_calls']}, errors {md['api_errors']}, fallbacks {md['fallbacks']} · "
+            f"latency p50 {lat.get('p50', '–')} s, p95 {lat.get('p95', '–')} s",
+            "",
+            "| Case | Supplier | Round | Choice | Confidence | Probabilities | near floor | walk risk | firmness 0-4 |",
+            "|---|---|---:|---|---:|---|---:|---:|---:|",
+        ]
+        for r in md["rows"]:
+            p = r.get("probabilities") or {}
+            probs = ", ".join(f"{k} {_fmt(v, 2)}" for k, v in p.items())
+            lines.append(
+                f"| {r['case_id']} | {r['supplier_id']} | {r['round']} | {r['level']}"
+                f"{' (fallback)' if r.get('fallback') else ''} | {_fmt(r['confidence'], 2)} | {probs} "
+                f"| {_fmt(r['near_floor'], 2)} | {_fmt(r['walk_risk'], 2)} | {_fmt(r['firmness'], 1)} |"
+            )
         lines.append("")
     h = s["http"]
     lines += [

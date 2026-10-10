@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from negotiator.strategy.base import Decision, Strategy
 from negotiator.strategy.baseline import BaselineStrategy
+from negotiator.strategy.decided import DecidedStrategy
 from negotiator.strategy.llm_strategy import LLMStrategy
 from negotiator.strategy.tactical import TacticalStrategy
 
@@ -12,7 +13,19 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     "tactical": TacticalStrategy,
     "baseline": BaselineStrategy,
     "llm": LLMStrategy,
+    "decided": DecidedStrategy,
 }
 NEEDS_LLM = {"llm"}
+NEEDS_DECISIONS = {"decided"}  # constructed as Strategy(data, DecisionsClient)
 
-__all__ = ["NEEDS_LLM", "STRATEGIES", "BaselineStrategy", "Decision", "LLMStrategy", "Strategy", "TacticalStrategy"]
+__all__ = [
+    "NEEDS_DECISIONS",
+    "NEEDS_LLM",
+    "DecidedStrategy",
+    "STRATEGIES",
+    "BaselineStrategy",
+    "Decision",
+    "LLMStrategy",
+    "Strategy",
+    "TacticalStrategy",
+]
