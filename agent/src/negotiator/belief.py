@@ -45,7 +45,6 @@ class FloorBelief:
         }
         self.rate = rate
         self.ppm: float | None = None  # its real defect rate (scorecard), when known
-        self.capped = False  # cap the extrapolation (ratio <= 0.6, not under 90 % of its lowest offer value)
         self.structures = [complete_offer(case, {**opening, **c}) for c in combos(case)]
         self.v_open = self.value(opening)
         self.v_hi = self.v_open  # its floor is no higher than any offer it made
@@ -132,7 +131,7 @@ class FloorBelief:
         elif len(p) >= 3:
             d1, d2 = p[-3] - p[-2], p[-2] - p[-1]
             if d1 > 0 and 0 < d2 < d1:
-                r = min(d2 / d1, 0.6) if self.capped else d2 / d1
+                r = d2 / d1
                 extrap = p[-1] - d2 * r / (1 - r)  # the steps shrink geometrically: sum what is left
             elif d1 > 0 and d2 <= 0:
                 extrap = p[-1]  # it stopped
@@ -142,8 +141,6 @@ class FloorBelief:
         if extrap is None:
             self.v_est = min(self.v_est, self.v_hi)
             return
-        if self.capped:
-            extrap = max(extrap, 0.9 * self.v_hi)  # two equal steps must not blow the estimate up (P01: 131 -> 113)
         weight = 0.6 if len(p) == 2 else 0.85  # its own moves outweigh our prior quickly (prior: data before round 1)
         self.v_est = min(self.v_hi, weight * extrap + (1 - weight) * self.v_prior)
 

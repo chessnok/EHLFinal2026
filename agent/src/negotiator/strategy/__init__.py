@@ -22,9 +22,8 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     **{name: partial(PlaybookStrategy, playbook) for name, playbook in VARIANTS.items()},
     **{name: partial(PatientStrategy, scale, name) for name, scale in SCALES.items()},
     "decided": DecidedStrategy,
-    # tactical with one review change switched on, for measuring each on its own; and with all of them
+    # tactical with one candidate change switched on, to measure it on its own (see FLAGS in tactical.py)
     **{f"tactical+{flag}": partial(TacticalStrategy, **{flag: True}) for flag in TACTICAL_FLAGS},
-    "tactical+all": partial(TacticalStrategy, **{flag: True for flag in TACTICAL_FLAGS}),
 }
 NEEDS_LLM = {"llm"}
 NEEDS_DECISIONS = {"decided"}  # constructed as Strategy(data, DecisionsClient)

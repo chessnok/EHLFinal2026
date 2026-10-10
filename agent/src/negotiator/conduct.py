@@ -33,8 +33,10 @@ from collections.abc import Callable
 
 # claims of other offers or a walk-away: only with a rival's offer or quote cited in the same message
 BLUFF = re.compile(
-    r"walk away|end (?:the|our|these) (?:negotiation|talks)|look elsewhere|(?:switch|move) to (?:another|other) supplier"
-    r"|(?:other|another) (?:suppliers?|bidders?) (?:offers?|quotes?|bids?)|competitors?\b|competing (?:offer|bid|quote)|better offers? (?:from|elsewhere)"
+    r"walk away|end (?:the|our|these) (?:negotiation|talks)|look elsewhere"
+    r"|(?:switch|move) to (?:another|other) supplier"
+    r"|(?:other|another) (?:suppliers?|bidders?) (?:offers?|quotes?|bids?)|competitors?\b"
+    r"|competing (?:offer|bid|quote)|better offers? (?:from|elsewhere)"
     r"|last chance|take it or leave it",
     re.I,
 )
