@@ -3,7 +3,7 @@
   "checkpoint_id": "6d6c371980d7",
   "strategy": "manual-commit",
   "branch": "feat/tactic-experiments",
-  "checkpoints_count": 6,
+  "checkpoints_count": 7,
   "files_touched": [
     "agent/src/negotiator/cli.py",
     "agent/src/negotiator/sim/arena.py"
@@ -29,13 +29,20 @@
       "compact_transcript": "/6d/6c371980d7/2/transcript.jsonl",
       "content_hash": "/6d/6c371980d7/2/content_hash.txt",
       "prompt": "/6d/6c371980d7/2/prompt.txt"
+    },
+    {
+      "metadata": "/6d/6c371980d7/3/metadata.json",
+      "transcript": "/6d/6c371980d7/3/full.jsonl",
+      "compact_transcript": "/6d/6c371980d7/3/transcript.jsonl",
+      "content_hash": "/6d/6c371980d7/3/content_hash.txt",
+      "prompt": "/6d/6c371980d7/3/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 235,
-    "cache_creation_tokens": 363253,
-    "cache_read_tokens": 23029932,
-    "output_tokens": 134127,
-    "api_call_count": 103
+    "input_tokens": 273,
+    "cache_creation_tokens": 407214,
+    "cache_read_tokens": 27137848,
+    "output_tokens": 154193,
+    "api_call_count": 120
   }
 }
