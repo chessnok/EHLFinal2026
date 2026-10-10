@@ -265,6 +265,29 @@ class WorldData:
             )
         return out
 
+    def evidence_orders(self, part_ids: list[str], supplier_id: str, price: float | None) -> list[Evidence]:
+        """Our last orders of this part from this supplier, by ID - what we pay today, checked by the arena."""
+        if not price or len(part_ids) != 1:
+            return []
+        rows = self.query(
+            "SELECT id, price FROM po_lines WHERE part_id = ? AND supplier_id = ? ORDER BY order_date DESC LIMIT 3",
+            (part_ids[0], supplier_id),
+        )
+        rows = [r for r in rows if self.fact(r["id"])]
+        if len(rows) < 2 or len({r["price"] for r in rows}) != 1 or rows[0]["price"] >= price:
+            return []
+        paid = rows[0]["price"]
+        ids = [r["id"] for r in rows]
+        return [
+            Evidence(
+                kind="orders",
+                refs=ids,
+                sentence=f"Our last orders for this part were at EUR {paid:,.2f} ({', '.join(ids)}).",
+                strength=3.0 + (price / paid - 1) * 20,
+                meta={"paid": paid},
+            )
+        ]
+
     def evidence_quote(self, quote_id: str | None) -> list[Evidence]:
         """The buyer's alternative quote, if the case has one."""
         q = self.fact(quote_id) if quote_id else None

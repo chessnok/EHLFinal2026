@@ -135,6 +135,7 @@ class Plan:
     proposed: dict = field(default_factory=dict)  # field -> values the supplier put on its own sheets
     text_price: float | None = None  # a lower price it wrote in the text but not on a sheet
     text_price_used: bool = False
+    request_counts: dict = field(default_factory=dict)  # lever -> replies that asked for it
     reanchored: bool = False
     asked_breakdown: bool = False
     breakdown_read: bool = False
@@ -230,6 +231,12 @@ class TacticalStrategy(BaselineStrategy):
         if p.has("we_pay_late") or p.has("relationship"):
             recip = min(1.0, recip + 0.1)
         return Policy(anchor, beta, recip, markup, base.claims_first, tuple(dict.fromkeys(trade)))
+
+    def _evidence(self, neg, sid, open_price, current):
+        out = super()._evidence(neg, sid, open_price, current)
+        if self.data:
+            out += self.data.evidence_orders(neg.case.get("parts", []), sid, open_price)
+        return sorted(out, key=lambda e: -e.strength)
 
     def _full_cost(self, parts: list[str], supplier_id: str) -> float | None:
         """The should-cost of THIS supplier's plant for a single-part case; None otherwise.
@@ -379,7 +386,10 @@ class TacticalStrategy(BaselineStrategy):
                     plan.banned_kinds.add(kind)
             if not plan.breakdown_read:
                 self._read_breakdown(neg, sid, plan, reply)
-            plan.requests |= {r for r in requests_in(reply.get("body", "")) if r in neg.case["negotiable"]}
+            asked = {r for r in requests_in(reply.get("body", "")) if r in neg.case["negotiable"]}
+            for r in asked:
+                plan.request_counts[r] = plan.request_counts.get(r, 0) + 1
+            plan.requests |= asked
             for f, values in proposed_values(neg.case, reply.get("term_sheets") or []).items():
                 plan.proposed.setdefault(f, [])
                 plan.proposed[f] += [v for v in values if v not in plan.proposed[f]]
@@ -445,10 +455,11 @@ class TacticalStrategy(BaselineStrategy):
         theirs_path = self._their_c_path(neg, sid)
         their_move = theirs_path[-2] - theirs_path[-1] if len(theirs_path) >= 2 else 0.0
         min_step = MIN_STEP * last
+        gap = max(0.0, their_c - last)
         if plan.stalls == 1:
-            step = min_step  # no move from it: only the smallest visible move from us
-        elif plan.stalls == 2:
-            step = max(by_time * 0.5, 2 * min_step)  # break the deadlock, gently
+            step = max(min_step, 0.15 * gap)  # no move from it: a visible step, not a "small bump"
+        elif plan.stalls >= 2:
+            step = max(by_time * 0.5, 0.25 * gap)  # break the deadlock
         else:
             # a real counter-step: at least half of its last move (cent steps read as no movement)
             step = min(plan.policy.reciprocity * max(their_move, 0.0), max(by_time, 0.5 * max(their_move, 0.0)))
@@ -585,6 +596,8 @@ class TacticalStrategy(BaselineStrategy):
         if price > gt.upper and not uncovered:
             return None  # its price is too high to take; only a sheet that leaves need uncovered is worth fixing
         t = neg.threads[sid]
+        if t.rounds_used < 2 and t.status != "final_offer":
+            return None  # never give its price away before we have negotiated (P02 round 1)
         at_risk = (
             t.status == "final_offer"
             or plan.stalls >= 2
@@ -693,6 +706,10 @@ class TacticalStrategy(BaselineStrategy):
         pool = valid or under_floor  # never go silent: an offer under its floor beats none
         if not pool:
             return []
+        repeated = {r for r, n in plan.request_counts.items() if n >= 2}
+        meets = [t for t in pool if all(satisfies(case, t, theirs, r, plan.proposed) for r in repeated)]
+        if repeated and meets:
+            pool = meets  # an option it has refused twice is no option
 
         def rank(t):
             return (*acceptance(case, t, theirs, plan.requests, plan.proposed), t["unit_price"])
@@ -715,6 +732,12 @@ class TacticalStrategy(BaselineStrategy):
             if structure_key(t) not in seen:
                 picked.append(t)
                 break
+        for t in picked:
+            before = plan.offered.get(structure_key(t))
+            if before is not None and t["unit_price"] <= before:
+                bumped = round(before * (1 + MIN_STEP), 2)
+                if bumped < theirs.get("unit_price", bumped + 1):
+                    t["unit_price"] = bumped
         out, keys = [], set()
         for t in picked:
             if structure_key(t) not in keys:
@@ -802,7 +825,11 @@ class TacticalStrategy(BaselineStrategy):
             lines.append("Could you send us a cost breakdown for this part?")
             plan.asked_breakdown = True
         if len(sheets) > 1:
-            if p.has("cash_short"):
+            if p.has("cash_short") and any(
+                (sh["terms"].get("payment_days") or 999)
+                < (neg.threads[plan.supplier_id].standing[1].get("payment_days") or 0)
+                for sh in sheets
+            ):
                 lines.append("If faster payment helps you, one option below pays early.")
             elif any(
                 f in plan.policy.trade_first and f in case["negotiable"] for f in ("contract_months", "volume_per_year")
@@ -857,7 +884,7 @@ class TacticalStrategy(BaselineStrategy):
             "index_clause": "the index clause you asked for",
             "contract_months": "the longer commitment you asked for",
             "volume_per_year": "a binding volume",
-            "payment_days": "the faster payment you asked for",
+            "payment_days": "the payment term you proposed",
             "ppm_commitment": "the quality commitment you proposed",
             "chargeback_eur_per_complaint": "the chargeback you proposed",
             "lead_time_days": "your lead time",
