@@ -3,6 +3,24 @@
 One record per strategy, day and model: `<date>-<strategy>-<model>.md` (`none`: no LLM). The rule is in the
 repository's `AGENTS.md`. This page is the overview; the records hold the runs, parameters and notes.
 
+## Best full practice pass so far
+
+As of 11 October 2026, 00:40 UTC. One strategy version in one pass over the 10 hosted cases - not the best score per
+case picked from different runs. Source: `summary.json` of each run under `agent/runs/`, and `../runs.md`.
+
+| Run | Strategy | Mean | Deals | Run ID |
+|---|---|---|---|---|
+| P-22 | tactical (`7143676`, margin charge in C) | **0.736** | 10 of 10 | `20261011-001629-practice-tactical` |
+| P-13 | tactical (`96f7545`) | 0.695 | 10 of 10 | `20261010-211824-practice-tactical` |
+| P-11 | tactical | 0.653 | 9 of 10 | – |
+| P-15 | tactical-slow25 (`fe7a9ea`) | 0.621 | 10 of 10 | `20261010-221425-practice-tactical-slow25` |
+| P-6 | llm (`claude-code:haiku`) | 0.517 | 10 of 10 | `20261010-180637-practice-llm` |
+| P-14 | playbook | 0.376 | 7 of 10 | `20261010-212101-practice-playbook` |
+
+P-22 per case: P01 0.969, P02 0.733, P03 0.903, P04 0.860, P05 0.742, P07 0.663, P08 0.550, P10 0.647, P11 0.672,
+P18 0.618. Its record is `2026-10-11-tactical-none.md` (on branch `fix/relationship-charge`). The `llm` strategy on
+tactical's mechanics (P-12, `claude-code:opus`) played six cases only: mean 0.549, P11 0.692.
+
 ## 2026-10-10 · sandbox (D01, D02) · no LLM
 
 | Strategy | D01 | D02 | Mean | vs. baseline | Record |
