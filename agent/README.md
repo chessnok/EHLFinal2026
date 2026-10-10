@@ -43,6 +43,33 @@ uv run negotiator --url http://127.0.0.1:8100 register "Team" sim               
 uv run negotiator --url http://127.0.0.1:8100 --key <sim key> run --set practice
 ```
 
+## LLM strategy and providers
+
+`--strategy llm` adds a model on top of the baseline: before the session opens it profiles each supplier from
+its dossier (letters, notes, news, negotiation history, credit index); each round it reads the reply and picks
+stance, concession, lever and arguments, and writes the e-mail text. Code still builds every term sheet from C,
+inserts the checked arguments, strips IDs and figures the model wrote, and falls back to the baseline move if
+the model is slow or fails.
+
+Switch the model with one string - `--llm <provider>:<model>` or `LLM=<provider>:<model>` in `.env`:
+
+| Spec | Protocol | Key |
+|---|---|---|
+| `ollama:qwen3.6:latest` (default) | OpenAI-compatible, `http://localhost:11434/v1`, thinking off | – |
+| `openai:<model>` | OpenAI | `OPENAI_API_KEY` |
+| `openrouter:<vendor>/<model>` | OpenAI-compatible | `OPENROUTER_API_KEY` |
+| `groq:` · `mistral:` · `deepseek:` · `together:` | OpenAI-compatible | `<PROVIDER>_API_KEY` |
+| `compat:<model>` | any OpenAI-compatible endpoint at `LLM_BASE_URL` | `LLM_API_KEY` |
+| `anthropic:<model>` | Anthropic messages | `ANTHROPIC_API_KEY` |
+
+Tuning: `LLM_REASONING` (`none|low|medium|high`, sent as `reasoning_effort`), `LLM_TIMEOUT_S` (default 30: each
+e-mail must reach the arena within 60 s of the reply), `LLM_PARALLEL` (concurrent calls, default 4).
+
+```sh
+uv run negotiator run --set sandbox --strategy llm
+uv run negotiator play case:P05 --strategy llm --llm anthropic:claude-haiku-4-5
+```
+
 ## Telemetry: `runs/<run_id>/`
 
 | File | Content |
@@ -52,7 +79,8 @@ uv run negotiator --url http://127.0.0.1:8100 --key <sim key> run --set practice
 | `run.log` | the human-readable log (debug level) |
 | `sessions/<sid>.json` | the whole case: case file, e-mails both ways, documents as text, decisions with rationale, result, the arena's trace and back office |
 | `sessions/<sid>/` | the documents suppliers attached (quote PDF, cost breakdown XLSX, …) |
-| `metrics.json` | counters (HTTP status, claim results, supplier statuses, timeouts, deals) and timings (supplier reply, decision delay after a reply, HTTP latency per endpoint, case duration) |
+| `metrics.json` | counters (HTTP status, claim results, supplier statuses, timeouts, deals, LLM calls, errors, tokens, fallbacks) and timings (supplier reply, decision delay after a reply, HTTP latency per endpoint, LLM latency per purpose, case duration) |
+| `events.jsonl` → `llm_call`, `profile` | every model call (purpose, model, latency, tokens, output) and each supplier profile |
 | `summary.json`, `report.md` | scores, C_open/C_deal/C_best/C_alt, price paths per thread, cost breakdown, claims, HTTP and timing tables |
 
 ## Architecture
@@ -66,7 +94,8 @@ profile.py     supplier traits from notes, letters, news, history (cash-short, a
 guards.py      hard rules before every send and accept: must-haves, alternative, valid sheets and IDs
 lessons.py     lessons.md: what each case taught
 session.py     Negotiation: threads, documents, costs (kit's C), send/accept/walk away, transcript
-strategy/      Strategy protocol (prepare, decide, conclude, keepalive) and the baseline
+llm.py         one client for OpenAI-compatible and Anthropic APIs, switched by `provider:model`; telemetry
+strategy/      Strategy protocol (prepare, decide, conclude, keepalive), baseline, llm_strategy
 runner.py      play_case (one worker per thread, keepalive, deadline), play_many, play_final
 report.py      summary.json, report.md, statistics across runs
 cli.py         the `negotiator` command

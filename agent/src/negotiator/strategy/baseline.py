@@ -18,6 +18,7 @@ or runs out of rounds; then it accepts the cheapest standing sheet that beats th
 """
 
 import math
+import threading
 from dataclasses import dataclass, field
 
 from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer
@@ -54,13 +55,14 @@ class SupplierPlan:
 class BaselineStrategy:
     name = "baseline"
 
-    def __init__(self, data: WorldData | None = None) -> None:
+    def __init__(self, data: WorldData | None = None, llm=None) -> None:
         self.data = data
         self.plans: dict[str, SupplierPlan] = {}
         # Each ID counts once per case (a duplicate earns nothing); only a rival's offer may be cited
         # to every other bidder, once per supplier.
         self.used_refs: set[str] = set()
         self.used_rival_refs: set[tuple[str, str]] = set()
+        self._claims_lock = threading.Lock()
 
     # ------------------------------------------------------------------ prepare
     def prepare(self, neg: Negotiation) -> None:
@@ -265,25 +267,30 @@ class BaselineStrategy:
         rival = self._rival_evidence(neg, sid)
         if rival:
             pool.insert(0, rival)
-        picked: list[Evidence] = []
-        kinds = set()
-        limit = MAX_CLAIMS if first else 1
-        for e in pool:
-            if len(picked) >= limit:
-                break
-            if e.kind == "rival_offer":
-                if any((sid, r) in self.used_rival_refs for r in e.refs):
+        return self._claim(sid, pool, MAX_CLAIMS if first else 1, distinct_kinds=first)
+
+    def _claim(self, sid: str, pool: list[Evidence], limit: int, distinct_kinds: bool = False) -> list[Evidence]:
+        """Take up to `limit` arguments from `pool` that have not been used yet (each ID counts once per
+        case; a rival's offer once per supplier) and mark them used. Threads of one case call this at once."""
+        with self._claims_lock:
+            picked: list[Evidence] = []
+            kinds = set()
+            for e in pool:
+                if len(picked) >= limit:
+                    break
+                if e.kind == "rival_offer":
+                    if any((sid, r) in self.used_rival_refs for r in e.refs):
+                        continue
+                elif any(r in self.used_refs for r in e.refs) or (distinct_kinds and e.kind in kinds):
                     continue
-            elif any(r in self.used_refs for r in e.refs) or (e.kind in kinds and first):
-                continue
-            picked.append(e)
-            kinds.add(e.kind)
-        for e in picked:
-            if e.kind == "rival_offer":
-                self.used_rival_refs.update((sid, r) for r in e.refs)
-            else:
-                self.used_refs.update(e.refs)
-        return picked
+                picked.append(e)
+                kinds.add(e.kind)
+            for e in picked:
+                if e.kind == "rival_offer":
+                    self.used_rival_refs.update((sid, r) for r in e.refs)
+                else:
+                    self.used_refs.update(e.refs)
+            return picked
 
     def _rival_evidence(self, neg: Negotiation, sid: str) -> Evidence | None:
         """In an RFQ: a rival's standing offer that is cheaper than this supplier's."""
@@ -310,7 +317,7 @@ class BaselineStrategy:
         self, neg: Negotiation, plan: SupplierPlan, sheets: list[dict], claims: list[Evidence], first: bool
     ) -> dict:
         case = neg.case
-        lines = [f"Dear {plan.name} team,", ""]
+        lines = [f"Dear {plan.name} team," if plan.name != plan.supplier_id else "Dear Sir or Madam,", ""]
         if first:
             lines.append(
                 "thank you for your quote. We have reviewed it against our data and cannot accept it as it stands."

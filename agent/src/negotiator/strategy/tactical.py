@@ -98,8 +98,8 @@ class Plan:
 class TacticalStrategy(BaselineStrategy):
     name = "tactical"
 
-    def __init__(self, data: WorldData | None = None) -> None:
-        super().__init__(data)
+    def __init__(self, data: WorldData | None = None, llm=None) -> None:
+        super().__init__(data, llm)
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
 

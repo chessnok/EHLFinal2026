@@ -36,6 +36,10 @@ def play_case(
 ) -> dict:
     """Play one case to its end and return its outcome (score, costs, rounds, replay link, ...)."""
     strategy = new_strategy()
+    if case is not None and hasattr(strategy, "before_open"):
+        # Reading and thinking before the session opens: no supplier clock runs yet.
+        with recorder.metrics.timer("strategy.before_open"):
+            strategy.before_open(case)
     neg = Negotiation(client, recorder, data, strategy_name=strategy.name)
     neg.deadline = deadline() if callable(deadline) else deadline
     neg.open(case_id, case)
@@ -58,12 +62,12 @@ def play_case(
 
 def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
     held: dict[str, Decision] = {}
-    lock = threading.Lock()
     stop = threading.Event()
 
     def worker(sid: str) -> None:
         while not neg.ended.is_set() and not stop.is_set():
-            with lock, neg.recorder.metrics.timer("strategy.decide"):
+            # No lock: an LLM call for one thread must not hold up the others (each has its own clock).
+            with neg.recorder.metrics.timer("strategy.decide"):
                 decision = strategy.decide(neg, sid)
             if decision.kind == "message":
                 try:
@@ -144,6 +148,7 @@ def play_many(
     data: WorldData | None = None,
     *,
     parallel: int = 4,
+    cases: dict[str, dict] | None = None,
 ) -> list[dict]:
     """Many cases at once (at most 10 open sessions per key). Stops starting cases once the practice
     quota is used up. Returns one outcome per case (or an error entry)."""
@@ -153,7 +158,7 @@ def play_many(
         if used_up.is_set():
             return {"case_id": case_id, "error": "not started: practice quota used up"}
         try:
-            return play_case(client, recorder, case_id, new_strategy, data)
+            return play_case(client, recorder, case_id, new_strategy, data, case=(cases or {}).get(case_id))
         except ArenaError as e:
             if e.quota_used_up:
                 used_up.set()

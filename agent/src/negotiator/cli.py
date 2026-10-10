@@ -25,9 +25,10 @@ from negotiator.client import ArenaClient, ArenaError
 from negotiator.config import Settings
 from negotiator.data import WorldData
 from negotiator.lessons import write_lessons
+from negotiator.llm import LLM
 from negotiator.report import history, write_report
 from negotiator.runner import play_case, play_final, play_many
-from negotiator.strategy import STRATEGIES
+from negotiator.strategy import NEEDS_LLM, STRATEGIES
 from negotiator.telemetry import Recorder
 
 console = Console()
@@ -57,10 +58,29 @@ def _data(settings: Settings) -> WorldData | None:
         return None
 
 
-def _strategy_factory(name: str, data: WorldData | None):
+def _strategy_factory(args, data: WorldData | None, recorder: Recorder):
+    name = args.strategy
     if name not in STRATEGIES:
         raise SystemExit(f"unknown strategy {name!r}; known: {', '.join(STRATEGIES)}")
-    return lambda: STRATEGIES[name](data)
+    llm = None
+    if name in NEEDS_LLM:
+        llm = LLM(getattr(args, "llm", None), recorder)
+        recorder.event("llm_config", model=llm.describe(), base_url=llm.base_url, reasoning=llm.reasoning)
+        console.print(f"LLM {llm.describe()}: warming up ...")
+        console.print(f"LLM ready in {llm.warm_up():.1f}s")
+    return lambda: STRATEGIES[name](data, llm)
+
+
+def _find_case(client: ArenaClient, case_id: str) -> dict | None:
+    """The case file before opening a session (practice, sandbox), so the strategy can read first."""
+    for set_ in ("practice", "sandbox"):
+        try:
+            for c in client.cases(set_):
+                if c["case_id"] == case_id:
+                    return c
+        except ArenaError:
+            continue
+    return None
 
 
 def _finish(recorder: Recorder, outcomes: list[dict]) -> None:
@@ -204,7 +224,8 @@ def _new_run(args, settings: Settings, label: str) -> tuple[Recorder, ArenaClien
 def cmd_play(args, settings: Settings) -> None:
     recorder, client = _new_run(args, settings, args.case_id.replace("case:", ""))
     data = _data(settings)
-    outcome = play_case(client, recorder, args.case_id, _strategy_factory(args.strategy, data), data)
+    factory = _strategy_factory(args, data, recorder)
+    outcome = play_case(client, recorder, args.case_id, factory, data, case=_find_case(client, args.case_id))
     if client.practice_remaining is not None:
         console.print(f"practice sessions left: {client.practice_remaining}")
     _finish(recorder, [outcome])
@@ -217,7 +238,10 @@ def cmd_run(args, settings: Settings) -> None:
     console.print(f"{len(ids)} case(s): {', '.join(ids)}")
     recorder, client = _new_run(args, settings, f"{args.set}-{args.strategy}")
     data = _data(settings)
-    outcomes = play_many(client, recorder, ids, _strategy_factory(args.strategy, data), data, parallel=args.parallel)
+    factory = _strategy_factory(args, data, recorder)
+    outcomes = play_many(
+        client, recorder, ids, factory, data, parallel=args.parallel, cases={c["case_id"]: c for c in cases}
+    )
     if client.practice_remaining is not None:
         console.print(f"practice sessions left: {client.practice_remaining}")
     _finish(recorder, outcomes)
@@ -227,7 +251,7 @@ def cmd_final(args, settings: Settings) -> None:
     settings = Settings(**{**settings.__dict__, "final_mode": True})
     recorder, client = _new_run(args, settings, f"final-{args.strategy}")
     data = _data(settings)
-    outcomes = play_final(client, recorder, _strategy_factory(args.strategy, data), data, parallel=args.parallel)
+    outcomes = play_final(client, recorder, _strategy_factory(args, data, recorder), data, parallel=args.parallel)
     _finish(recorder, outcomes)
 
 
@@ -329,13 +353,16 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("play", cmd_play, "play one case with telemetry and a report", needs_client=False)
     p.add_argument("case_id")
     p.add_argument("--strategy", default="tactical", choices=list(STRATEGIES))
+    p.add_argument("--llm", help="<provider>:<model>, e.g. ollama:qwen3.6:latest or anthropic:claude-haiku-4-5")
     p = add("run", cmd_run, "play many cases in parallel", needs_client=False)
     p.add_argument("--set", default="sandbox", choices=["practice", "sandbox"])
     p.add_argument("--cases", nargs="*", help="case ids (default: every hosted case of the set)")
     p.add_argument("--strategy", default="tactical", choices=list(STRATEGIES))
+    p.add_argument("--llm", help="<provider>:<model>, e.g. ollama:qwen3.6:latest or anthropic:claude-haiku-4-5")
     p.add_argument("--parallel", type=int, default=4)
     p = add("final", cmd_final, "the Live Final: waves, in parallel", needs_client=False)
     p.add_argument("--strategy", default="tactical", choices=list(STRATEGIES))
+    p.add_argument("--llm", help="<provider>:<model>, e.g. ollama:qwen3.6:latest or anthropic:claude-haiku-4-5")
     p.add_argument("--parallel", type=int, default=10)
     add("report", cmd_report, "rebuild and show a run's report", needs_client=False).add_argument(
         "run", nargs="?", default="latest"
