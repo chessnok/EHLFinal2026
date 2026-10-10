@@ -216,7 +216,12 @@ FLAGS: dict[str, str] = {
     "60 % of the usual but never under 0.6 % of C",
     "answers": "plain answers: the volume we need, an opener that matches its move, a fixed field said once, a "
     "clause it must have kept, no 'pays early' that is not",
+    "band_steps": "outside strategic cases every counter-step is 1-3 % of C: under 1 % the supplier held its price "
+    "in 34 % of replies, over 3 % it agreed to ours in 34 % (docs/bot-mechanics.md section 3)",
+    "rival_rest": "after a big step answering a rival quote we cited, the smallest visible move: the supplier gives "
+    "the rest of its step after checking the quote, whatever we send (docs/bot-mechanics.md section 1)",
 }
+BAND_STEP = (0.01, 0.03)  # band_steps: a counter-step between these shares of our last C
 
 
 class TacticalStrategy(BaselineStrategy):
@@ -668,6 +673,15 @@ class TacticalStrategy(BaselineStrategy):
         their_move = theirs_path[-2] - theirs_path[-1] if len(theirs_path) >= 2 else 0.0
         min_step = MIN_STEP * last
         gap = max(0.0, their_c - last)
+        if (
+            self.flags["rival_rest"]
+            and any(c.kind == "rival_offer" for c in plan.last_claims)
+            and len(theirs_path) >= 2
+            and their_move >= BIG_STEP * theirs_path[-2]
+        ):
+            # "I give half the step now and check the rest" - "Checked: give the rest of the step" (P05, 47 of 50):
+            # the rest comes anyway; a step of ours now only pays for it (28.79 agreed at once, against 27.85)
+            return min(last + min_step, their_c, plan.upper_c)
         if APPROVAL_PENDING.search(t.latest.get("body", "")):
             # "we need to clarify this internally" / "more than my band allows": its boss approves the next
             # step anyway (8 of 8 in the back office) - hold, with the smallest visible move
@@ -684,6 +698,8 @@ class TacticalStrategy(BaselineStrategy):
             step = max(step, min_step)
             if self.flags["persistent"]:
                 step = min(step, max(PERSIST_STEP * step, PERSIST_MIN * last))
+        if self.flags["band_steps"] and neg.buyer.get("category_goal") not in RELATIONSHIP_GOALS:
+            step = min(max(step, BAND_STEP[0] * last), BAND_STEP[1] * last)
         if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
             # only the price moves here, and the room is narrow: 0.4 % of C is 8 % of what there is to win on
             # P01 and 19 % on P02 - three such steps met the supplier in round 3 of 10 (P01 0.785, P02 0.421,
