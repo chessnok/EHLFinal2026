@@ -3,14 +3,23 @@
   "checkpoint_id": "5b4c728b3707",
   "strategy": "manual-commit",
   "branch": "fix/timeout-moves",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/docs/runs.md"
+  ],
   "sessions": [
     {
       "metadata": "/5b/4c728b3707/0/metadata.json",
       "transcript": "/5b/4c728b3707/0/full.jsonl",
       "compact_transcript": "/5b/4c728b3707/0/transcript.jsonl",
       "content_hash": "/5b/4c728b3707/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/5b/4c728b3707/1/metadata.json",
+      "transcript": "/5b/4c728b3707/1/full.jsonl",
+      "compact_transcript": "/5b/4c728b3707/1/transcript.jsonl",
+      "content_hash": "/5b/4c728b3707/1/content_hash.txt",
       "prompt": ""
     }
   ],
