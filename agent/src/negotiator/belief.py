@@ -44,6 +44,7 @@ class FloorBelief:
             **(standard or {}),
         }
         self.rate = rate
+        self.ppm: float | None = None  # its real defect rate (scorecard), when known
         self.structures = [complete_offer(case, {**opening, **c}) for c in combos(case)]
         self.v_open = self.value(opening)
         self.v_hi = self.v_open  # its floor is no higher than any offer it made
@@ -57,7 +58,10 @@ class FloorBelief:
     def value(self, terms: dict) -> float:
         if terms.get("unit_price") is None:
             return math.inf
-        return supplier_value(self.case, terms, {"standard": self.standard, "interest_rate": self.rate})
+        sup = {"standard": self.standard, "interest_rate": self.rate}
+        if self.ppm is not None:
+            sup["ppm"] = self.ppm  # the defect rate it really has: a chargeback costs it that much per unit
+        return supplier_value(self.case, terms, sup)
 
     def price_for(self, structure: dict, v: float) -> float:
         """The price at which this structure gives the supplier exactly the value v (value is linear in price)."""

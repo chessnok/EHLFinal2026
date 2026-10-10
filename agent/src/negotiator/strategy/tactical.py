@@ -186,6 +186,7 @@ class TacticalStrategy(BaselineStrategy):
             if terms.get("unit_price") is not None:
                 rate = buyer.get("interest_rate", 0.08) * (2 if profile.has("cash_short") else 1)
                 plan.belief = FloorBelief(neg.case, terms, thread.standard_terms, gt.lower, rate)
+                plan.belief.ppm = profile.ppm  # scorecard ppm: what a chargeback really costs it
             plan.evidence = self._evidence(neg, sid, terms.get("unit_price"), current) if terms else []
             if profile.has("hedged"):
                 plan.banned_kinds.add("index")  # "not our reality" until its hedge runs out
@@ -828,7 +829,18 @@ class TacticalStrategy(BaselineStrategy):
             pool = meets  # an option it has refused twice is no option
 
         def rank(t):
-            return (*acceptance(case, t, theirs, plan.requests, plan.proposed), t["unit_price"])
+            # at equal C for us: what it asked for first, then what the package is worth to it in cash (its cost of
+            # money, the chargebacks at its real defect rate) - P11's best package dropped a chargeback that cost us
+            # little and it a lot; P02's paid early instead of a price its margin could not carry
+            answered, alike = acceptance(case, t, theirs, plan.requests, plan.proposed)
+            worth = plan.belief.value(t) if asymmetric else 0.0
+            return (answered, round(worth, 4), alike, t["unit_price"])
+
+        # what a package is worth to it ranks the options only where the data shows a lever is worth much more to
+        # it than it costs us: chargebacks at its real defect rate (scorecard). On payment days and freight both
+        # sides value money alike - offering it the cash-richest package (D02: 14 days, EXW) only bought it a
+        # structure that is dear for us, not a lower price (sandbox 0.608 -> 0.535)
+        asymmetric = bool(plan.belief and plan.belief.ppm and "chargeback_eur_per_complaint" in case["negotiable"])
 
         for t in pool:  # a structure offered before never comes back at a lower price
             before = plan.offered.get(structure_key(t))
