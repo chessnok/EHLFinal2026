@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "f1a73d4f60ea",
+  "strategy": "manual-commit",
+  "branch": "feat/llm-limit",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/f1/a73d4f60ea/0/metadata.json",
+      "transcript": "/f1/a73d4f60ea/0/full.jsonl",
+      "compact_transcript": "/f1/a73d4f60ea/0/transcript.jsonl",
+      "content_hash": "/f1/a73d4f60ea/0/content_hash.txt",
+      "prompt": "/f1/a73d4f60ea/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 8,
+    "cache_creation_tokens": 3763,
+    "cache_read_tokens": 1907875,
+    "output_tokens": 4802,
+    "api_call_count": 4
+  }
+}
