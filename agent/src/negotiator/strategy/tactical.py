@@ -113,6 +113,7 @@ BIG_STEP = 0.04  # a supplier move of 4 %+ in one round says it had room
 UPPER_ROOM = 0.06  # the upper bound sits at least this far above our first ask
 STOP_MARGIN = 0.01  # we take an offer within 1 % of where we expect the supplier to stop
 MIN_STEP = 0.004  # every message moves at least 0.4 % of C: these bots punish a repeated offer
+RELATIONSHIP_STEP = 0.25  # stabilise / secure_supply: our step as a share of the usual one
 MAX_SPREAD = 0.08  # options of one message stay within 8 % of each other's price
 
 
@@ -393,7 +394,11 @@ class TacticalStrategy(BaselineStrategy):
         price_only = bool(gt and gt.lower and gt.lower >= open_price * 0.95)  # the prior says: only the price moves
         depth = ANCHOR_PRICE_ONLY if price_only else ANCHOR_WITH_LEVERS
         extra = ANCHOR_DATA_EXTRA
-        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+        if neg.supplier_estimates.get(sid):
+            # the margin charge is in C: the ask may go as deep as a price-only talk, it stops at the price that
+            # costs us least (below). P01 came down to 132.20 after a 10 % ask, to 137.00 after a 3 % one
+            depth, extra = ANCHOR_PRICE_ONLY, 0.0
+        elif neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
             depth, extra = min(depth, ANCHOR_RELATIONSHIP), 0.0  # squeezing a strategic supplier costs us C
         # round 1 carries 67 % of all supplier movement and no supplier ever walked over a deep first offer
         # (0 of 917 replies); within a case deeper first offers went with better scores - so we open deep
@@ -611,6 +616,12 @@ class TacticalStrategy(BaselineStrategy):
             step = max(step, min_step)
             if self.flags["big_steps"] and math.isfinite(plan.open_c):
                 step = min(max(step, 0.02 * plan.open_c), 0.04 * plan.open_c, 0.6 * gap)
+        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+            # only the price moves here, and in small steps: on P02 it went 373.88 -> 373.22 -> 372.62 while we
+            # went 362.11 -> 367.90 -> 370.36 and met it in round 3 of 10; on P01 a quarter of the step kept it
+            # coming down for four replies (136.50 -> 132.20, runs.md P-15). Under 0.4 % of C it answers in
+            # crumbs (D01: 0.1 a reply, 0.809 against 0.969)
+            step = max(RELATIONSHIP_STEP * step, min_step)
         return min(last + step, their_c, plan.upper_c)  # the upper bound is never asked for beyond
 
     def _round_budget(self, neg: Negotiation, sid: str) -> int:
@@ -910,10 +921,11 @@ class TacticalStrategy(BaselineStrategy):
                 continue
             valid.append(terms)
         if neg.supplier_estimates.get(sid) and valid:
-            # under a margin charge a structure cannot cost less than at its cheapest price: one that misses
-            # `ask_c` even there is no equal offer, it is a dearer one (and its price is the highest of all)
-            reach = min(neg.cost(sid, t) for t in valid)
-            valid = [t for t in valid if neg.cost(sid, t) <= max(ask_c, reach) * (1 + STALL_EPS)]
+            # under a margin charge a structure cannot cost less than at its cheapest price. One that misses
+            # `ask_c` there stays only while it is nearer to our ask than to the supplier's offer (P02: the index
+            # clause costs us 0.8 % and is the one structure it lowers its price for)
+            limit = max(ask_c, min(neg.cost(sid, t) for t in valid), (ask_c + their_c) / 2)
+            valid = [t for t in valid if neg.cost(sid, t) <= limit * (1 + STALL_EPS)]
         pool = valid or under_floor  # never go silent: an offer under its floor beats none
         if not pool:
             return []
