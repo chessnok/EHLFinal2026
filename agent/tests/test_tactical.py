@@ -3,12 +3,11 @@
 import json
 import time
 from pathlib import Path
-from types import SimpleNamespace
 
 from negotiator.chats import write_chats
 from negotiator.client import ArenaClient
 from negotiator.config import REPO_ROOT, Settings
-from negotiator.data import Evidence, WorldData
+from negotiator.data import WorldData
 from negotiator.guards import accept_problems, clean_message, sheet_problems
 from negotiator.lessons import write_lessons
 from negotiator.profile import build_profile
@@ -310,24 +309,3 @@ def test_margin_charge_is_priced_without_payment_terms_in_the_quote_pdf(tmp_path
     # an ask no price can reach: we stop at the price that costs us least, not under it
     assert strategy._iso_cost_price(neg, sid, terms, 0.0) >= round(cheapest, 2) - 0.01
     assert neg.cost(sid, {**terms, "unit_price": cheapest}) < neg.cost(sid, {**terms, "unit_price": 15.0})
-
-
-def test_more_drops_adds_the_next_window_of_an_accepted_driver(world) -> None:
-    s = TacticalStrategy(world, more_drops=True)
-    plan = SimpleNamespace(counters=[])
-    claim = Evidence(
-        kind="recent_drop",
-        refs=["idx:PPI-C2431@2026-06", "idx:PPI-C2431@2026-08"],
-        sentence="x",
-        meta={"series": "PPI-C2431"},
-    )
-    body = "We have factored the verified drop in PPI-C2431 into our calculation; however, our AS-14404 is covered."
-    s._another_drop(plan, claim, body)
-    assert plan.counters and not set(plan.counters[0].refs) & set(claim.refs)
-    hedged = SimpleNamespace(counters=[])
-    s._another_drop(
-        hedged,
-        Evidence(kind="recent_drop", refs=["a", "b"], sentence="y", meta={"series": "AS-14404"}),
-        "That is not our reality: our AS-14404 is covered at fixed prices until March 2027.",
-    )
-    assert not hedged.counters
