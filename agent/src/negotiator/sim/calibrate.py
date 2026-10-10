@@ -128,6 +128,26 @@ def _kind(case, p: Profile, buyer, reasons, prev_status, prev_reasons, best_buye
     return ("moved" if moved else "still"), top
 
 
+def _example(t: dict, n: int, before: str, buyer: dict, m: dict, gave: float | None, ask: float | None) -> dict:
+    """One recorded exchange as the llm opponent is shown it: the buyer's e-mail and what the supplier did.
+    `gave`: the share of its room to the floor it gave up; `ask`: where the buyer's best sheet sat on that room."""
+    results = {c["index"]: c["result"] for c in m.get("claim_results") or []}
+    claims = (buyer.get("interpreted") or {}).get("claims") or []
+    return {
+        "session": t.get("_id"),
+        "reply": n + 1,
+        "before": before,
+        "buyer": buyer.get("body") or "",
+        "sheets": [s["terms"] for s in buyer.get("term_sheets") or []],
+        "claims": [{"type": c["type"], "result": results.get(i, "unchecked")} for i, c in enumerate(claims)],
+        "status": m["status"],
+        "gave": None if gave is None else round(gave, 3),
+        "ask": None if ask is None else round(ask, 3),
+        "terms": m.get("terms") or {},
+        "text": m.get("text") or "",
+    }
+
+
 def calibrate(sessions: list[dict]) -> dict:
     """The model: one profile per (case, supplier), the pool over all of them, and the cases themselves."""
     pool_rates, own_rates = _rates(sessions)
@@ -189,7 +209,7 @@ def calibrate(sessions: list[dict]) -> dict:
     for key, p in profiles.items():
         case = cases[key.split("|")[0]]
         steps, finals, convinced = defaultdict(list), defaultdict(lambda: [0, 0]), defaultdict(lambda: [0, 0])
-        costs, walks = [], [0, 0]
+        costs, walks, shown = [], [0, 0], []
         for t in seen[key]:
             value, status, prev_reasons, best_buyer, n = p.opening_value, "open", [], None, 0
             for buyer, m, reasons in _moves(t, p.supplier_id):
@@ -197,12 +217,17 @@ def calibrate(sessions: list[dict]) -> dict:
                     walks[0] += m["status"] == "walked_away"
                     walks[1] += 1
                 if buyer is None or m["terms"].get("unit_price") is None:
+                    if buyer and m["status"] == "walked_away":
+                        shown.append(_example(t, n, status, buyer, m, None, None))
                     prev_reasons = reasons
                     continue
                 kind, top = _kind(case, p, buyer, reasons, status, prev_reasons, best_buyer)
                 best_buyer = max(x for x in (best_buyer, top) if x is not None) if top is not None else best_buyer
                 new = value_of(case, p.rates, p.ref, m["terms"])
                 gap = value - p.floor
+                room = gap > p.quantum / 2
+                shown.append(_example(t, n, status, buyer, m, min(1.0, max(0.0, (value - new) / gap)) if room else None,
+                                      (value - top) / gap if room and top is not None else None))  # fmt: skip
                 if m["status"] != "agreed" and gap > p.quantum / 2:
                     share = min(1.0, max(0.0, (value - new) / gap))
                     clarify = any(CLARIFY in r for r in reasons)
@@ -224,6 +249,7 @@ def calibrate(sessions: list[dict]) -> dict:
             if charge > 0 and t["outcome"].get("supplier_id") == p.supplier_id:
                 costs.append(_full_cost(case, p, t["outcome"]["terms"], charge))
         p.steps, p.finals, p.convinced, p.walks = dict(steps), dict(finals), dict(convinced), walks
+        p.examples = shown
         p.full_cost = round(statistics.median(costs), 4) if costs else None
 
     pool = Profile("pool", {"unit_price": 1.0}, {}, {}, pool_rates, floor=0.0)

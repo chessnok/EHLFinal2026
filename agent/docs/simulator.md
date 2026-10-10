@@ -73,6 +73,40 @@ So: use it for what the numbers do (anchor, concession schedule, menus, which ar
 never for tone, questions, unbacked claims or leaks. Those need the sandbox, which is free and, for a strategy
 without an LLM, gives the same replies every time.
 
+## The opponent that reads the e-mail (`--opponents llm`)
+
+Since 11 October a model can play the supplier (`sim/llm_supplier.py`): it gets the buyer's e-mail, the thread, and
+this supplier's recorded exchanges closest to the moment (same status, like wording, near reply number), decides how
+much of its room to give up and whether to call the offer final, agree or leave, and writes the reply. The floor,
+the price of a structure and the `C_best` limit stay in code. It costs model calls; `--opponents all` leaves it out.
+
+```sh
+uv run negotiator sim bench tactical --opponents llm --cases case:P11 --reps 3   # --supplier-llm <provider>:<model>
+uv run negotiator sim check --opponent llm --sessions 24    # next to the fitted supplier, on the same sessions
+uv run negotiator sim serve --opponent llm
+```
+
+The model is `--supplier-llm`, else `SIM_LLM`, else `LLM`. Measured on 11 October with `claude-code:haiku`, model
+fitted from 182 sessions:
+
+| `sim check --opponent llm --sessions 24` (two per case, each left out of its fit) | Fitted | llm |
+|---|---|---|
+| Mean error of the score | 0.051 | 0.058 |
+| Replies with the recorded status | 0.75 | 0.76 |
+
+71 model calls, 440,451 tokens in / 77,561 out, USD 0.1108, 3 minutes.
+
+**It does not reproduce the arena's reaction to wording.** `sim bench baseline budget shelby --opponents llm`, D01
+and D02, two repeats (106 calls, USD 0.1657, 9 minutes):
+
+| | D01 baseline | D01 shelby | D02 baseline | D02 budget |
+|---|---|---|---|---|
+| Arena | 0.843 | 0.663 | 0.629 | 0.314 |
+| llm opponent | 0.89 | 0.89 | 0.64 | 0.64 |
+
+So for now it is as good as the fitted supplier on the numbers and no better on text: wording still needs the
+sandbox.
+
 **Walking away is fitted since 10 October, 22:00:** per supplier, how often a term sheet sent after its final offer
 made it walk away, with the pool of all suppliers as prior. The record then: 3 walk-aways in 26 such sheets (P04, P07
 and P18, one each, all from `playbook`'s closing offer; the three demo suppliers never walked in 20). One observation

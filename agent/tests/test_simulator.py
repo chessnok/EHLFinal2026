@@ -6,9 +6,11 @@ from arena_kit.cost import total_cost
 
 from negotiator.config import Settings
 from negotiator.data import WorldData
+from negotiator.llm import LLMError
 from negotiator.runner import play_many
 from negotiator.sim.arena import bench, price_cap
 from negotiator.sim.calibrate import as_objects, best_cost, calibrate, load_sessions
+from negotiator.sim.llm_supplier import LLMThread, pick
 from negotiator.sim.pricing import FEATURES, features, fit_rates, price_for, value_of
 from negotiator.sim.supplier import PERSONAS, Profile, Thread
 from negotiator.strategy import BaselineStrategy
@@ -153,3 +155,68 @@ def test_round_trip_calibrate_and_play(sim: Settings, world: WorldData, tmp_path
                  opponents=("hardball", "manipulator"), jitter=True)  # fmt: skip
     assert set(pool["by_opponent"]) == {("baseline", "hardball"), ("baseline", "manipulator")}
     assert all(0.0 <= r["score"] <= 1.0 for rows in pool["by_opponent"].values() for r in rows)
+
+
+class _Model:
+    """Stands in for `negotiator.llm.LLM`: answers every prompt with the next prepared choice."""
+
+    def __init__(self, *choices):
+        self.choices, self.prompts = list(choices), []
+
+    def json(self, system, user, **_):
+        self.prompts.append(user)
+        choice = self.choices.pop(0)
+        if isinstance(choice, Exception):
+            raise choice
+        return choice
+
+
+def _llm_thread(model, **kw) -> LLMThread:
+    return LLMThread(_profile(**kw), _pool(), random.Random(1), llm=model)
+
+
+def test_llm_opponent_moves_by_the_models_share_and_never_below_the_floor() -> None:
+    model = _Model({"decision": "counter", "concede_share": 0.5, "body": "We move: {offer}."},
+                   {"decision": "final_offer", "concede_share": 5, "body": "No further."})  # fmt: skip
+    th = _llm_thread(model, examples=[{"session": "s", "reply": 1, "before": "open", "buyer": "Our ceiling is 9.",
+                                       "sheets": [], "claims": [], "status": "open", "gave": 0.1, "ask": 1.5,
+                                       "terms": {}, "text": "Thank you, we hold."}])  # fmt: skip
+    sheet = [{"unit_price": 7.0, "payment_days": 30}]
+    first = th.reply(CASE, sheet, [], mail={"body": "Management set a ceiling.", "claims": []})
+    assert first["status"] == "open" and first["terms"]["unit_price"] == 9.0
+    assert "a price of €9.00 per unit" in first["reasons"][0]
+    assert "Management set a ceiling." in model.prompts[0] and "Our ceiling is 9." in model.prompts[0]
+    assert "the 1 closest recorded replies with your status open" in model.prompts[0]
+    assert "median 10%" in model.prompts[0]
+    last = th.reply(CASE, sheet, [], mail={"body": "Again.", "claims": []})
+    assert last["status"] == "final_offer" and last["terms"]["unit_price"] == 8.0  # the floor, not the share of 5
+    assert "final offer" in last["reasons"][0] and "Management set a ceiling." in model.prompts[1]
+
+
+def test_llm_opponent_cannot_agree_below_its_floor_and_walks_only_after_a_final_offer() -> None:
+    model = _Model({"decision": "agree", "concede_share": 0, "body": "Deal."},
+                   {"decision": "walk_away", "concede_share": 0, "body": "Enough."},
+                   {"decision": "agree", "concede_share": 0, "body": "Deal: {offer}."})  # fmt: skip
+    th = _llm_thread(model)
+    low = [{"unit_price": 7.0, "payment_days": 30}]
+    assert th.reply(CASE, low, [], mail={"body": "", "claims": []})["status"] == "open"
+    assert th.reply(CASE, low, [], mail={"body": "", "claims": []})["status"] == "open"  # no final offer yet
+    out = th.reply(CASE, [{"unit_price": 8.5, "payment_days": 30}], [], mail={"body": "", "claims": []})
+    assert out["status"] == "agreed" and out["terms"]["unit_price"] == 8.5
+
+
+def test_llm_opponent_falls_back_to_the_fitted_supplier() -> None:
+    th = _llm_thread(_Model(LLMError("timeout")), steps={"moved": [[0.5, False], [0.5, False]]})
+    out = th.reply(CASE, [{"unit_price": 7.0, "payment_days": 30}], [], mail={"body": "Hello", "claims": []})
+    assert out["terms"]["unit_price"] == 9.0 and th.fallbacks == 1
+
+
+def test_llm_opponent_is_shown_the_replies_to_e_mails_in_like_words() -> None:
+    def past(buyer: str, gave: float) -> dict:
+        return {"session": "s", "reply": 1, "before": "open", "buyer": buyer, "sheets": [], "claims": [],
+                "status": "open", "gave": gave, "ask": 1.0, "terms": {}, "text": "..."}  # fmt: skip
+
+    examples = [past("Thank you for your quote, we reviewed the delivery record", 0.4),
+                past("Our management has set a ceiling for this part", 0.05)]  # fmt: skip
+    first = pick(examples, "open", 1, "Please note the ceiling our management set", limit=1)
+    assert first[0]["gave"] == 0.05

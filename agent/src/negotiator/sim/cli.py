@@ -1,7 +1,10 @@
 """`negotiator sim ...`: calibrate, check, bench and serve the local supplier simulator (see `arena.py`)."""
 
 import json
+import logging
+import os
 import statistics
+from collections import defaultdict
 
 from rich.console import Console
 from rich.table import Table
@@ -14,6 +17,7 @@ from negotiator.sim.supplier import PERSONAS
 console = Console()
 MODEL = PACKAGE_ROOT / "data" / "sim" / "model.json"  # git-ignored: fitted from replays, never committed
 SIM_RUNS = PACKAGE_ROOT / "runs-sim"  # apart from runs/: `negotiator stats` counts arena sessions only
+SUPPLIER_LLM = "<provider>:<model> of the opponent `llm` (default: SIM_LLM, then LLM)"
 
 
 def _num(value, digits: int = 3) -> str:
@@ -42,7 +46,78 @@ def cmd_calibrate(args, settings: Settings) -> None:
     console.print(table)
 
 
+class SupplierModel:
+    """The model behind the opponent `llm`, with a run folder of its own so that its calls and cost are measured."""
+
+    def __init__(self, spec: str | None):
+        from negotiator.llm import LLM
+        from negotiator.telemetry import Recorder
+
+        self.recorder = Recorder(SIM_RUNS, "sim-supplier-llm", logging.ERROR)
+        self.llm = LLM(spec or os.environ.get("SIM_LLM"), self.recorder)
+
+    def close(self, fallbacks: int) -> None:
+        from negotiator.report import build_summary
+
+        counters = self.recorder.metrics.snapshot()["counters"]
+        self.recorder.close()
+        summary = build_summary(self.recorder.dir)
+        cost = summary.get("llm_cost_usd")
+        tokens = f"{counters.get('llm.tokens.prompt', 0)} in / {counters.get('llm.tokens.completion', 0)} out"
+        console.print(
+            f"supplier model {self.llm.describe()}: {summary['llm_calls']} calls, {counters.get('llm.errors', 0)} "
+            f"failed, {fallbacks} replies left to the fitted supplier; tokens {tokens}; cost "
+            + ("APPROX-NOT-MEASURED" if cost is None else f"USD {cost:.4f}")
+            + f" ({self.recorder.dir.name})"
+        )
+
+
+def _with_examples(settings: Settings, refit: bool) -> dict:
+    """The model for the opponent `llm`: fitted again when the stored one predates the recorded exchanges."""
+    model = _model(settings, refit=refit)
+    return model if any(p.examples for p in model["profiles"].values()) else _model(settings, refit=True)
+
+
+def _spread(sessions: list[dict], n: int) -> set[str]:
+    """`n` sessions for a check that costs model calls: the newest of each case in turn."""
+    by_case = defaultdict(list)
+    for t in sessions:
+        by_case[t["case"]["case_id"]].append(t["_id"])
+    picked: list[str] = []
+    while len(picked) < n and any(by_case.values()):
+        picked += [ids.pop() for _, ids in sorted(by_case.items()) if ids]
+    return set(picked[:n])
+
+
+def _check_llm(args, settings: Settings) -> None:
+    sessions = load_sessions(settings.runs_dir)
+    only = _spread(sessions, args.sessions)
+    supplier = SupplierModel(args.supplier_llm)
+    fitted = check(sessions, seeds=args.seeds, only=only)
+    result = check(sessions, seeds=1, llm=supplier.llm, only=only)
+    if args.json:
+        console.print_json(json.dumps({"fitted": fitted, "llm": result}))
+    table = Table(title=f"fitted and llm opponent on the same {result['sessions']} sessions, each left out of its fit")
+    for col in ("case", "sessions", "arena", "fitted", "llm", "abs error fitted", "abs error llm",
+                "same status fitted", "same status llm"):  # fmt: skip
+        table.add_column(col)
+    before = {c["case_id"]: c for c in fitted["cases"]}
+    for c in result["cases"]:
+        f = before.get(c["case_id"], {})
+        table.add_row(c["case_id"], str(c["sessions"]), _num(c["real"]), _num(f.get("sim")), _num(c["sim"]),
+                      _num(f.get("abs_error")), _num(c["abs_error"]), _num(f.get("same_status"), 2),
+                      _num(c["same_status"], 2))  # fmt: skip
+    table.add_row("all", str(result["sessions"]), "", "", "", _num(fitted["abs_error"]), _num(result["abs_error"]),
+                  _num(fitted["same_status"], 2), _num(result["same_status"], 2))  # fmt: skip
+    console.print(table)
+    console.print("The buyer's recorded e-mails are replayed; the score is of the offer standing when it accepted.")
+    console.print("Same status: the share of replies with the recorded status (open, final offer, agreed).")
+    supplier.close(result["fallbacks"])
+
+
 def cmd_check(args, settings: Settings) -> None:
+    if args.opponent == "llm":
+        return _check_llm(args, settings)
     result = check(load_sessions(settings.runs_dir), seeds=args.seeds)
     if args.json:
         console.print_json(json.dumps(result))
@@ -88,13 +163,18 @@ def _pool_table(by_opponent: dict, strategies: list[str], opponents: tuple[str, 
 def cmd_bench(args, settings: Settings) -> None:
     from negotiator.data import WorldData
 
-    model = _model(settings, refit=args.refit)
+    free = tuple(n for n, p in PERSONAS.items() if not p.llm)  # `all` leaves out the opponent that costs tokens
+    opponents = free if "all" in args.opponents else tuple(args.opponents)
+    reads = any(PERSONAS[o].llm for o in opponents)
+    model = _with_examples(settings, args.refit) if reads else _model(settings, refit=args.refit)
     data = WorldData(settings.data_dir, settings.release_dir)
     case_ids = args.cases or sorted(model["cases"])
     console.print(f"{len(args.strategies)} strategies x {len(case_ids)} cases x {args.reps} repeats on the simulator")
-    opponents = tuple(PERSONAS) if "all" in args.opponents else tuple(args.opponents)
+    supplier = SupplierModel(args.supplier_llm) if reads else None
     out = bench(model, settings, data, args.strategies, case_ids, args.reps, SIM_RUNS, strangers=args.strangers,
-                opponents=opponents, jitter=args.jitter)  # fmt: skip
+                opponents=opponents, jitter=args.jitter, supplier_llm=supplier and supplier.llm)  # fmt: skip
+    if supplier:
+        supplier.close(out["model_replies"]["fallbacks"])
     if len(opponents) > 1 or args.jitter:
         _pool_table(out["by_opponent"], args.strategies, opponents)
         console.print(f"runs under {SIM_RUNS}")
@@ -127,8 +207,11 @@ def cmd_bench(args, settings: Settings) -> None:
 def cmd_serve(args, settings: Settings) -> None:
     from arena_kit.data import DataPackage
 
-    model = _model(settings)
-    sim = CalibratedSim(model, DataPackage(settings.data_dir).facts, args.seed, args.strangers, not args.clock)
+    reads = PERSONAS[args.opponent].llm
+    model = _with_examples(settings, False) if reads else _model(settings)
+    supplier = SupplierModel(args.supplier_llm) if reads else None
+    sim = CalibratedSim(model, DataPackage(settings.data_dir).facts, args.seed, args.strangers, not args.clock,
+                        persona=args.opponent, llm=supplier and supplier.llm)  # fmt: skip
     serve(sim, args.port, block=True)
 
 
@@ -142,6 +225,10 @@ def add_parser(add) -> None:
     sub.add_parser("calibrate", help="fit the suppliers from runs/").set_defaults(sim_func=cmd_calibrate)
     c = sub.add_parser("check", help="how well the fit predicts sessions it has not seen")
     c.add_argument("--seeds", type=int, default=20)
+    c.add_argument("--opponent", choices=["fitted", "llm"], default="fitted",
+                   help="llm: the model answers the recorded e-mails, next to the fitted supplier")  # fmt: skip
+    c.add_argument("--sessions", type=int, default=20, help="with --opponent llm: sessions to replay (model calls)")
+    c.add_argument("--supplier-llm", help=SUPPLIER_LLM)
     c.add_argument("--json", action="store_true")
     c.set_defaults(sim_func=cmd_check)
     b = sub.add_parser("bench", help="play strategies on the simulator, next to their arena scores")
@@ -153,6 +240,7 @@ def add_parser(add) -> None:
     b.add_argument("--opponents", nargs="+", default=["fitted"], choices=[*PERSONAS, "all"],
                    help="opponent types to play against (all: the whole pool)")  # fmt: skip
     b.add_argument("--jitter", action="store_true", help="move each supplier's floor at random, per session")
+    b.add_argument("--supplier-llm", help=SUPPLIER_LLM)
     b.add_argument("--json", action="store_true")
     b.set_defaults(sim_func=cmd_bench)
     s = sub.add_parser("serve", help="the simulator as a local arena")
@@ -160,4 +248,6 @@ def add_parser(add) -> None:
     s.add_argument("--seed", type=int, default=0)
     s.add_argument("--strangers", action="store_true")
     s.add_argument("--clock", action="store_true", help="keep the 60-second rule")
+    s.add_argument("--opponent", choices=list(PERSONAS), default="fitted")
+    s.add_argument("--supplier-llm", help=SUPPLIER_LLM)
     s.set_defaults(sim_func=cmd_serve)
