@@ -3,7 +3,7 @@
   "checkpoint_id": "2cf293f91b94",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 11,
+  "checkpoints_count": 12,
   "files_touched": [
     "AGENTS.md",
     "agent/docs/llm-strategy-best-run.ru.md",
@@ -17,13 +17,19 @@
       "transcript": "/2c/f293f91b94/0/full.jsonl",
       "content_hash": "/2c/f293f91b94/0/content_hash.txt",
       "prompt": "/2c/f293f91b94/0/prompt.txt"
+    },
+    {
+      "metadata": "/2c/f293f91b94/1/metadata.json",
+      "transcript": "/2c/f293f91b94/1/full.jsonl",
+      "content_hash": "/2c/f293f91b94/1/content_hash.txt",
+      "prompt": "/2c/f293f91b94/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 842,
-    "cache_creation_tokens": 915918,
-    "cache_read_tokens": 228583007,
-    "output_tokens": 396187,
-    "api_call_count": 423
+    "input_tokens": 848,
+    "cache_creation_tokens": 940004,
+    "cache_read_tokens": 228704432,
+    "output_tokens": 397111,
+    "api_call_count": 426
   }
 }
