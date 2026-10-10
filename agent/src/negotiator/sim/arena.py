@@ -43,6 +43,7 @@ CLAIM_TYPES = {
     "news": "news",
 }
 MAX_CLAIMS = 3
+SIM_URL, SIM_KEY = "http://127.0.0.1:8100", "sim"  # where `sim serve` listens, and the key it always accepts
 
 
 def price_cap(case: dict, ref: dict, c_best: float):
@@ -324,13 +325,16 @@ def serve(sim: CalibratedSim, port: int | None = None, host: str = "127.0.0.1", 
     import uvicorn
 
     kit.MAX_CALLS = 10**6  # no calls-per-second limit on a laptop
+    sim.teams.setdefault(SIM_KEY, "local")  # no registration: the usual commands work with `--sim`
     port = port or _free_port()
     server = uvicorn.Server(uvicorn.Config(kit.create_app(sim), host=host, port=port, log_level="warning"))
     url = f"http://{host}:{port}"
     if block:
-        print(f"negotiator sim: {url}  (register a key: negotiator --url {url} register <team> sim)", flush=True)
+        print(f"negotiator sim: {url}, key {SIM_KEY!r} - use the usual commands with --sim, e.g.\n"
+              f"  negotiator --sim run --set practice --strategy tactical\n"
+              f"  board: {url}/leaderboard   a finished case: {url}/replay/<session id>", flush=True)  # fmt: skip
         server.run()
-        return url, None, server
+        return url, SIM_KEY, server
     threading.Thread(target=server.run, daemon=True).start()
     for _ in range(200):
         try:
@@ -338,8 +342,7 @@ def serve(sim: CalibratedSim, port: int | None = None, host: str = "127.0.0.1", 
                 break
         except httpx.HTTPError:
             time.sleep(0.05)
-    key = httpx.post(f"{url}/v1/register", json={"team_name": "bench", "event_code": "sim"}).json()["api_key"]
-    return url, key, server
+    return url, SIM_KEY, server
 
 
 def arena_scores(sessions: list[dict]) -> dict:

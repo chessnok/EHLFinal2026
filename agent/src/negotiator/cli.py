@@ -9,7 +9,7 @@
   negotiator lessons [run_id|latest]                     what each case taught: scores, costs, supplier reasons
   negotiator chats [run_id|latest]                       every negotiation as a readable e-mail thread
   negotiator sim calibrate | check | bench <strategies> | serve     the local supplier simulator (no quota)
-Global: --url (e.g. http://127.0.0.1:8000 for arena-sim), --key, --json.
+Global: --url (e.g. http://127.0.0.1:8000 for arena-sim), --key, --json; --sim for `negotiator sim serve`.
 """
 
 import argparse
@@ -32,6 +32,8 @@ from negotiator.lessons import write_lessons
 from negotiator.llm import LLM
 from negotiator.report import history, write_report
 from negotiator.runner import play_case, play_final, play_many
+from negotiator.sim.arena import SIM_KEY, SIM_URL
+from negotiator.sim.cli import SIM_RUNS
 from negotiator.sim.cli import add_parser as add_sim_parser
 from negotiator.strategy import NEEDS_DECISIONS, NEEDS_LLM, STRATEGIES
 from negotiator.telemetry import Recorder
@@ -41,6 +43,8 @@ console = Console()
 
 def _settings(args) -> Settings:
     overrides = {}
+    if getattr(args, "sim", False):  # the local simulator in place of the arena; its runs are kept apart
+        overrides.update(arena_url=SIM_URL, api_key=SIM_KEY, runs_dir=SIM_RUNS)
     if args.url:
         overrides["arena_url"] = args.url.rstrip("/")
     if args.key:
@@ -327,6 +331,7 @@ def build_parser() -> argparse.ArgumentParser:
         kw = {} if defaults else {"default": argparse.SUPPRESS}
         p.add_argument("--url", help="arena base URL (default ARENA_URL or https://arena.tacto.ai)", **kw)
         p.add_argument("--key", help="API key (default ARENA_API_KEY)", **kw)
+        p.add_argument("--sim", action="store_true", help="talk to `negotiator sim serve` instead of the arena", **kw)
         p.add_argument("--json", action="store_true", help="print raw JSON", **kw)
         p.add_argument("-v", "--verbose", action="store_true", help="debug logging on the console", **kw)
         return p

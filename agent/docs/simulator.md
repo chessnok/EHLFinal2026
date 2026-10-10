@@ -16,6 +16,18 @@ uv run negotiator sim bench old new --opponents all --jitter --reps 3   # the op
 uv run negotiator sim serve --port 8100                # as a local arena for `negotiator --url ...`
 ```
 
+**The usual commands, on the simulator.** `sim serve` is the arena's API on `http://127.0.0.1:8100`; add `--sim` to
+any command and it talks to it instead of the arena - same client, runner, strategies, reports and chats:
+
+```sh
+uv run negotiator sim serve                                   # terminal 1
+uv run negotiator --sim run --set practice --strategy tactical   # terminal 2: all 12 cases (--cases to pick)
+uv run negotiator --sim play case:P05 --strategy llm
+```
+
+`http://127.0.0.1:8100/leaderboard` is its board and `/replay/<session id>` a finished case as a page. `sim bench`
+is only a loop over the same thing: it starts this server per repeat and plays through the same runner.
+
 Simulator runs go to `agent/runs-sim/`, apart from `runs/`: they are not benchmark records and never enter
 `negotiator stats`.
 
