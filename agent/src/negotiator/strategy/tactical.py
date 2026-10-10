@@ -73,6 +73,8 @@ STALL_EPS = 0.0005  # a C move below 0.05 % is no move
 DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
 ANCHOR_WITH_LEVERS = 0.25  # first ask 25 % under the quote where competition, material or capacity give a lever
 ANCHOR_DATA_EXTRA = 0.05  # how much deeper the data may take the first ask
+RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
+ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
 ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
 MAX_ANCHOR = 0.15  # (kept for the experiments that import it)
 MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D02, P05, P18), but a deeper first
@@ -280,6 +282,8 @@ class TacticalStrategy(BaselineStrategy):
             return
         std = neg.threads[sid].standard_terms
         if not {"payment_days", "incoterm"} <= std.keys():
+            # no estimate without its standard terms: filling them in made the charge dominate every move (P01/P02
+            # stopped negotiating in a dry run) - the shallow strategic anchor guards against the squeeze instead
             return
         rate = neg.buyer.get("interest_rate", 0.08)
         neg.supplier_estimates[sid] = {
@@ -342,6 +346,9 @@ class TacticalStrategy(BaselineStrategy):
             return math.inf
         price_only = bool(gt and gt.lower and gt.lower >= open_price * 0.95)  # the prior says: only the price moves
         depth = ANCHOR_PRICE_ONLY if price_only else ANCHOR_WITH_LEVERS
+        extra = ANCHOR_DATA_EXTRA
+        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+            depth, extra = min(depth, ANCHOR_RELATIONSHIP), 0.0  # squeezing a strategic supplier costs us C
         # round 1 carries 67 % of all supplier movement and no supplier ever walked over a deep first offer
         # (0 of 917 replies); within a case deeper first offers went with better scores - so we open deep
         candidates = [open_price * (1 - depth)]
@@ -351,7 +358,7 @@ class TacticalStrategy(BaselineStrategy):
         if alt_price and alt_price < open_price:
             candidates.append(alt_price * 0.98)
         # the data may take it deeper - a cheaper alternative, a low grounded floor - but not past 5 points more
-        price = max(min(candidates), open_price * (1 - depth - ANCHOR_DATA_EXTRA))
+        price = max(min(candidates), open_price * (1 - depth - extra))
         # no hard floor for strategic suppliers: the relationship term already prices a squeeze in C, and
         # our cost estimate can sit above its real one (P02: should-cost 380 over a 371 quote, C_best ~364)
         price = min(price, open_price)
@@ -398,7 +405,10 @@ class TacticalStrategy(BaselineStrategy):
         signals = reply_signals(t.latest.get("body", ""))
         # the lower bound is where we anchor, not where we stop: below it we keep asking - the supplier
         # ends it with a stall or a final offer, and only it knows its real floor
-        if their_c <= plan.lower_c or self._undercut_after_big_step(neg, supplier_id, plan, theirs):
+        closing_word = t.status == "final_offer" or (signals["firm"] and t.rounds_used > 0)
+        if not closing_word and (
+            their_c <= plan.lower_c or self._undercut_after_big_step(neg, supplier_id, plan, theirs)
+        ):
             if reanchor := self._reanchor(neg, supplier_id, plan, theirs, their_c):
                 return reanchor
         if alt := self._take_alternative(neg, supplier_id, plan):
@@ -832,6 +842,13 @@ class TacticalStrategy(BaselineStrategy):
         pool = valid or under_floor  # never go silent: an offer under its floor beats none
         if not pool:
             return []
+        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS and plan.full_cost:
+            # a strategic supplier is never asked below 95 % of its own plant's should-cost: P02 closed at 345
+            # against a should-cost of 380 and paid EUR 179k of margin charge (score 0); its C_best sat near 362
+            floor = round(plan.full_cost * RELATIONSHIP_COST_FLOOR, 2)
+            for t in pool:
+                t["unit_price"] = max(t["unit_price"], floor)
+            pool = [t for t in pool if neg.cost(sid, t) < their_c] or pool
         repeated = {r for r, n in plan.request_counts.items() if n >= 2}
         meets = [t for t in pool if all(satisfies(case, t, theirs, r, plan.proposed) for r in repeated)]
         if repeated and meets:
