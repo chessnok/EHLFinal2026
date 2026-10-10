@@ -121,16 +121,16 @@ Put each case in the first category that fits, and sort inside a category by the
 3. **Close to the best, or a high house score that few teams beat.** A ceiling. Spend no attempts.
 
 As of 11 October 2026: house, best, tried and beaten from the live page of 10 October at about 21:05; ours from
-`negotiator me` on 11 October at 00:20. Rows keep the order of 10 October. Refresh both before using it.
+`negotiator me` on 11 October at 01:05. Rows keep the order of 10 October (P03 is above the house now). Refresh both before using it.
 
 | Category | Case | Lever, goal | Ours | House | Best | Tried | Beaten | Gap to best |
 |---|---|---|---|---|---|---|---|---|
 | 1 | P08 | raw material, leverage | 0.626 | 0.75 | 0.91 | 22 | 1 | 0.284 |
 | 1 | P02 | price increase, stabilise | 0.733 | 0.74 | 0.85 | 21 | 1 | 0.117 |
-| 1 | P07 | bundling, routine | 0.721 | 0.78 | 0.81 | 21 | 1 | 0.089 |
+| 1 | P07 | bundling, routine | 0.740 | 0.78 | 0.81 | 21 | 1 | 0.070 |
 | 1 | P01 | price increase, stabilise | 0.969 | 0.97 | 0.99 | 22 | 2 | 0.021 |
 | 1 | P10 | capacity, secure_supply | 0.663 | 0.69 | 0.70 | 22 | 3 | 0.037 |
-| 1 | P03 | renewal, stabilise | 0.905 | 0.92 | 0.94 | 21 | 1 | 0.035 |
+| 1 | P03 | renewal, stabilise | 0.923 | 0.92 | 0.94 | 21 | 1 | 0.017 |
 | 2 | P11 | quality, quality_first | 0.692 | 0.31 | 0.81 | 20 | 17 | 0.118 |
 | 2 | P05 | RFQ, leverage | 0.839 | 0.56 | 0.92 | 21 | 12 | 0.081 |
 | 2 | P18 | raw material, leverage | 0.618 | 0.39 | 0.68 | 20 | 17 | 0.062 |

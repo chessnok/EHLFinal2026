@@ -55,6 +55,7 @@ scored at the suppliers' final offers the same run gives 0.539, still behind tac
 
 | Strategy | Mean | Deals | Record |
 |---|---|---|---|
+| tactical (`6bb73d1`, merged with main, routine cap, should-cost argument) | **0.746** | 10 of 10 | [record](2026-10-11-tactical-none.md) |
 | tactical (`7143676`, margin charge in C) | **0.736** | 10 of 10 | [record](2026-10-11-tactical-none.md) |
 
-One full run, 10 practice sessions, after 16 sessions of partial runs on P01, P02, P03 and P10.
+Two full runs, 20 practice sessions, and 22 sessions of partial runs (`../runs.md` P-16 to P-27).
