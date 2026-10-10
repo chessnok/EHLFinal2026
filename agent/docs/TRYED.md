@@ -34,6 +34,7 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | Forecast as proof of volume | practice P-13 | worked in 5 cases | "it holds and we took it into account"; cited again it comes back `duplicate` (P07) |
 | Falling index over a short window | practice P-15 | worked on P18 and partly on P08 | "we have adjusted our pricing accordingly"; P08's AS-14404 is hedged until March, only PPI-C2431 counted |
 | A rival's quote cited by ID | sandbox, practice | worked | "it holds and we took it into account" |
+| The contract's own index clause cited against the supplier's index argument ("the rise is already in the price we pay", `ctr:…#3.2`) | practice P-24 (P08, P18) | failed: P08 0.550 → 0.539, P18 0.618 → 0.485 | the arena did not read it as an argument (no claim result), and it took the first e-mail's slot from one that counts |
 | Complaints (`qn:` rows) cited one by one as further quality arguments | practice P-23 (P11) | failed: 0.672, unchanged | the first one came back `duplicate` after the scorecard's ppm figure, and the supplier called its offer final in that round |
 
 ## LLM
@@ -74,7 +75,6 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | P11: three sheets at chargeback 0 with ppm 300 / 800 / 1500 | its scorecard ppm is 2376: a EUR 500 chargeback costs it about 1.19 a unit and us 0.135; it priced 800 ppm / 0 at 46.50 against 300 ppm / 0 at 47.00 | unknown |
 | P11, P01: one fresh citable argument per round, never an empty round | each accepted argument moved P11's price by 0.50; a round without one got a final offer | unknown |
 | P08, P18: first ask 18-20 % under the quote instead of 25-34 %, short-window index falls in the first e-mail | first counters 5.41-5.46 (P08) and 5.40-5.60 (P18) against 5.71 and 5.70 after a 30 % ask | unknown |
-| P08, P18: argue that the metal is already passed through by the contract's clause (double counting) | `ctr:4600070710#3.2` passes AS-14404 through quarterly; the opening cites the same rise again | unknown |
 | P10: accept the alternative sheet by its own ID instead of resending it | the alternative has an ID of its own (54 days) | unknown |
 | P05: offers that arrive after a timeout move are lost | the arena trace shows 14 such offers over 6 P05 sessions; our counter says 0 | unknown |
 | LLM as reader and writer around `tactical` (numbers stay with `tactical`) | – | in work on `feat/llm-writer`, sandbox only |
