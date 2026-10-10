@@ -1,0 +1,11 @@
+Там еще залили новую стратегию, скачай ее, посмотри что там, в другой ветке
+
+---
+
+<task-notification>
+<task-id>byyufbdu0</task-id>
+<tool-use-id>toolu_01KyZUjedUKiiitZ878Tuezy</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/byyufbdu0.output</output-file>
+<status>completed</status>
+<summary>Background command "Run baseline and llm on sandbox, compare" completed (exit code 0)</summary>
+</task-notification>
