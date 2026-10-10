@@ -241,6 +241,28 @@ class WorldData:
                 )
         return out
 
+    def evidence_forecast(self, part_ids: list[str]) -> list[Evidence]:
+        """Our latest demand forecast per part (shared with suppliers): the answer to "which volume can you commit to?"
+        when volume is not negotiable. The arena checks the recorded change in %."""
+        out = []
+        for part in part_ids:
+            refs = sorted(r for r in self.facts if r.startswith(f"fc:{part.split(':')[-1]}@"))
+            fact = self.facts.get(refs[-1]) if refs else None
+            if not fact or fact.get("change_pct") is None:
+                continue
+            volume = fact.get("volume_per_year", "the stated")
+            out.append(
+                Evidence(
+                    kind="forecast",
+                    refs=[refs[-1]],
+                    sentence=f"Our latest forecast puts our need at {volume} units a year, "
+                    f"a change of {fact['change_pct']:+.1f}% ({refs[-1]}).",
+                    strength=0.2,
+                    meta={"change_pct": fact["change_pct"], "volume_per_year": fact.get("volume_per_year")},
+                )
+            )
+        return out
+
     def evidence_quote(self, quote_id: str | None) -> list[Evidence]:
         """The buyer's alternative quote, if the case has one."""
         q = self.fact(quote_id) if quote_id else None

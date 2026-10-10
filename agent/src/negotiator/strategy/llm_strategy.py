@@ -48,43 +48,90 @@ PROFILE_SYSTEM = """You are a senior procurement analyst at Hollerau Pumpenwerke
 Read everything we know about one supplier and work out what will move it in a negotiation: what it is
 dealing with right now, what it values, what it cannot do, and how it reacted in the past.
 
+Look especially for these signals (they decide which trade works):
+- cash: asks to be paid earlier, cash discounts, short-time work, the bank watching, a weak credit index;
+- volume and security: wants a binding volume or a longer contract, calls us small or "not strategic";
+- index: has bought material forward or insists on a price escalation clause (Preisgleitklausel);
+- frozen price: "no room on price", list price for all customers - then trade terms, not price;
+- approval ladder: price moves need a committee or head office - expect small steps, keep asking;
+- open book: offered to show its calculation - only then is a cost breakdown worth asking for;
+- capacity: fully booked (firm) or idle (needs the work).
+
 Return JSON:
 {"summary": "<3 sentences: the supplier's situation and what it wants>",
  "drivers": ["<from: cash, volume, capacity, contract_security, list_price, relationship, quality, energy_costs,
-              material_costs, wages, lead_time, other>"],
+              material_costs, wages, lead_time, index_clause, other>"],
  "cash_pressure": <0..1, how much it needs money soon>,
  "firmness": <0..1, how little it usually concedes>,
  "relationship": "good" | "neutral" | "strained",
  "levers": ["<negotiable fields that should matter to it, from the list given>"],
+ "open_book": <true if it offered to show its calculation>,
  "arguments_that_work": "<which kinds of argument it accepts, or 'unknown'>",
  "avoid": "<what would backfire with this supplier>",
  "tone": "<how to write to it>"}"""
 
 DECIDE_SYSTEM = """You are the buyer of Hollerau Pumpenwerke negotiating by e-mail with an industrial supplier.
-Goal: the lowest total cost C for our need, without breaking a must-have. Code computes every price and
-every term sheet; you choose the strategy for this round and write the e-mail text.
+Goal: the lowest total cost C for our need over the whole horizon, without breaking a must-have. C is not the unit
+price: a short contract leaves need uncovered at an expensive fallback price, early payment costs interest. Code
+computes every price and every term sheet; you choose the strategy for this round and write the e-mail text.
 
 Decide:
-- stance: "push" (ask for more with a concession of ours), "trade" (offer something the supplier values -
-  a lever - for a better price), "hold" (stop here, keep the standing offer for the close), or "accept"
-  (its standing offer is good enough; code still checks it beats our alternative).
+- stance: "push" (ask for more with a concession of ours), "trade" (give the supplier a lever it values for a
+  better price), "hold" (stop here, keep the standing offer for the close), or "accept" (its standing offer is good
+  enough; code still checks it beats our alternative).
 - concession: 0..1 - how much of the scheduled price step to give this round (0 = stand firm, 1 = full step).
-  Concede little when the supplier moves on its own, more when it is stuck but reasonable.
+  Answer real steps of the supplier with real steps of ours: "without movement from your side we cannot move" means
+  a concession of 0 stalls the talks. Concede little when it moves a lot on its own.
 - lever: one negotiable field to trade, or "none".
-- evidence: up to 3 argument numbers from the list (they are inserted verbatim with their figures and IDs);
-  pick only those relevant to what the supplier just said; [] if none.
-- ask_cost_breakdown: true to ask for its cost breakdown (useful once, early).
+- evidence: up to 3 argument numbers from the list (inserted verbatim with their figures and IDs); pick only those
+  relevant to what the supplier just said; [] if none.
+- ask_cost_breakdown: true only once, and only if the profile says open_book - most suppliers refuse.
 - question: one short question to the supplier, or "".
-- message: the e-mail body WITHOUT greeting, signature, prices, percentages, data IDs or term sheets (code
-  adds all of these). 40-120 words, polite, firm, specific to what the supplier wrote. Never reveal urgency,
-  a budget, a missing alternative or our target. State no fact that is not in the arguments list: no market
-  benchmarks, competitor prices, other bids, volume growth, volume tiers, forecasts or new projects - the
-  supplier asks for proof and trusts us less. Do not promise volume we have not offered in the options.
-  Refer to "the options below" instead of naming prices or terms; the options are equal value to us, so
-  invite the supplier to pick the one that suits it.
+- message: the e-mail body WITHOUT greeting, signature, prices, percentages, data IDs or term sheets (code adds
+  all of these). 40-120 words, polite, firm, specific to what the supplier wrote.
+
+What the supplier signals, and how to answer (the SIGNALS line lists what code found in its last e-mail):
+- "Which volume can you commit to?" / "a binding higher volume would help": if volume_per_year or contract_months
+  is a lever, trade it (lever = that field). If not, say our annual requirement is fixed by our forecast and use a
+  forecast argument from the list if there is one - never invent a volume, a growth or a new project.
+- "Faster payment is welcome" / cash pressure: trade payment_days if it is a lever. If it is not, do not keep
+  squeezing price in tiny steps; give a real step or trade another lever.
+- It insists on an index / escalation clause (Preisgleitklausel) for a long contract: trade index_clause - code
+  offers it with the widest deadband, which costs us little. Refusing it got us walk-aways.
+- "We need to clarify this internally": an approval step - ask again with a small real step; the next concession
+  comes on the next message.
+- It cites its own cost drivers rising ("your figures confirm our case"): do not use index arguments on those drivers.
+- A final offer in the first two rounds is often a position: you may probe it once with "trade" on the conditions
+  it named ("provided the lead time remains...", "alternatively..."). A final offer later is its limit: "hold".
+- "Price list for all customers", "no room on price": trade terms (payment, contract length, volume), not price.
+
+Never: reveal urgency, a budget, a target, a deadline or a missing alternative; state any fact that is not in the
+arguments list (no market benchmarks, competitor prices, other bids, volume growth, forecasts or new projects); name
+prices or terms (write "the options below"). The options are equal value to us: invite the supplier to pick.
 
 Return JSON: {"stance": "...", "concession": 0.0, "lever": "...", "evidence": [], "ask_cost_breakdown": false,
 "question": "...", "message": "...", "reason": "<one sentence: why>"}"""
+
+# Words that must never reach the supplier: they leak our position or read as claims we cannot back.
+FORBIDDEN_RE = re.compile(
+    r"\b(budget|benchmark|market price|target price|our target|urgent|urgently|deadline|no alternative|"
+    r"other bidders?|competitor)\b",
+    re.I,
+)
+SIGNALS = {
+    "asks_volume": re.compile(r"which volume|binding (higher )?volume|volume (can you )?commit|exact volume", re.I),
+    "wants_faster_payment": re.compile(r"faster payment|pay(ment)? (earlier|faster|sooner)|cash", re.I),
+    "wants_index_clause": re.compile(
+        r"index clause|preisgleitklausel|escalation clause|cannot accept a fixed price", re.I
+    ),
+    "approval_step": re.compile(r"clarify (this )?internally|approval|management|committee", re.I),
+    "no_move_no_move": re.compile(r"without (movement|a move)|remain(s)? unchanged|unchanged from your", re.I),
+    "drivers_rose": re.compile(r"confirm our case|rose .* of our cost|driver rose", re.I),
+    "offers_alternatives": re.compile(r"\balternatively\b|provided (that )?the", re.I),
+    "price_frozen": re.compile(r"no room on price|price list applies|frozen", re.I),
+}
+EARLY_FINAL_ROUNDS = 2  # a final offer this early is probed once
+MIN_CONCESSION_WHEN_MOVED = 0.3  # the supplier moved: no crumbs from us
 
 
 class LLMStrategy(BaselineStrategy):
@@ -94,6 +141,7 @@ class LLMStrategy(BaselineStrategy):
         super().__init__(data)
         self.llm = llm or LLM()
         self.profiles: dict[str, dict] = {}
+        self.probed_final: set[str] = set()
 
     # ------------------------------------------------------------------ before the clock
     def before_open(self, case: dict) -> None:
@@ -156,8 +204,14 @@ class LLMStrategy(BaselineStrategy):
         if not t.live:
             return Decision.drop(supplier_id, f"thread {t.status}")
         _, theirs = t.standing
-        if t.status in ("agreed", "final_offer"):  # pushing past a final offer risks the supplier walking
-            return Decision.hold(supplier_id, t.status)
+        if t.status == "agreed":
+            return Decision.hold(supplier_id, "agreed")
+        if t.status == "final_offer":
+            # a late final offer is the supplier's limit; an early one is often a position worth one probe
+            early = t.rounds_used <= EARLY_FINAL_ROUNDS and supplier_id not in self.probed_final
+            if not early or neg.case.get("round_limit", 10) - t.rounds_used <= 2:
+                return Decision.hold(supplier_id, "final offer")
+            self.probed_final.add(supplier_id)
         if theirs.get("unit_price") is None or plan.target_price is None:
             return Decision.hold(supplier_id, "no price to negotiate on")
         rounds_left = neg.case.get("round_limit", 10) - t.rounds_used
@@ -181,6 +235,9 @@ class LLMStrategy(BaselineStrategy):
             f"STANDING OFFER: {json.dumps(theirs)} -> C = {_eur(neg.cost(sid, theirs))}; status {t.status}",
             f"OUR ALTERNATIVE without a deal: C = {_eur(neg.c_alt)}",
             f"OUR LAST PRICE: {(t.our_price_path() or ['none'])[-1]}; SCHEDULED NEXT PRICE: {scheduled}",
+            f"SIGNALS in the supplier's last e-mail: {', '.join(signals(t.latest.get('body') or '')) or 'none'}; "
+            f"supplier moved last round: {_moved(t)}; contract shorter than our horizon: "
+            f"{short_contract(neg, theirs)}",
             f"LEVERS (negotiable fields and options): "
             f"{json.dumps({f: neg.case.get('term_options', {}).get(f, 'free') for f in neg.case['negotiable']})}",
             "ARGUMENTS AVAILABLE (by number):",
@@ -222,6 +279,9 @@ class LLMStrategy(BaselineStrategy):
         stance = str(choice.get("stance", "push")).lower()
         stance = stance if stance in STANCES else "push"
         rationale = {"llm": {k: v for k, v in choice.items() if not k.startswith("_")}}
+        if stance in ("hold", "accept") and short_contract(neg, theirs) and plan.longer_offers < 1:
+            stance = "push"  # never settle on a contract shorter than the horizon before offering the longer one
+            rationale["override"] = "short contract: offer the longer structure first"
         if stance in ("hold", "accept"):
             if neg.cost(sid, theirs) < neg.c_alt or stance == "hold":
                 return Decision.hold(sid, f"llm: {stance}", **rationale)
@@ -229,6 +289,8 @@ class LLMStrategy(BaselineStrategy):
         ours = t.our_price_path()
         base = ours[-1] if ours else plan.target_price
         concession = _clamp(choice.get("concession"), 0.0, 1.0, default=1.0)
+        if _moved(t):  # the supplier stepped towards us: answer with a step, not a crumb
+            concession = max(concession, MIN_CONCESSION_WHEN_MOVED)
         price = round(min(base + (choice["_scheduled"] - base) * concession, theirs["unit_price"]), 2)
         if ours:
             price = max(price, ours[-1])
@@ -245,6 +307,8 @@ class LLMStrategy(BaselineStrategy):
         if not sheets:
             return Decision.hold(sid, "no term sheet beats the standing offer", **rationale)
 
+        if any(short_contract(neg, s["terms"]) is False for s in sheets) and short_contract(neg, theirs):
+            plan.longer_offers += 1
         pool = choice["_pool"]
         wanted = [pool[i] for i in choice.get("evidence") or [] if isinstance(i, int) and 0 <= i < len(pool)]
         first = t.rounds_used == 0
@@ -267,9 +331,14 @@ class LLMStrategy(BaselineStrategy):
     def _lever_sheet(self, neg: Negotiation, sid: str, theirs: dict, price: float, lever: str) -> dict | None:
         """Give the supplier its own value on `lever` and ask a price that keeps our C where the ideal sheet is."""
         ideal = complete_offer(neg.case, self._optimise(neg, sid, {**theirs, "unit_price": price}))
-        if lever not in theirs or theirs[lever] == ideal.get(lever):
+        given = theirs.get(lever)
+        if lever == "index_clause":
+            # the supplier wants a clause: give the one that costs us least - the widest deadband on offer
+            clauses = [o for o in neg.case.get("term_options", {}).get("index_clause", []) if o]
+            given = max(clauses, key=lambda o: o.get("deadband_pct", 0)) if clauses else None
+        if given is None or given == ideal.get(lever):
             return None
-        traded = {**ideal, lever: theirs[lever]}
+        traded = {**ideal, lever: given}
         # Equal cost to us (like the rest of the menu): the supplier gets its value on the lever and pays for
         # it in price - by exactly what the lever is worth to us.
         traded["unit_price"] = self._iso_cost_price(neg, sid, traded, neg.cost(sid, ideal))
@@ -287,13 +356,14 @@ class LLMStrategy(BaselineStrategy):
         text = ID_RE.sub("", str(choice.get("message") or "")).strip()
         text = re.sub(r"\(\s*[,;\s]*\)", "", text)
         text = strip_figures(text)
+        text = strip_forbidden(text)
         lines = [f"Dear {plan.name} team," if plan.name != sid else "Dear Sir or Madam,", ""]
         lines.append(text or ("thank you for your reply." if not first else "thank you for your quote."))
         lines += [c.sentence for c in claims]
         if choice.get("ask_cost_breakdown") and not plan.asked_cost_breakdown:
             lines.append("Could you send us a cost breakdown for this part?")
             plan.asked_cost_breakdown = True
-        question = ID_RE.sub("", str(choice.get("question") or "")).strip()
+        question = strip_forbidden(ID_RE.sub("", str(choice.get("question") or "")).strip())
         if question:
             lines.append(question)
         lines += ["", "We can award on any of these options:" if len(sheets) > 1 else "Our proposal:"]
@@ -313,6 +383,35 @@ def strip_figures(text: str) -> str:
     sentences = re.split(r"(?<=[.!?])\s+", text)
     kept = [x for x in sentences if not FIGURE_RE.search(x)]
     return " ".join(kept).strip()
+
+
+def strip_forbidden(text: str) -> str:
+    """Drop every sentence that leaks our position or claims what we cannot back (budget, benchmarks, ...)."""
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    return " ".join(x for x in sentences if not FORBIDDEN_RE.search(x)).strip()
+
+
+def signals(body: str) -> list[str]:
+    """What the supplier's e-mail asks for or warns about, as named signals for the model."""
+    return [name for name, pattern in SIGNALS.items() if pattern.search(body or "")]
+
+
+def short_contract(neg: Negotiation, terms: dict) -> bool | None:
+    """True if these terms cover less than the horizon while a longer contract is negotiable; None if n/a."""
+    if "contract_months" not in neg.case.get("negotiable", []):
+        return None
+    months = terms.get("contract_months")
+    if months is None:
+        return None
+    horizon = neg.buyer.get("horizon_years", 1) * 12
+    longer = [o for o in neg.case.get("term_options", {}).get("contract_months", []) if o and o > months]
+    return bool(months < horizon and longer)
+
+
+def _moved(t) -> bool:
+    """Did the supplier lower its price in its last reply?"""
+    path = t.price_path()
+    return len(path) >= 2 and path[-1] < path[-2] - 1e-9
 
 
 def _clamp(value, lo: float, hi: float, default: float) -> float:

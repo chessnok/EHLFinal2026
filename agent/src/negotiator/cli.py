@@ -25,12 +25,13 @@ from rich.table import Table
 from negotiator.client import ArenaClient, ArenaError
 from negotiator.config import Settings
 from negotiator.data import WorldData
+from negotiator.decisions import DecisionsClient
 from negotiator.lessons import write_lessons
 from negotiator.llm import LLM
 from negotiator.report import history, write_report
 from negotiator.runner import play_case, play_final, play_many
 from negotiator.sim.cli import add_parser as add_sim_parser
-from negotiator.strategy import NEEDS_LLM, STRATEGIES
+from negotiator.strategy import NEEDS_DECISIONS, NEEDS_LLM, STRATEGIES
 from negotiator.telemetry import Recorder
 
 console = Console()
@@ -65,7 +66,11 @@ def _strategy_factory(args, data: WorldData | None, recorder: Recorder):
     if name not in STRATEGIES:
         raise SystemExit(f"unknown strategy {name!r}; known: {', '.join(STRATEGIES)}")
     llm = None
-    if name in NEEDS_LLM:
+    if name in NEEDS_DECISIONS:
+        llm = DecisionsClient(recorder)
+        recorder.event("decisions_config", model=llm.describe(), base_url=llm.base_url)
+        console.print(f"Decisions API {llm.describe()}")
+    elif name in NEEDS_LLM:
         llm = LLM(getattr(args, "llm", None), recorder)
         recorder.event("llm_config", model=llm.describe(), base_url=llm.base_url, reasoning=llm.reasoning)
         console.print(f"LLM {llm.describe()}: warming up ...")

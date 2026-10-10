@@ -1,8 +1,8 @@
 """LLM client with telemetry. Two wire protocols - OpenAI chat completions and Anthropic messages - cover
 any provider; switch with one string, `LLM=<provider>:<model>` in .env or `--llm` on the command line:
 
-  ollama:qwen3.6:latest          local Ollama (its OpenAI-compatible /v1), thinking off by default
-  openai:gpt-5-mini              OpenAI                      key: OPENAI_API_KEY (or LLM_API_KEY)
+  openai:gpt-6.1-sol (default)   OpenAI, reasoning_effort low   key: OPENAI_API_KEY (or LLM_API_KEY)
+  ollama:qwen3:30b-a3b           local Ollama (its OpenAI-compatible /v1), thinking off by default
   openrouter:<vendor>/<model>    OpenRouter                  key: OPENROUTER_API_KEY
   groq:<model> · mistral:<model> · deepseek:<model> · together:<model>    their OpenAI-compatible APIs
   anthropic:claude-haiku-4-5     Anthropic messages API      key: ANTHROPIC_API_KEY
@@ -32,7 +32,7 @@ import httpx
 
 from negotiator.telemetry import Recorder, log
 
-DEFAULT_SPEC = "ollama:qwen3.6:latest"
+DEFAULT_SPEC = "openai:gpt-6.1-sol"
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class Preset:
 
 PRESETS = {
     "ollama": Preset("openai", "http://localhost:11434/v1", None, reasoning="none"),
-    "openai": Preset("openai", "https://api.openai.com/v1", "OPENAI_API_KEY"),
+    "openai": Preset("openai", "https://api.openai.com/v1", "OPENAI_API_KEY", reasoning="low"),
     "openrouter": Preset("openai", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "groq": Preset("openai", "https://api.groq.com/openai/v1", "GROQ_API_KEY"),
     "mistral": Preset("openai", "https://api.mistral.ai/v1", "MISTRAL_API_KEY"),
@@ -141,10 +141,13 @@ class LLM:
         body = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "temperature": 0.3,
-            "max_tokens": max_tokens,
             "response_format": {"type": "json_object"},
         }
+        if self.provider == "openai":
+            # OpenAI's current models take max_completion_tokens and only their default temperature
+            body["max_completion_tokens"] = max_tokens
+        else:
+            body.update(temperature=0.3, max_tokens=max_tokens)
         if self.reasoning:
             body["reasoning_effort"] = self.reasoning
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
