@@ -82,6 +82,15 @@ uv run negotiator run --set sandbox --strategy llm
 uv run negotiator play case:P05 --strategy llm --llm anthropic:claude-haiku-4-5
 ```
 
+## Langfuse (optional)
+
+Set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` in the root `.env` (and `LANGFUSE_HOST` for a self-hosted or
+regional server) and every run is also traced to Langfuse: one session per run, one trace per case with the
+supplier's quotes, each model call (prompt, output, tokens, cost where the provider measured it), each decision,
+each e-mail both ways and the arena's score. Without the keys nothing is sent. It only writes, in the background;
+if Langfuse is unreachable the run goes on without it. Prompts carry supplier data from the package and replays -
+they leave the machine when this is on.
+
 ## Telemetry: `runs/<run_id>/`
 
 | File | Content |
@@ -101,6 +110,7 @@ uv run negotiator play case:P05 --strategy llm --llm anthropic:claude-haiku-4-5
 config.py      settings from env / .env (ARENA_API_KEY, ARENA_URL, NEGOTIATOR_FINAL, …)
 client.py      every endpoint; paced < 10 calls/s; safe retries with X-Move-Id; final-mode guard
 telemetry.py   Recorder: events, HTTP log, metrics, transcripts, logging
+tracing.py     optional Langfuse sink for the recorder's events (on when LANGFUSE_* keys are set)
 data.py        data package in SQLite + facts.json; checkable Evidence (index moves, scorecard, notice, …)
 profile.py     supplier traits from notes, letters, news, history (cash-short, approval ladder, hedged, …)
 guards.py      hard rules before every send and accept: must-haves, alternative, valid sheets and IDs

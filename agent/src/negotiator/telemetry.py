@@ -21,6 +21,8 @@ from pathlib import Path
 
 from rich.logging import RichHandler
 
+from negotiator.tracing import sink_from_env
+
 log = logging.getLogger("negotiator")
 
 
@@ -111,6 +113,7 @@ class Recorder:
         self._events = (self.dir / "events.jsonl").open("a", encoding="utf-8")
         self._http = (self.dir / "http.jsonl").open("a", encoding="utf-8")
         self._configure_logging(console_level)
+        self.sink = sink_from_env(self.run_id)  # Langfuse, when configured (tracing.py)
         self.event("run_started", run_id=self.run_id)
 
     def _configure_logging(self, console_level: int) -> None:
@@ -133,8 +136,13 @@ class Recorder:
             handle.flush()
 
     def event(self, kind: str, /, **fields) -> None:
+        """One event to events.jsonl - and to the tracing sink, which also gets the fields that start with an
+        underscore (a model call's full prompt: too large for the event log)."""
+        private = {k: fields.pop(k) for k in [k for k in fields if k.startswith("_")]}
         self.metrics.incr(f"event.{kind}")
         self._write(self._events, {"ts": utc_now(), "t": round(time.time() - self.started, 3), **fields, "kind": kind})
+        if self.sink:
+            self.sink.event(kind, fields, private)
 
     def http(self, **fields) -> None:
         self._write(self._http, {"ts": utc_now(), **fields})
@@ -152,6 +160,8 @@ class Recorder:
 
     def close(self) -> None:
         self.event("run_finished", seconds=round(time.time() - self.started, 3))
+        if self.sink:
+            self.sink.close()
         self.save_json("metrics.json", self.metrics.snapshot())
         with self._lock:
             self._events.close()

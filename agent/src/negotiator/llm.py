@@ -113,7 +113,8 @@ class LLM:
             error = f"{type(e).__name__}: {e}"
             raise LLMError(error) from e
         finally:
-            self._record(purpose, time.perf_counter() - start, waited, usage, error, len(user), text, context)
+            prompt = {"system": system, "user": user}
+            self._record(purpose, time.perf_counter() - start, waited, usage, error, len(user), text, context, prompt)
 
     def _call(self, system: str, user: str, max_tokens: int, timeout: float) -> tuple[str, tuple]:
         system = system + "\nReply with one JSON object and nothing else."
@@ -177,7 +178,7 @@ class LLM:
         self._last.cost_usd = data.get("total_cost_usd")
         return str(data.get("result") or ""), (prompt, u.get("output_tokens"))
 
-    def _record(self, purpose, elapsed, waited, usage, error, prompt_chars, text, context) -> None:
+    def _record(self, purpose, elapsed, waited, usage, error, prompt_chars, text, context, prompt=None) -> None:
         prompt_tokens, completion_tokens = usage
         if self.recorder:
             m = self.recorder.metrics
@@ -205,6 +206,7 @@ class LLM:
                 ok=error is None,
                 error=error,
                 output=text[:3000],
+                _input=prompt,  # to the tracing sink only, not to events.jsonl
                 **(context or {}),
             )
         if error:

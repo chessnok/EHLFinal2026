@@ -125,9 +125,9 @@ class DecisionsClient:
             raise DecisionError(error) from e
         finally:
             extras = {a.get("name"): _extra(a) for a in answers if a.get("name") != name}
-            self._record(name, time.perf_counter() - start, answer, extras, error, len(input_text), context)
+            self._record(name, time.perf_counter() - start, answer, extras, error, len(input_text), context, body)
 
-    def _record(self, name, elapsed, answer, extras, error, input_chars, context) -> None:
+    def _record(self, name, elapsed, answer, extras, error, input_chars, context, body=None) -> None:
         if self.recorder:
             m = self.recorder.metrics
             m.incr("decisions.calls")
@@ -145,6 +145,7 @@ class DecisionsClient:
                 confidence=answer.get("confidence"),
                 ok=error is None,
                 error=error,
+                _input=body,  # to the tracing sink only, not to events.jsonl
                 **(context or {}),
             )
         if error:
