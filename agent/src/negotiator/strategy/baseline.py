@@ -304,18 +304,19 @@ class BaselineStrategy:
                 best[f] = min(options[f], key=key)
         return best
 
-    def _iso_cost_price(self, neg: Negotiation, sid: str, terms: dict, target_c: float) -> float:
+    def _iso_cost_price(self, neg: Negotiation, sid: str, terms: dict, target_c: float, under: bool = False) -> float:
         """The price at which these terms cost us `target_c`. C rises with the price - except where a margin
         charge is estimated (stabilise, secure_supply): there C falls again below the price that costs us least,
-        and we never ask under that price."""
-        lo, hi = self._cheapest_price(neg, sid, terms), terms["unit_price"] * 1.5
+        and we never ask under that price - unless `under` asks for the price on that lower side."""
+        cheapest = self._cheapest_price(neg, sid, terms)
+        lo, hi = (0.0, cheapest) if under else (cheapest, terms["unit_price"] * 1.5)
         for _ in range(40):
             mid = (lo + hi) / 2
-            if neg.cost(sid, {**terms, "unit_price": mid}) > target_c:
+            if (neg.cost(sid, {**terms, "unit_price": mid}) > target_c) != under:
                 hi = mid
             else:
                 lo = mid
-        return round(lo, 2)
+        return round(hi if under else lo, 2)
 
     def _cheapest_price(self, neg: Negotiation, sid: str, terms: dict) -> float:
         """The price that minimises C on these terms: 0 without a margin charge; with one, the price below

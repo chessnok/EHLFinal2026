@@ -113,7 +113,9 @@ BIG_STEP = 0.04  # a supplier move of 4 %+ in one round says it had room
 UPPER_ROOM = 0.06  # the upper bound sits at least this far above our first ask
 STOP_MARGIN = 0.01  # we take an offer within 1 % of where we expect the supplier to stop
 MIN_STEP = 0.004  # every message moves at least 0.4 % of C: these bots punish a repeated offer
+ANCHOR_SLACK = 0.25  # share of the room (quote to cost minimum) a deal on our deep first ask may cost
 RELATIONSHIP_STEP = 0.25  # stabilise / secure_supply: our step as a share of the usual one
+RELATIONSHIP_MIN_STEP = 0.05  # ... and at least this share of the room between its quote and our first ask
 MAX_SPREAD = 0.08  # options of one message stay within 8 % of each other's price
 
 
@@ -617,11 +619,12 @@ class TacticalStrategy(BaselineStrategy):
             if self.flags["big_steps"] and math.isfinite(plan.open_c):
                 step = min(max(step, 0.02 * plan.open_c), 0.04 * plan.open_c, 0.6 * gap)
         if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
-            # only the price moves here, and in small steps: on P02 it went 373.88 -> 373.22 -> 372.62 while we
-            # went 362.11 -> 367.90 -> 370.36 and met it in round 3 of 10; on P01 a quarter of the step kept it
-            # coming down for four replies (136.50 -> 132.20, runs.md P-15). Under 0.4 % of C it answers in
-            # crumbs (D01: 0.1 a reply, 0.809 against 0.969)
-            step = max(RELATIONSHIP_STEP * step, min_step)
+            # only the price moves here, and the room is narrow: 0.4 % of C is 8 % of what there is to win on
+            # P01 and 19 % on P02 - three such steps met the supplier in round 3 of 10 (P01 0.785, P02 0.421,
+            # runs.md P-17). A quarter of the step, at least a twentieth of the room; D01 answered a step of 1 %
+            # of the room in crumbs (0.809) and one of 5 % in full (0.957-0.969)
+            room = max(0.0, plan.open_c - plan.target_c)
+            step = max(RELATIONSHIP_STEP * step, min(min_step, RELATIONSHIP_MIN_STEP * room))
         return min(last + step, their_c, plan.upper_c)  # the upper bound is never asked for beyond
 
     def _round_budget(self, neg: Negotiation, sid: str) -> int:
@@ -879,7 +882,8 @@ class TacticalStrategy(BaselineStrategy):
         if not sheets:
             return Decision.hold(sid, "no valid term sheet below their offer")
         plan.last_keys = self._keys(sheets)
-        plan.our_c.append(neg.cost(sid, sheets[0]["terms"]))
+        # with a margin charge the sheets of a deep ask cost more than the ask they stand for (`_sheets`)
+        plan.our_c.append(ask_c if neg.supplier_estimates.get(sid) else neg.cost(sid, sheets[0]["terms"]))
         claims = self._choose_claims(neg, sid, plan, first=not plan.last_claims and neg.threads[sid].rounds_used == 0)
         plan.last_claims = claims
         message = self._write(neg, plan, sheets, claims, probe)
@@ -911,16 +915,32 @@ class TacticalStrategy(BaselineStrategy):
         B  the structure the supplier takes most readily (its requests answered, closest to its own);
         C  the next most acceptable structure of a different kind (another clause, term or payment)."""
         case = neg.case
-        menu = priced_menu(case, theirs, lambda terms: self._iso_cost_price(neg, sid, terms, ask_c))
+        # Under a margin charge every C above the minimum has two prices. While our ask is within ANCHOR_SLACK
+        # of the minimum we send the lower one: a deep first ask whose every step up is a move the supplier sees
+        # and a gain for us, and if it agrees we pay at most the slack. After that, the usual side.
+        slack = ANCHOR_SLACK * max(0.0, plan.open_c - plan.target_c) if neg.supplier_estimates.get(sid) else 0.0
+        spent = max(0.0, ask_c - plan.target_c)
+        under = spent < slack
+
+        def price_for(terms: dict) -> float:
+            if not under:
+                return self._iso_cost_price(neg, sid, terms, ask_c - slack)
+            least = neg.cost(sid, {**terms, "unit_price": self._cheapest_price(neg, sid, terms)})
+            return self._iso_cost_price(neg, sid, terms, least + slack - spent, under=True)
+
+        menu = priced_menu(case, theirs, price_for)
         valid, under_floor = [], []
         for terms in menu:
             if not neg.keeps_must_haves(sid, terms) or neg.cost(sid, terms) >= their_c:
+                continue
+            if under:
+                valid.append(terms)
                 continue
             if plan.floor_price and terms["unit_price"] < plan.floor_price * (1 - UNDER_FLOOR - 0.01):
                 under_floor.append(terms)  # far below what it can sell at: an insult
                 continue
             valid.append(terms)
-        if neg.supplier_estimates.get(sid) and valid:
+        if neg.supplier_estimates.get(sid) and valid and not under:
             # under a margin charge a structure cannot cost less than at its cheapest price. One that misses
             # `ask_c` there stays only while it is nearer to our ask than to the supplier's offer (P02: the index
             # clause costs us 0.8 % and is the one structure it lowers its price for)
