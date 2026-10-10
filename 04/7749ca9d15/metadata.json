@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "047749ca9d15",
+  "strategy": "manual-commit",
+  "branch": "fix/relationship-charge",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/04/7749ca9d15/0/metadata.json",
+      "transcript": "/04/7749ca9d15/0/full.jsonl",
+      "compact_transcript": "/04/7749ca9d15/0/transcript.jsonl",
+      "content_hash": "/04/7749ca9d15/0/content_hash.txt",
+      "prompt": "/04/7749ca9d15/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 322,
+    "cache_creation_tokens": 405811,
+    "cache_read_tokens": 40540933,
+    "output_tokens": 169020,
+    "api_call_count": 154,
+    "subagent_tokens": {
+      "input_tokens": 118,
+      "cache_creation_tokens": 125722,
+      "cache_read_tokens": 13229105,
+      "output_tokens": 6529,
+      "api_call_count": 57
+    }
+  }
+}
