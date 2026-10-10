@@ -1,0 +1,59 @@
+did we do public submissions recently?
+
+---
+
+and lets save the whole conversation in json or whatever. do not make any public submissions without my approve
+
+---
+
+so are the middle layer is going to be right or not? how about to test it and spend a few submissions (just discussing). do not write any predictions in files - only real verifyed data (add this rule in agents.md)
+
+---
+
+can we set up LangFuse?
+
+---
+
+do commit, git pull
+
+---
+
+push
+
+---
+
+write in agents md to do pull,push,commit regularly
+
+---
+
+langfuse is only for middle layer or for public it also can be done?
+
+---
+
+so we get a full dialog with public side - right?
+
+---
+
+okay - add langfuse in a seperate commit. and lets do a short test with no more then 10 sessions with middle layer and a public to compare how close it works and see all the conversations and nalyze them
+
+---
+
+<pasted_content id="dde7">
+How to keep it honest
+
+Use a pool of opponents. Include a cooperative one, a hardball one, one that walks away early, one with deadline pressure, and one that tries to manipulate or prompt-inject your agent. If possible, use different models, and randomize the opponents’ reservation prices.
+Run several seeds per matchup. Report the mean, the worst case and the deal rate, not just the mean.
+Accept a change only if it wins across most opponents, not just on the overall average.
+Spend 2–3 public submissions on calibration, not optimization. Submit two variants that differ a lot locally and check that the public board ranks them the same way. If it does, you can trust the harness. If not, fix the simulator before optimizing further.
+Use public transcripts if you can get them. Real opponent behavior is more useful than the opponent’s prompt; build your personas to imitate it.
+</pasted_content id="dde7">
+
+ some best practices how to test middle layers
+
+---
+
+write some rule that you will not run public or middleware sumbissions unless LANGFUSE KEY IS SPECIFIED
+
+---
+
+LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and LANGFUSE_HOST in .env, - add to env and create env.example
