@@ -106,6 +106,9 @@ Read the file for the area you touch before changing it:
 - [`.agents/git.md`](.agents/git.md) — commit messages (Conventional Commits), branches, pre-commit checks
 - [`agent/README.md`](agent/README.md) — package architecture, telemetry layout, how to add a strategy
 - [`agent/docs/benchmarks/`](agent/docs/benchmarks/) — one record per benchmark run (see Benchmarks above)
+- [`agent/docs/knowledge/competitions-info.md`](agent/docs/knowledge/competitions-info.md) — scoring, practice and
+  final rules from the arena's FAQ that the brief does not state; read it before changing how we score, close or run
+- [`agent/docs/backlog.md`](agent/docs/backlog.md) — where the current strategy loses score, and the 7/3 holdout
 
 Files hold measured data only: a number in a doc, a benchmark record or a comment is something a run on the arena
 (or a named tool run, e.g. `negotiator sim check`) actually returned, with its source. No predictions, forecasts or

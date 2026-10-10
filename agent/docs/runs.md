@@ -34,6 +34,8 @@ suppliers, leverage).
 | P-10 | 16:36 | *likely* `243b294` (tactical unchanged on `feat/tactic-experiments`) | `tactical` | P02, P11, P18 | *likely* Vector | tactical after the teammate's menu, ground-truth and counter-step changes | P02 0.366, P11 0.441, P18 0.467 | new bests on P11 and P18 (index clause, final offer accepted) |
 | P-11 | 16:51 | *likely* `243b294` | `tactical` | all 10 hosted cases | *likely* Vector | full tactical pass | P01 0.856, P02 0.686, P03 0.903, P04 0.860, P05 0.824, P07 0.702, P08 0.603, P10 0.555, P11 0.545, P18 0.000 (walked away) · mean 0.653 | best full pass so far; P18 walked after a 2-cent push on a final offer that said "bridge the remaining gap"; options B/C repeated unchanged; P02 varies (0.366 vs 0.686 on the same code) |
 | P-12 | 19:32 | `7613d6d` | `llm` v3 on tactical mechanics | P02, P05, P08, P10, P11, P18, `--llm claude-code:opus`, `--parallel 2` | Mikhail Fadin | first practice check of llm on tactical mechanics | P02 0.366, P05 0.824, P08 0.473, P10 0.539, P11 **0.692**, P18 0.401 · mean 0.549 | new best on P11; no walk-away (P18 took its 5.60 final, R3); P10 and P18 got final offers in R1/R3 and were taken without a probe; P08 and P18 closed above the calibrated upper bound; 28 model calls, 0 fallbacks, $1.194 measured |
+| P-13 | 21:18 | `96f7545` | `tactical` | all 10 hosted cases, `--parallel 5` | Vector (Claude session) | reference pass of tactical as on main, next to playbook | P01 0.856, P02 0.686, P03 0.905, P04 0.860, P05 0.742, P07 0.721, P08 0.570, P10 0.647, P11 0.545, P18 0.419 · mean 0.695 | 10 of 10 deals; no thread used more than 4 of 10 rounds; details in `backlog.md` |
+| P-14 | 21:21 | `96f7545` | `playbook` | all 10 hosted cases, `--parallel 5` | Vector (Claude session) | first practice pass of the books-guide strategy with its closing offer after a final offer | P01 0.917, P02 0.385, P03 0.762, P04 0.000 (walked away), P05 0.295, P07 0.121 (walked away), P08 0.316, P10 0.568, P11 0.398, P18 0.000 (walked away) · mean 0.376 | the closing offer made 3 of 10 suppliers walk away, which the sandbox never showed; do not push past a final offer without a fallback; new best on P01 |
 
 **Team best per case** (what the practice board counts), as of P-12:
 
@@ -42,6 +44,9 @@ suppliers, leverage).
 | 0.858 (llm) | 0.686 (tactical) | 0.903 (tactical) | 0.860 | 0.824 (tactical) | 0.702 (tactical) | 0.603 (tactical) | 0.562 (tactical) | 0.692 (llm) | 0.467 (tactical) | 71.57 |
 
 Quota after P-12: 66 used of a limit raised to 650, resetting 2026-10-11 12:47 UTC.
+
+After P-14 the team bests are P01 0.917 (playbook), P03 0.905, P07 0.721 and P10 0.647 (tactical), the others as
+above: 73.2 on the practice board. Quota after P-14: 96 used of 650.
 
 ## Sandbox runs (free)
 
@@ -61,3 +66,6 @@ Quota after P-12: 66 used of a limit raised to 650, resetting 2026-10-11 12:47 U
 | S-12 | 15:12 | uncommitted → `ea0cd5c` | `decided` | + C and its parts per candidate | Mikhail Fadin | money framing | 0.756 / 0.553 · 0.655 | with money shown, the model always picks the softest level |
 | S-13 | 16:10 | uncommitted → `653398b` | `llm` v3 (practice feedback in the prompts) | `--llm claude-code:haiku` | Mikhail Fadin | sandbox check before practice | 0.763 / not played (429: 10 open sessions on the team key) | coordinate runs: the key allows 10 open sessions for the whole team |
 | S-14 | 19:11 | uncommitted → `cae4ae9` | `llm` v3 on tactical mechanics | `--llm claude-code:opus` | Mikhail Fadin | llm now inherits tactical (ground truth, full equal-C menu, counter-steps, best sheet, written price, guarded close); no probe of a last word inside the upper bound; every option moves each round | **0.969** / 0.615 · 0.792 | D01 best ever (tactical 0.909); 15 model calls, 0 fallbacks, cost $0.502 (measured) |
+| S-15 | 19:56 | uncommitted → `97e6004` | `playbook`; `playbook-noprobe` | D01, D02 | Vector (Claude session) | baseline plus a deeper anchor, a cash sheet and one closing offer after a final offer; the control leaves the closing offer out | playbook 0.943 / 0.660 · 0.801; noprobe 0.869 / 0.639 · 0.754 | the closing offer gained on both demo cases and no demo supplier walked away - practice (P-14) contradicted it |
+| S-16 | 21:44 | `556a31d` | `tactical` | D01, D02 | Vector (Claude session) | control for S-17 on the current main | 0.969 / 0.587 · 0.778 | – |
+| S-17 | 21:46 | uncommitted → `ef1bb70` | `tactical-slow25` | D01, D02; our step a quarter of tactical's | Vector (Claude session) | slower concessions, from `backlog.md` 2.1 | 0.957 / 0.671 · 0.814 | D02 +0.084, D01 −0.012; the simulator had pointed the same way; not played on practice |
