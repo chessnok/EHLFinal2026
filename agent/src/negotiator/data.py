@@ -225,13 +225,17 @@ class WorldData:
                 ]
         return []
 
-    def evidence_should_cost(self, part_ids: list[str], price: float) -> list[Evidence]:
+    def evidence_should_cost(self, part_ids: list[str], price: float, supplier_id: str | None = None) -> list[Evidence]:
         out = []
         for row in self.query(
-            f"SELECT id, unit_cost FROM should_cost WHERE part_id IN ({','.join('?' for _ in part_ids)})",
+            f"SELECT id, unit_cost, supplier_id FROM should_cost WHERE part_id IN ({','.join('?' for _ in part_ids)})",
             tuple(part_ids),
         ):
-            if row["unit_cost"] and price > row["unit_cost"] * 1.12:
+            # the estimate of this supplier's own plant counts from 3 % under its quote: P10's supplier "took
+            # it into account", the arena's worked example on P01 cites it at 4.5 % (competitions-info.md).
+            # Another plant's estimate (error 5-15 %) only from 12 %
+            own = bool(supplier_id) and row["supplier_id"] == supplier_id
+            if row["unit_cost"] and price > row["unit_cost"] * (1.03 if own else 1.12):
                 out.append(
                     Evidence(
                         kind="should_cost",
