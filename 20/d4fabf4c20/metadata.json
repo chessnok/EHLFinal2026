@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "20d4fabf4c20",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "agent/tests/test_llm_strategy.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/20/d4fabf4c20/0/metadata.json",
+      "transcript": "/20/d4fabf4c20/0/full.jsonl",
+      "content_hash": "/20/d4fabf4c20/0/content_hash.txt",
+      "prompt": "/20/d4fabf4c20/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 104,
+    "cache_creation_tokens": 176840,
+    "cache_read_tokens": 11438474,
+    "output_tokens": 43728,
+    "api_call_count": 52
+  }
+}
