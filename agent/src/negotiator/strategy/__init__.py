@@ -23,12 +23,14 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     **{name: partial(PlaybookStrategy, playbook) for name, playbook in VARIANTS.items()},
     **{name: partial(PatientStrategy, scale, name) for name, scale in SCALES.items()},
     "decided": DecidedStrategy,
-    # tactical with one review change switched on, for measuring each on its own; and with all of them
+    # tactical with one candidate change switched on, to measure it on its own (see FLAGS in tactical.py)
     **{f"tactical+{flag}": partial(TacticalStrategy, **{flag: True}) for flag in TACTICAL_FLAGS},
-    "tactical+all": partial(TacticalStrategy, **{flag: True for flag in TACTICAL_FLAGS}),
     # tactical's numbers, a model for the words (and, with +reader, for the levers the regular expressions miss)
     "tactical-llm": WrittenStrategy,
     "tactical-llm+reader": partial(WrittenStrategy, reader=True),
+    # the evening's package: say yes to its structure and conditions, answer everything, negotiate longer and steadier
+    "tactical+intense": partial(TacticalStrategy, alt_structure=True, answers=True, persistent=True),
+    "tactical+yes": partial(TacticalStrategy, alt_structure=True, answers=True),
 }
 NEEDS_LLM = {"llm", "tactical-llm", "tactical-llm+reader"}
 NEEDS_DECISIONS = {"decided"}  # constructed as Strategy(data, DecisionsClient)
