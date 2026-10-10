@@ -1,9 +1,18 @@
 """Play cases: one case (threads in parallel), many cases in parallel, or the Live Final in waves.
 
-Every supplier thread has its own 60 s clock from its last reply, so each live thread gets its own
-worker. A thread the strategy holds (agreed, final offer, ...) keeps ticking while the others still
-negotiate: the coordinator sends the strategy's keepalive before the clock runs out, and closes the
-case with `strategy.conclude` once every thread is held or dropped - or when the deadline is near.
+Every supplier thread has its own 60 s clock, from the opening and then from each of its replies, so each
+live thread gets its own worker. A thread the strategy holds (agreed, final offer, ...) keeps ticking while
+the others still negotiate: the coordinator sends the strategy's keepalive before the clock runs out, and
+closes the case with `strategy.conclude` once every thread is held or dropped - or when the deadline is near.
+
+The arena answers one call of a session at a time, so with several suppliers a thread waits while the
+others are answered, and its 60 s can run out (case:P05, three suppliers: 14 timeouts in six sessions; no
+single-supplier session had one). At the end of the 60 s the arena itself plays the timeout: it repeats our
+last offer, uses a round, and the supplier answers - a new price, a final offer, or it walks away (the third
+in a row). That answer is in no reply of ours: only in the thread's `timeouts` and the session's `moves`.
+So the workers queue for the session's turn (`Negotiation.turn`, the clock that ends first goes first), the
+arena's state is read whenever a clock has run out, and a move written before a timeout answer arrived is
+not sent: the strategy decides again on the offer that stands.
 """
 
 import threading
@@ -67,13 +76,21 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
     stop = threading.Event()
 
     def worker(sid: str) -> None:
+        t = neg.threads[sid]
         while not neg.ended.is_set() and not stop.is_set():
             # No lock: an LLM call for one thread must not hold up the others (each has its own clock).
+            basis = t.version
             with neg.recorder.metrics.timer("strategy.decide"):
                 decision = strategy.decide(neg, sid)
+            if decision.kind == "message" and not t.live:
+                decision = Decision.drop(sid, f"the thread has ended: {t.closed or t.status}")
+            if decision.kind == "message" and t.arena_rounds >= _round_limit(neg):
+                # our timeouts used rounds too: the arena takes no further e-mail, only an accept
+                decision = Decision.hold(sid, f"round limit reached with {t.timeouts} timeout(s)")
             if decision.kind == "message":
                 try:
-                    neg.send(sid, decision.message, decision.rationale)
+                    # not sent if the supplier answered a timeout meanwhile: the next turn decides again
+                    neg.send(sid, decision.message, decision.rationale, basis=basis)
                 except ArenaError as e:
                     if e.status == 422:  # invalid message: costs nothing, but do not loop on it
                         held[sid] = Decision.hold(sid, f"invalid message: {e.detail}")
@@ -116,17 +133,26 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
                 t = neg.threads[sid]
                 if held[sid].kind != "hold" or not t.live or t.seconds_since_reply() < KEEPALIVE_AFTER_S:
                     continue
+                if t.arena_rounds >= _round_limit(neg) - 1:
+                    continue  # the last round is not worth a question
+                basis = t.version
                 message = strategy.keepalive(neg, sid)
                 if message is None:
                     continue
                 neg.recorder.metrics.incr("moves.keepalive")
-                neg.send(sid, message, {"why": "keepalive while other threads negotiate"})
+                neg.send(sid, message, {"why": "keepalive while other threads negotiate"}, basis=basis)
             time.sleep(POLL_S)
         stop.set()
+    if not neg.ended.is_set() and len(neg.threads) > 1:
+        neg.sync()  # the closing move compares the suppliers: on what stands at the arena now
     if not neg.ended.is_set():
         with neg.recorder.metrics.timer("strategy.conclude"):
             decision = strategy.conclude(neg)
         _apply(neg, decision)
+
+
+def _round_limit(neg: Negotiation) -> int:
+    return neg.case.get("round_limit") or 10
 
 
 def _apply(neg: Negotiation, decision: Decision) -> None:

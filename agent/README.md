@@ -95,7 +95,7 @@ they leave the machine when this is on.
 
 | File | Content |
 |---|---|
-| `events.jsonl` | every event: `session_opened` (opening C per supplier), `plan`, `message_sent` (sheets with C), `reply` (status, terms, C, claim results, signals, latency), `attachment`, `thread_hold`, `decision`, `conflict`, `result` |
+| `events.jsonl` | every event: `session_opened` (opening C per supplier), `plan`, `message_sent` (sheets with C), `reply` (status, terms, C, claim results, signals, latency), `attachment`, `thread_hold`, `decision`, `conflict`, `timeout` (the supplier's answer to a move of ours the arena counted as late), `move_withdrawn` (an e-mail not sent because that answer replaced the offer it was written for), `timeouts_unseen`, `result` |
 | `http.jsonl` | every HTTP attempt: endpoint, status, latency, retry, move id, pacing wait, practice quota left |
 | `run.log` | the human-readable log (debug level) |
 | `sessions/<sid>.json` | the whole case: case file, e-mails both ways, documents as text, decisions with rationale, result, the arena's trace and back office |
