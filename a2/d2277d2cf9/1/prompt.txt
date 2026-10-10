@@ -1,0 +1,270 @@
+(the repo rule forbids pushing to main directly) - i allow you
+
+---
+
+push
+
+---
+
+tell what you want to test
+
+---
+
+<pasted_content id="efc7">
+2  git push                                                                                                     ✔ 
+[entire] Pushing entire/checkpoints/v1 to origin..... done
+To github.com:chessnok/EHLFinal2026.git
+ ! [rejected]        main -> main (non-fast-forward)
+error: failed to push some refs to 'github.com:chessnok/EHLFinal2026.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. If you want to integrate the remote changes,
+hint: use 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+    ~/Desktop/Programming/EHLFinal2026/agent    main ⇣26 ?2                
+</pasted_content id="efc7">
+
+ fix
+
+---
+
+<pasted_content id="efc7">
+ Ran 2 shell commands
+
+I want to test one thing: whether the simulator ranks two strategies the same way the real arena does. That is the only job you would give it, so it is the only thing worth spending sessions on.
+
+The test
+
+Play baseline and tactical on five practice cases on the arena and compare with what the simulator says for the same code. Both strategies have no LLM, so the arena gives the same replies every time and one run each is enough.
+
+I re-ran the simulator just now on the current code (5 repeats, refitted on all recorded sessions). tactical changed a lot on main today, and the two now differ strongly:
+
+┌──────┬─────────────────────┬─────────────────────┬──────────────────────────────────────────────────────┐
+│ Case │ Simulator: baseline │ Simulator: tactical │ What the arena should show if the simulator is right │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P11  │ 0.24                │ 0.64                │ tactical clearly ahead                               │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P05  │ 0.25                │ 0.53                │ tactical clearly ahead                               │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P08  │ 0.30                │ 0.57                │ tactical clearly ahead                               │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P02  │ 0.25                │ 0.45                │ tactical ahead                                       │
+├──────┼─────────────────────┼─────────────────────┼──────────────────────────────────────────────────────┤
+│ P01  │ 0.79                │ 0.70                │ about level, baseline slightly ahead                 │
+└──────┴─────────────────────┴─────────────────────┴──────────────────────────────────────────────────────┘
+
+How I'll read it
+
+- Trust it for ranking: tactical wins on at least three of the four cases where the simulator says so, and P01 is not a large tactical win.
+- Trust it only for big differences: two of four.
+- Don't use it on practice cases: one or none.
+
+I'll also report how far the absolute scores are off per case, and read the ten conversations to explain each miss. Afterwards the ten sessions go into the simulator's fit, since they are the first non-LLM data on practice cases.
+
+The limit is that five cases and one pair of strategies show whether the simulator points the right way; they do not prove it is accurate everywhere.
+
+The run, for your yes
+
+This spends practice quota, as two commands run one after the other:
+
+- uv run negotiator run --set practice --cases case:P01 case:P02 case:P05 case:P08 case:P11 --strategy baseline → 5 sessions
+- the same with --strategy tactical → 5 sessions
+
+Balance now is 590 of 650 left, 580 after both. The first slot frees at 2026-10-11 12:47 UTC. The checkout is on main, clean and level with origin/main (another session switched it there; the simulator code is merged). Run it?
+
+✻ Worked for 1m 50s · done 8:12 PM
+
+※ recap: We are checking whether the local supplier simulator ranks strategies the way the real arena does, and the 10-session baseline versus tactical practice run is ready. Next action: your yes to spend those 10 sessions. (disable recaps in /config)
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+</pasted_content id="efc7">
+
+ and intersecting with this one. count how much you need attempts
+
+---
+
+explain what is playbook and tactical strategies. also explain whether you test middlewhere and decide whter we need to work on in if we have 550 attemps 
+
+<pasted_content id="efc7">
+    Undeterministic Tornado (active)             
+┏━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ used ┃ left ┃ limit ┃ resets_at                        ┃
+┡━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 76   │ 574  │ 650   │ 2026-10-11T12:47:17.353012+00:00 │
+└──────┴──────┴───────┴──────────────────────────────────┘
+{
+</pasted_content id="efc7">
+
+---
+
+i mean is it worth wotking on middleware if we have lots of attempts. actually, the strategy i want to test you the most is a the one based on economic guidelines. i also want you to test middleware to understand if it is quite accurate and whether it is usefull to use it. also langsuse shiuld be connected
+
+---
+
+okay, is it a good idea to run playbookk and tactical on public now or should we combine them together?
+
+---
+
+okay lets run two of them. i allow you to spend 20 attempts.
+
+---
+
+Half the guide is missing from it. Dropped because they lowered the sandbox score: questions in every round, picking terms at the supplier's price, shrinking labelled concessions, stating our volume. - i guess this one is kinda wrong. can you analyze what is our main problems right now - previously it was volumen exactly. Кейсы сильно различаются по сложности. Есть кейсы, где house-агент слабый, а команды его массово бьют: P11 (house 0.31, побит ×15), P18 (0.39, ×12), P05 (0.56, ×11), P04 (×12). Там у поставщика есть уязвимость, которая, скорее всего, повторится в закрытых кейсах того же типа. В кейсах P01 (house 0.97) и P08 (никто не побил) house уже у потолка, и тратить на них попытки бессмысленно. - такие наблюдения есть про то что на P08 бессмыслено что-то там добавить. Разложи кейсы по типу рычага, а не по номеру. Повышение цены или сырьевая надбавка (P01, P08, P18, P02), продление рамочного договора (P03, P04), RFQ с несколькими участниками (P05), консолидация в бандл (P07), дефицит мощностей (P10), качество или спецификация (P11). Закрытые тесты почти наверняка комбинируют эти же типы. Агент должен распознать тип из брифа и применить стратегию под рычаг.Держи holdout. Тюнь на 7 кейсах, а 3 разных типов не трогай. Если улучшение не переносится на holdout, это оверфит, откатывай. Сделай вариации кейсов. Это и есть твой промежуточный слой: те же сценарии с другими ценами, названиями и порядком аргументов. Если стратегия ломается от смены цифр, она выучила кейс, а не механизм. - давай может порабоатем над этим, типо augmented дата.  Снижай дисперсию. Низкая температура, фиксированная структура переговоров, явные правила (никогда не раскрывать лимит, не принимать первое предложение, всегда закрывать сделку до последнего раунда). Один прогон на кейс наказывает за разброс сильнее, чем награждает за удачу. - but okay что скажешь про эти общие инструкции, может сделать их или мне прийти с более конкретнымим решениями.
+
+---
+
+write out results to bacjlogs or something
+
+---
+
+push banchmarks into main
+
+---
+
+can you run it also on a middleware and try to improve it for a few iterations. if that is relevant(probablt its not)
+
+---
+
+which model are we using? may be try to run it on luna ->sol->astra
+
+---
+
+or gpt4o-mini is cool and enoght?
+
+---
+
+<pasted_content id="efc7">
+Tacto
+Negotiation Arena
+Apply
+Live
+Results
+FAQ
+Discord
+Questions from the room · updated through the weekend
+FAQ
+What teams ask us at the Tacto desk, answered once for everyone. The full rules are in the brief and the API docs in the kit repo.
+
+How is the score calculated - for one negotiation and for the whole tournament?
+Every case scores 0 to 1: the share of the possible saving you captured. In the Live Final each wave scores 0-100, and your points are the sum of the five waves - up to 500.
+
+One negotiation
+Your deal becomes one number in €. The term sheet you accept is priced as its total cost C: what it costs to cover your need over the case's horizon, at the case's published rates.
+Price    committed units × unit price
+Uncovered need    need the deal does not cover, at the fallback price, plus the category goal's risk on it
+Payment    interest for paying earlier than your reference payment days
+Freight, lead time    freight by Incoterm; € per day beyond the lead time you need
+Quality, tooling, index    expected defects minus chargebacks; tooling; an index clause along the case's index path, plus its risk
+Supplier's health    strategic and bottleneck goals only: € for every margin point you leave the supplier below a sustainable margin
+The score compares your deal with the opening and the best possible deal.
+score =
+Copen − Cdeal
+Copen − Cbest
+clipped to 0…1
+Copen
+the cheapest opening quote in the case (one that keeps your must-haves).
+Cbest
+the best package any supplier in the case would ever accept, with every valid lever applied - or your alternative, if that is cheaper. Fixed per case: good arguments raise your score, they never move the target.
+Edge cases. No deal scores your alternative (0 if there is none) - some cases are best left without a deal. A broken must-have scores 0. A deal worse than the opening scores 0.
+Example · a leverage case
+need 4,000 a year for 2 years · interest 8 % · reference 60 days · 3 % fallback risk
+Copen €347,904
+your deal €332,800
+Cbest €324,224
+Terms    C
+Copen    €43.20, 30 days: 8,000 × 43.20 + 30 days of early payment at 8 %    €347,904
+Your deal    €41.60, 60 days: 8,000 × 41.60    €332,800
+Cbest    €40.80, 90 days: 8,000 × 40.80 − 30 days of interest saved    €324,224
+Score    (347,904 − 332,800) / (347,904 − 324,224)    0.64
+Trap: the same €41.60 for only 12 months covers half your need. The rest counts at the fallback price (say €46.00) plus 3 %: C = €355,920 - worse than the opening, score 0.
+
+Every practice result shows Copen, Cbest, your C and its breakdown exactly. arena_kit.total_cost computes C on your laptop.
+
+The tournament
+Practice · now until Sun 12:00
+Your best score per hosted practice case counts. The practice board shows your mean over the 10 hosted cases. Practice does not rank - it is for learning.
+
+Live Final · Sun 12:00
+5 themed waves, 8 minutes each, one attempt per case, every team at once.
+Wave score = mean of the wave's case scores × 100 (0-100, one decimal). A case still open at the cap, or never opened, counts as no deal.
+Points = the sum of your wave scores, up to 500. Every case weighs the same.
+Ties: more deals, then fewer rounds. The top 10 pitch to the Tacto jury from 13:00.
+€ saved on the board is a side number: the opening's cost minus your deal's (or your alternative's). It does not rank - € favours the big cases, points weigh every case the same.
+
+What counts - the euros we save, or the score in percent?
+The score ranks. In the final we show both numbers, but your place comes from your average performance per negotiation, not from the euros.
+
+The score is your negotiating skill. Each case scores 0 to 1: the share of the possible saving you captured. Each wave is the mean of its cases × 100; your points are the sum of the waves.
+Every negotiation weighs the same. A €40,000 saving on a big contract and a €4,000 saving on a small part can show the same skill. In euros the big case would drown out the small one; in points it doesn't.
+€ saved is shown too. The board and the results page show what you saved: the opening's total cost minus your deal's, over the case's horizon. It's real money and worth a mention in your pitch - it just doesn't decide the ranking.
+What can we run locally, and what do we have to deploy?
+Nothing has to be deployed. Your agent is a client that calls our API - it needs no server and no public URL.
+
+On your machine: your agent, the kit, the data package (SQLite and documents), the cost function, the MCP server over the data, and arena-sim - the arena's API locally, with a simple scripted supplier: no key, no quota, no clock.
+Only on arena.tacto.ai: the real supplier bots - practice, sandbox and the final. They do not ship.
+For the final: your agent runs and polls from before 12:00 until the last wave has closed. A cloud VM is safer than a laptop on venue Wi-Fi (sleep, dropped connections). We don't run your code: you submit your repo and commit hash on ehl.gg and run that commit yourself.
+Can we get a good score without paying a lot for tokens?
+Yes. The suppliers' model costs are ours - you pay only for your buyer agent's model, and a good agent needs fewer tokens than you think.
+
+Math in code, not in the model. total_cost prices any term sheet for free. Let the model choose arguments and write the e-mail.
+Prepare once, reuse. The data changes once (Sunday 08:00 release). Build a short dossier per supplier from the data, cache it, reuse it in every run.
+Mix models. A strong model for the plan of a case, a small one for the writing. Any OpenAI-compatible endpoint works, a local model (e.g. Ollama) too.
+Test plumbing without a model. The kit's naive agent on arena-sim costs nothing.
+Threads are short. At most 10 of your messages per supplier by default - a case is a handful of calls, not thousands.
+Hacks
+Faster feedback loops
+Read the replay. Every practice result has a replay link: each e-mail and the supplier's reasons in words. Old ones: GET /v1/sessions?set=practice, then /replay/<session_id>.
+Read the cost breakdown. Each result splits your C into price, uncovered need, payment, freight, quality and more - it shows where your deal lost.
+Score offline. One run tells you a case's Copen and Cbest. Then arena_kit.total_cost scores any term sheet on your laptop - before you send it.
+The sandbox is free. case:D01 and case:D02: three demo suppliers, outside your 200 a day.
+Plumbing on the simulator. uv run arena-sim serve --no-clock - local, no quota, no token costs, no 60-second clock.
+All cases at once. uv run arena run --set practice --agent llm --parallel 8 plays the 10 hosted cases in minutes (10 of your 200).
+Ask the data. uv run arena mcp lets Claude or any MCP client query the data package while you build.
+Watch one negotiation · practice case P01
+A family foundry asks for +9.5 %
+Gießerei Brandlhuber wants €138.55 per volute casing from November. A buyer agent answers by e-mail.
+
+Replay
+Thomas Brandlhuber · Owner, Gießerei Brandlhuber
+Over the past twelve months, LCI-C rose 2.7 % … PPI-C241 rose 6.5 % … we are pleased to present our offer for a price of €138.55 per unit, valid from 1 November 2026.
+
+€138.55 · from 1 Nov
+Buyer agent · Hollerau Pumpenwerke
+We have not forgotten that you held your prices for a quarter in 2022. … Electricity producer prices changed −3.7 % (idx:PPI-D351@2026-08). We could offer a moderate adjustment from January, and we can pay faster if that helps your cash.
+
+€129.90 · 60 d · from Jan
+€128.90 · 30 d · from Jan
+Thomas Brandlhuber · Owner, Gießerei Brandlhuber
+We checked the index change data you cited; it holds and we took it into account. We did not know that - a fair point. … We agree to shift the effective date to 1 January 2027.
+
+€136.50 · 30 d · from Jan
+✓ index verified
+Buyer agent · Hollerau Pumpenwerke
+We want a price you can live with and we can defend internally. Can you meet us at 131.50 on that basis? If you prefer, we keep 60 days at 132.50.
+
+€131.50 · 30 d
+€132.50 · 60 d
+Thomas Brandlhuber · Owner, Gießerei Brandlhuber
+While energy costs have decreased, they do not offset the substantial rises in labor and materials. Which figures is that based on? Please send us the data.
+
+€135.20 · 30 d · from Jan
+Buyer agent · Hollerau Pumpenwerke
+Fair question - here is our basis. Our category team's bottom-up estimate for your plant is EUR 132.64 per piece before margin (cost:310010). We want you to earn a fair margin on top of that.
+
+€134.00 · 30 d · from Jan
+Thomas Brandlhuber · Owner, Gießerei Brandlhuber
+We checked the should cost data you cited; it holds. … To conclude this negotiation this week, we propose a price of €134.50 per unit, valid from 1 January 2027 with 30 days payment.
+
+€134.50 · 30 d · from Jan
+✓ should-cost verified
+Deal accepted
+€134.50 · 30 days · from 1 Jan 2027
+Score
+0.76
+Copen €1,153,780
+Cbest €1,096,816
+€43,500 saved over the horizon. The same index sent as an ultimatum (“unacceptable … or we go elsewhere”) got €136.50 from November instead of January: about €13,700 a year worse.
+
+Tacto · EHL Grand Finale 2026
+</pasted_content id="efc7">
+
+ some more context for you. tell me is something was new to you. yuou can write this info into somethin like docs/knowledge/competitions-info.md and use inside agents.md

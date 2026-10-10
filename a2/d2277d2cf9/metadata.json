@@ -3,7 +3,7 @@
   "checkpoint_id": "a2d2277d2cf9",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "AGENTS.md",
     "agent/docs/knowledge/competitions-info.md",
@@ -16,13 +16,20 @@
       "compact_transcript": "/a2/d2277d2cf9/0/transcript.jsonl",
       "content_hash": "/a2/d2277d2cf9/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/a2/d2277d2cf9/1/metadata.json",
+      "transcript": "/a2/d2277d2cf9/1/full.jsonl",
+      "compact_transcript": "/a2/d2277d2cf9/1/transcript.jsonl",
+      "content_hash": "/a2/d2277d2cf9/1/content_hash.txt",
+      "prompt": "/a2/d2277d2cf9/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 277,
+    "cache_creation_tokens": 332196,
+    "cache_read_tokens": 28934232,
+    "output_tokens": 142057,
+    "api_call_count": 120
   }
 }
