@@ -1,0 +1,6 @@
+[10/10/26 7:59 PM] Mikhail Fadin: negotiator session <sid> --json
+[10/10/26 8:00 PM] Mikhail Fadin: cd agent && uv run negotiator sessions how to look with this commands?
+
+---
+
+okay the middleware - how it is implemented? can we launch our local dashboard and like test with ussual commands and it will be just replaced by out middleware instead? that's like a good practice because otherwise if you write a seperate workflow it is not good.

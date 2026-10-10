@@ -3,7 +3,7 @@
   "checkpoint_id": "82ef35f82cfe",
   "strategy": "manual-commit",
   "branch": "feat/tactic-experiments",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "agent/README.md",
     "agent/docs/benchmarks/README.md",
@@ -18,6 +18,13 @@
       "compact_transcript": "/82/ef35f82cfe/0/transcript.jsonl",
       "content_hash": "/82/ef35f82cfe/0/content_hash.txt",
       "prompt": "/82/ef35f82cfe/0/prompt.txt"
+    },
+    {
+      "metadata": "/82/ef35f82cfe/1/metadata.json",
+      "transcript": "/82/ef35f82cfe/1/full.jsonl",
+      "compact_transcript": "/82/ef35f82cfe/1/transcript.jsonl",
+      "content_hash": "/82/ef35f82cfe/1/content_hash.txt",
+      "prompt": "/82/ef35f82cfe/1/prompt.txt"
     }
   ],
   "token_usage": {
