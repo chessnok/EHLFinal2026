@@ -24,6 +24,19 @@ The backend container runs `alembic upgrade head` on start. The frontend proxies
 the browser only ever talks to the frontend. Networks are split: the frontend can reach the backend but not
 the database.
 
+## Develop locally (database in Docker, apps on the host)
+
+```sh
+git submodule update --init   # negotiation-arena-kit/
+make install                  # uv sync + pnpm install
+make db                       # PostgreSQL on localhost:5432
+make backend                  # terminal 1: migrations + fastapi dev  -> http://localhost:8000/docs
+make frontend                 # terminal 2: next dev                  -> http://localhost:3000
+make test && make lint
+```
+
+Both dev servers reload on save. `make up` / `make down` run the whole stack in Docker instead.
+
 ## Backend: three layers
 
 ```
