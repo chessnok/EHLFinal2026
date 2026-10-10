@@ -34,6 +34,7 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | Forecast as proof of volume | practice P-13 | worked in 5 cases | "it holds and we took it into account"; cited again it comes back `duplicate` (P07) |
 | Falling index over a short window | practice P-15 | worked on P18 and partly on P08 | "we have adjusted our pricing accordingly"; P08's AS-14404 is hedged until March, only PPI-C2431 counted |
 | A rival's quote cited by ID | sandbox, practice | worked | "it holds and we took it into account" |
+| Complaints (`qn:` rows) cited one by one as further quality arguments | practice P-23 (P11) | failed: 0.672, unchanged | the first one came back `duplicate` after the scorecard's ppm figure, and the supplier called its offer final in that round |
 
 ## LLM
 

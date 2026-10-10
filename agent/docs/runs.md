@@ -44,6 +44,7 @@ suppliers, leverage).
 | P-20 | 11 Oct 00:01 | `023d02e` | `tactical` | P01, P02, P03, P10 | Vector (Claude session) | index clause offered at our cost minimum when the supplier argues with that index; no early price match | P01 0.733, P02 0.733, P03 0.903, P10 0.647 | P02: supplier agreed to 362.02 with a 5 % deadband in round 1. P01 took an alternative sheet in round 3 at 134.80: the upper bound had shrunk to the supplier's own offer |
 | P-21 | 11 Oct 00:05 | `cdd288c` | `tactical` | P01, P02 | Vector (Claude session) | upper bound scaled to the room | P01 **0.969**, P02 0.733 | P01: final offer 131.30 after four replies; team best on P01 and P02 |
 | P-22 | 11 Oct 00:16 | `7143676` | `tactical` | all 10 hosted cases, `--parallel 5` | Vector (Claude session) | full pass of the candidate, with the brief-reading fixes | P01 0.969, P02 0.733, P03 0.903, P04 0.860, P05 0.742, P07 0.663, P08 0.550, P10 0.647, P11 0.672, P18 0.618 · mean 0.736 | 10 of 10 deals, no zero; against P-13 (0.695): P01 +0.113, P02 +0.047, P11 +0.127, P18 +0.199, P07 −0.058, P08 −0.020; P07, P08, P11, P18 also carry main's changes since `96f7545`, not separated |
+| P-23 | 11 Oct 00:24 | `9af44f6` | `tactical` | P11 | Vector (Claude session) | complaints (`qn:`) as further arguments in a quality case, one per round | P11 0.672 | no change: the complaint came back `duplicate` in round 4 and the supplier's offer became final; reverted |
 
 **Team best per case** (what the practice board counts), as of P-12:
 
@@ -78,6 +79,6 @@ above: 73.2 on the practice board. Quota after P-14: 96 used of 650.
 | S-16 | 21:44 | `556a31d` | `tactical` | D01, D02 | Vector (Claude session) | control for S-17 on the current main | 0.969 / 0.587 · 0.778 | – |
 | S-17 | 21:46 | uncommitted → `ef1bb70` | `tactical-slow25` | D01, D02; our step a quarter of tactical's | Vector (Claude session) | slower concessions, from `backlog.md` 2.1 | 0.957 / 0.671 · 0.814 | D02 +0.084, D01 −0.012; the simulator had pointed the same way; not played on practice |
 
-After P-22 (11 October, 00:20): 26 practice sessions spent by this series (P-16 to P-22). Team bests from `negotiator
+After P-23 (11 October, 00:25): 27 practice sessions spent by this series (P-16 to P-23). Team bests from `negotiator
 me` then: P01 0.969, P02 0.733, P03 0.905, P04 0.860, P05 0.839, P07 0.721, P08 0.626, P10 0.663, P11 0.692,
 P18 0.618.
