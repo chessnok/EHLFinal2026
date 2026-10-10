@@ -3,8 +3,11 @@
   "checkpoint_id": "b0729c2a420c",
   "strategy": "manual-commit",
   "branch": "feat/sim-llm-supplier",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 7,
+  "files_touched": [
+    "agent/docs/simulator.md",
+    "agent/src/negotiator/sim/cli.py"
+  ],
   "sessions": [
     {
       "metadata": "/b0/729c2a420c/0/metadata.json",
@@ -12,6 +15,13 @@
       "compact_transcript": "/b0/729c2a420c/0/transcript.jsonl",
       "content_hash": "/b0/729c2a420c/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/b0/729c2a420c/1/metadata.json",
+      "transcript": "/b0/729c2a420c/1/full.jsonl",
+      "compact_transcript": "/b0/729c2a420c/1/transcript.jsonl",
+      "content_hash": "/b0/729c2a420c/1/content_hash.txt",
+      "prompt": "/b0/729c2a420c/1/prompt.txt"
     }
   ],
   "token_usage": {
