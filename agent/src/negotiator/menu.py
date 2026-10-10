@@ -31,6 +31,12 @@ REQUESTS = {
         r"volume commitment|commit to (?:a )?(?:higher )?volume|which volume|binding (?:higher )?volume|higher volume",
         re.I,
     ),
+    "ppm_commitment": re.compile(r"quality commitment|\bppm\b|defect rate", re.I),
+    "chargeback_eur_per_complaint": re.compile(r"chargeback|per complaint", re.I),
+    "lead_time_days": re.compile(r"lead ?time|lieferzeit|deliver in", re.I),
+    "incoterm": re.compile(r"incoterm|\b(?:EXW|FCA|DAP)\b|freight", re.I),
+    "effective_date": re.compile(r"effective (?:date|from)|valid from|starting (?:on|from)|start(?:ing)? date", re.I),
+    "tooling_eur": re.compile(r"tooling", re.I),
     "payment_days": re.compile(
         r"faster payment|pay(?:ing)? (?:us )?earlier|earlier payment|payment within|shorter payment|cash ?flow|"
         r"pay our invoices",
@@ -56,10 +62,24 @@ def combos(case: dict) -> list[dict]:
     return out or [{}]
 
 
-def satisfies(case: dict, terms: dict, theirs: dict, lever: str) -> bool:
-    """Does this structure answer the supplier's request for `lever`?"""
+def proposed_values(case: dict, sheets: list[dict]) -> dict[str, list]:
+    """The values the supplier itself put on its sheets (its offer and its alternatives), per negotiable field:
+    what it names is what it is willing to trade on."""
+    out: dict[str, list] = {}
+    for sheet in sheets:
+        for f, v in (sheet.get("terms") or {}).items():
+            if f != "unit_price" and f in case["negotiable"] and v not in out.setdefault(f, []):
+                out[f].append(v)
+    return out
+
+
+def satisfies(case: dict, terms: dict, theirs: dict, lever: str, proposed: dict | None = None) -> bool:
+    """Does this structure answer the supplier's request for `lever`? Only negotiable fields count; where the
+    supplier named values itself, meeting one of them answers it."""
     if lever not in case["negotiable"]:
         return False
+    if proposed and proposed.get(lever) and lever not in ("index_clause",):
+        return terms.get(lever) in proposed[lever]
     if lever == "index_clause":
         return terms.get("index_clause") is not None
     if lever == "payment_days":
@@ -68,12 +88,12 @@ def satisfies(case: dict, terms: dict, theirs: dict, lever: str) -> bool:
         options = [o for o in case.get("term_options", {}).get(lever, []) if o is not None]
         floor = max(theirs.get(lever) or 0, min(options) if options else 0)
         return (terms.get(lever) or 0) >= floor and (terms.get(lever) or 0) > (min(options) if options else 0)
-    return False
+    return lever in theirs and terms.get(lever) == theirs.get(lever)  # its own value on that lever
 
 
-def acceptance(case: dict, terms: dict, theirs: dict, requests: set[str]) -> tuple:
+def acceptance(case: dict, terms: dict, theirs: dict, requests: set[str], proposed: dict | None = None) -> tuple:
     """How readily the supplier takes this structure: requests answered, then likeness to its own."""
-    answered = sum(satisfies(case, terms, theirs, r) for r in requests)
+    answered = sum(satisfies(case, terms, theirs, r, proposed) for r in requests)
     alike = sum(1 for f, v in terms.items() if f != "unit_price" and theirs.get(f) == v)
     return answered, alike
 

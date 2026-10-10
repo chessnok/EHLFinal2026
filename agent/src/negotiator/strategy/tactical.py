@@ -36,7 +36,7 @@ from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer
 from negotiator.data import Evidence, WorldData
 from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
-from negotiator.menu import acceptance, priced_menu, requests_in, satisfies, structure_key
+from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
 from negotiator.profile import SupplierProfile, build_profile
 from negotiator.session import Negotiation
 from negotiator.strategy.base import Decision
@@ -130,6 +130,9 @@ class Plan:
     last_keys: frozenset = frozenset()  # the structures and prices we sent last
     offered: dict = field(default_factory=dict)  # structure -> the highest price we offered for it
     volume_proved: bool = False
+    proposed: dict = field(default_factory=dict)  # field -> values the supplier put on its own sheets
+    text_price: float | None = None  # a lower price it wrote in the text but not on a sheet
+    text_price_used: bool = False
     reanchored: bool = False
     asked_breakdown: bool = False
     breakdown_read: bool = False
@@ -309,7 +312,11 @@ class TacticalStrategy(BaselineStrategy):
         if theirs.get("unit_price") is None or not math.isfinite(plan.target_c):
             return Decision.hold(supplier_id, "no price to negotiate on")
         if t.status == "agreed":
+            if take := self._take_agreed(neg, supplier_id):
+                return take
             return Decision.hold(supplier_id, "agreed")
+        if text := self._text_price_offer(neg, supplier_id, plan):
+            return text
         rounds_left = neg.case.get("round_limit", 10) - t.rounds_used
         if rounds_left <= 1:
             return Decision.hold(supplier_id, "last round: keep it for the close")
@@ -368,7 +375,21 @@ class TacticalStrategy(BaselineStrategy):
                     plan.banned_kinds.add(kind)
             if not plan.breakdown_read:
                 self._read_breakdown(neg, sid, plan, reply)
-            plan.requests |= requests_in(reply.get("body", ""))
+            plan.requests |= {r for r in requests_in(reply.get("body", "")) if r in neg.case["negotiable"]}
+            for f, values in proposed_values(neg.case, reply.get("term_sheets") or []).items():
+                plan.proposed.setdefault(f, [])
+                plan.proposed[f] += [v for v in values if v not in plan.proposed[f]]
+                if len(plan.proposed[f]) > 1:
+                    plan.requests.add(f)  # it varies this field across its sheets: a lever it trades on
+            sheet_prices = [s["terms"].get("unit_price") for s in reply.get("term_sheets") or []]
+            sheet_prices = [p for p in sheet_prices if p]
+            said = [
+                p
+                for p in prices_in_text(reply.get("body", ""))
+                if sheet_prices and 0.6 * min(sheet_prices) < p < min(sheet_prices) - 0.004
+            ]
+            if said:
+                plan.text_price = min(said)  # "I am dropping the price to EUR 28.00" on a 29.09 sheet (P05)
             sheets = reply.get("term_sheets") or []
             if sheets and sheets[0]["terms"].get("index_clause"):
                 plan.requests.add("index_clause")  # it proposed one: it wants one
@@ -477,6 +498,55 @@ class TacticalStrategy(BaselineStrategy):
         step = (prices[-2] - prices[-1]) / prices[-2]
         return theirs["unit_price"] <= ours[-1] * 1.005 and step >= BIG_STEP
 
+    def _take_agreed(self, neg: Negotiation, sid: str) -> Decision | None:
+        """It agreed to our terms: if no other live thread offers less, close now - holding it while others
+        talk cost P05 two timeouts and nearly the deal."""
+        offer_id, terms = neg.best_offer(sid)
+        if not offer_id or accept_problems(neg, sid, offer_id):
+            return None
+        c = neg.cost(sid, terms)
+        for other, ot in neg.threads.items():
+            if other == sid or not ot.live:
+                continue
+            _, their = neg.best_offer(other)
+            if their and neg.cost(other, their) < c * 0.98:
+                return None  # a rival is clearly cheaper: keep talking there
+        return Decision(
+            "accept", sid, term_sheet_id=offer_id, rationale={"c": c, "why": "agreed and the best on the table"}
+        )
+
+    def _text_price_offer(self, neg: Negotiation, sid: str, plan: Plan) -> Decision | None:
+        """It wrote a lower price than it put on its sheet: take it at its word, on its own terms, once."""
+        if not plan.text_price or plan.text_price_used or not self._may_push(neg, sid):
+            return None
+        _, theirs = neg.best_offer(sid)
+        if not theirs or plan.text_price >= (theirs.get("unit_price") or 0):
+            return None
+        plan.text_price_used = True
+        sheet = complete_offer(neg.case, {**theirs, "unit_price": round(plan.text_price, 2)})
+        if not neg.keeps_must_haves(sid, sheet):
+            return None
+        plan.our_c.append(neg.cost(sid, sheet))
+        plan.last_keys = self._keys([{"terms": sheet}])
+        body = "\n".join(
+            [
+                f"Dear {plan.name} team,",
+                "",
+                f"thank you - you wrote that you can go to EUR {plan.text_price:,.2f}. We accept that price on your "
+                "terms below and are ready to place the order.",
+                "",
+                f"Our proposal: {describe(neg.case, sheet)}",
+                "",
+                SIGNATURE,
+            ]
+        )
+        return Decision(
+            "message",
+            sid,
+            message={"subject": neg.case.get("title", "Your quote"), "body": body, "term_sheets": [{"terms": sheet}]},
+            rationale={"move": "take its written price", "text_price": plan.text_price},
+        )
+
     def _may_push(self, neg: Negotiation, sid: str) -> bool:
         t = neg.threads[sid]
         return neg.case.get("round_limit", 10) - t.rounds_used >= 2 and neg.seconds_to_deadline() > 150
@@ -522,9 +592,9 @@ class TacticalStrategy(BaselineStrategy):
         if not menu:
             return None
         # the structures that answer most of its requests; among them the one that costs us least
-        best_answer = max(acceptance(neg.case, m, theirs, plan.requests)[0] for m in menu)
+        best_answer = max(acceptance(neg.case, m, theirs, plan.requests, plan.proposed)[0] for m in menu)
         matched = min(
-            (m for m in menu if acceptance(neg.case, m, theirs, plan.requests)[0] == best_answer),
+            (m for m in menu if acceptance(neg.case, m, theirs, plan.requests, plan.proposed)[0] == best_answer),
             key=lambda m: neg.cost(sid, m),
         )
         if neg.cost(sid, matched) >= their_c * (1 - 0.005):
@@ -620,7 +690,7 @@ class TacticalStrategy(BaselineStrategy):
             return []
 
         def rank(t):
-            return (*acceptance(case, t, theirs, plan.requests), t["unit_price"])
+            return (*acceptance(case, t, theirs, plan.requests, plan.proposed), t["unit_price"])
 
         for t in pool:  # a structure offered before never comes back at a lower price
             before = plan.offered.get(structure_key(t))
@@ -783,8 +853,18 @@ class TacticalStrategy(BaselineStrategy):
             "contract_months": "the longer commitment you asked for",
             "volume_per_year": "a binding volume",
             "payment_days": "the faster payment you asked for",
+            "ppm_commitment": "the quality commitment you proposed",
+            "chargeback_eur_per_complaint": "the chargeback you proposed",
+            "lead_time_days": "your lead time",
+            "incoterm": "your delivery terms",
+            "effective_date": "your start date",
+            "tooling_eur": "your tooling terms",
         }
-        met = [words[r] for r in sorted(plan.requests) if satisfies(neg.case, terms, theirs, r)]
+        met = [
+            words[r]
+            for r in sorted(plan.requests)
+            if r in words and satisfies(neg.case, terms, theirs, r, plan.proposed)
+        ]
         return f" {label} includes {' and '.join(met)}." if met else ""
 
     def keepalive(self, neg: Negotiation, supplier_id: str) -> dict | None:
@@ -830,6 +910,21 @@ class TacticalStrategy(BaselineStrategy):
             next(iter(neg.threads)),
             rationale={"c_alt": neg.c_alt, "rejected": rejected, "why": "no sheet passes the guards"},
         )
+
+
+PRICE_IN_TEXT = re.compile(
+    r"(?:drop|lower|reduce|go(?: down)? to|come down to|can do|offer you)[^.€]{0,50}(?:€|EUR)\s?(\d[\d,]*\.?\d*)", re.I
+)
+
+
+def prices_in_text(body: str) -> list[float]:
+    out = []
+    for raw in PRICE_IN_TEXT.findall(body or ""):
+        try:
+            out.append(float(raw.replace(",", "")))
+        except ValueError:
+            pass
+    return out
 
 
 def parse_breakdown(text: str) -> float | None:
