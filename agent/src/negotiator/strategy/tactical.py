@@ -616,9 +616,12 @@ class TacticalStrategy(BaselineStrategy):
         if not offer_id or accept_problems(neg, sid, offer_id):
             return None
         c = neg.cost(sid, terms)
+        time_short = neg.seconds_to_deadline() < 180
         for other, ot in neg.threads.items():
             if other == sid or not ot.live:
                 continue
+            if len(ot.supplier_messages) < 2 and not time_short:
+                return None  # a rival has not answered us yet (P05: closed at 33.50 before the 28.00 bidder spoke)
             _, their = neg.best_offer(other)
             if their and neg.cost(other, their) < c * 0.98:
                 return None  # a rival is clearly cheaper: keep talking there
