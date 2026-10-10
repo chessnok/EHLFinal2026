@@ -60,6 +60,14 @@ class ThreadState:
         return (sheets[0]["term_sheet_id"], sheets[0]["terms"]) if sheets else (None, {})
 
     @property
+    def offers(self) -> list[tuple[str, dict]]:
+        """Every sheet of the supplier's latest message: its primary offer and its alternatives
+        (case:P10 offered EUR 31.80 at 54 days next to EUR 33.70 at 42 - the second was ours)."""
+        return [
+            (s["term_sheet_id"], s["terms"]) for s in self.latest.get("term_sheets") or [] if s.get("term_sheet_id")
+        ]
+
+    @property
     def rounds_used(self) -> int:
         return sum(1 for m in self.messages if m.get("from") == "buyer" and not m.get("action"))
 
@@ -240,6 +248,14 @@ class Negotiation:
                 best = min(best, self.cost(sid, first["term_sheets"][0]["terms"]))
         return best
 
+    def best_offer(self, supplier_id: str) -> tuple[str | None, dict]:
+        """The supplier's sheet that costs us least and keeps the must-haves (else its primary one)."""
+        t = self.threads[supplier_id]
+        valid = [(sid_, terms) for sid_, terms in t.offers if self.keeps_must_haves(supplier_id, terms)]
+        if not valid:
+            return t.standing
+        return min(valid, key=lambda o: self.cost(supplier_id, o[1]))
+
     def cost(self, supplier_id: str, terms: dict) -> float:
         if not terms or terms.get("unit_price") is None:
             return math.inf
@@ -410,7 +426,7 @@ class Negotiation:
             self.recorder.metrics.incr("guards.accept_refused")
             self.recorder.event("guard_refused", session_id=self.session_id, supplier_id=supplier_id, problems=problems)
             raise GuardRefused(f"{supplier_id} {term_sheet_id}: {'; '.join(problems)}")
-        terms = self.threads[supplier_id].standing[1]
+        terms = dict(self.threads[supplier_id].offers).get(term_sheet_id) or self.threads[supplier_id].standing[1]
         self._decision(
             "accept",
             supplier_id,

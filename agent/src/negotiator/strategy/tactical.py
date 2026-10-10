@@ -305,7 +305,7 @@ class TacticalStrategy(BaselineStrategy):
         if not t.live:
             return Decision.drop(supplier_id, f"thread {t.status}")
         self._learn(neg, supplier_id, plan)
-        sheet_id, theirs = t.standing
+        sheet_id, theirs = neg.best_offer(supplier_id)  # judge it by its best sheet for us, not its first
         if theirs.get("unit_price") is None or not math.isfinite(plan.target_c):
             return Decision.hold(supplier_id, "no price to negotiate on")
         if t.status == "agreed":
@@ -809,15 +809,15 @@ class TacticalStrategy(BaselineStrategy):
         best = None
         rejected = {}
         for sid, t in neg.threads.items():
-            sheet_id, terms = t.standing
-            if not sheet_id or t.closed or t.status in ("walked_away", "no_bid"):
+            if t.closed or t.status in ("walked_away", "no_bid"):
                 continue
-            if problems := accept_problems(neg, sid, sheet_id):
-                rejected[sid] = problems
-                continue
-            c = neg.cost(sid, terms)
-            if best is None or c < best[0]:
-                best = (c, sid, sheet_id)
+            for sheet_id, terms in t.offers:  # its alternatives too: the cheapest for us may not be its first
+                if problems := accept_problems(neg, sid, sheet_id):
+                    rejected[f"{sid} {sheet_id}"] = problems
+                    continue
+                c = neg.cost(sid, terms)
+                if best is None or c < best[0]:
+                    best = (c, sid, sheet_id)
         if best:
             return Decision(
                 "accept",

@@ -157,8 +157,10 @@ class WorldData:
                 continue
             earlier, later, pct = change
             gap = (asked_pct if asked_pct is not None else 0.0) - pct
-            if gap <= 0:
-                continue  # this index supports the supplier, not us
+            if gap <= 0 or pct > 0:
+                # a driver that rose supports the supplier even when it rose less than it asks: case:P10
+                # answered "your figures confirm our case: that driver rose" - only falling drivers argue for us
+                continue
             m0, m1 = earlier.split("@")[1], later.split("@")[1]
             name = (d["name"] or d["series_id"]).split(",")[0].split("(")[0].strip()
             out.append(
