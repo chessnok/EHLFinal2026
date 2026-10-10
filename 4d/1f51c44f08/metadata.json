@@ -3,8 +3,12 @@
   "checkpoint_id": "4d1f51c44f08",
   "strategy": "manual-commit",
   "branch": "fix/relationship-charge",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/docs/TRYED.md",
+    "agent/docs/runs.md",
+    "agent/src/negotiator/data.py"
+  ],
   "sessions": [
     {
       "metadata": "/4d/1f51c44f08/0/metadata.json",
@@ -12,13 +16,20 @@
       "compact_transcript": "/4d/1f51c44f08/0/transcript.jsonl",
       "content_hash": "/4d/1f51c44f08/0/content_hash.txt",
       "prompt": "/4d/1f51c44f08/0/prompt.txt"
+    },
+    {
+      "metadata": "/4d/1f51c44f08/1/metadata.json",
+      "transcript": "/4d/1f51c44f08/1/full.jsonl",
+      "compact_transcript": "/4d/1f51c44f08/1/transcript.jsonl",
+      "content_hash": "/4d/1f51c44f08/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 276,
-    "cache_creation_tokens": 369547,
-    "cache_read_tokens": 32109815,
-    "output_tokens": 152326,
-    "api_call_count": 134
+    "input_tokens": 292,
+    "cache_creation_tokens": 402892,
+    "cache_read_tokens": 33512189,
+    "output_tokens": 175428,
+    "api_call_count": 142
   }
 }
