@@ -1,0 +1,37 @@
+also try this one 
+
+<pasted_content id="2560">
+Your data says the 10 rounds aren't the lever. The supplier closes most threads by round 4, and nearly all of its movement happens in its first two replies (about 1.4% and 1.3% price drop, then about 0.3%). The 60 seconds are only useful as compute, because nothing in the brief rewards answering slowly.
+
+## What the data actually gives you
+
+1. **Accepting while the supplier is still conceding.** Eight deals were accepted while its last reply was still dropping. Excluding P02 (stabilise, where a lower price costs score), the P01 and P11 rows are money left on the table.
+
+   Proposed rule: if the supplier's last drop was at least about 0.5% and the case isn't stabilise, send one more counter instead of accepting. It's a small change; test it on P01 and P11 first (2–3 sessions).
+
+2. **"Final" early in the conversation may be a bluff.** On P10 the supplier says "final" in round 1 and then still drops from 33.80 to 31.90 (about 6%). Ask Claude for the base rate across all practice threads: when the supplier says "final" in rounds 1–2, how often does it move afterwards, and how often does it walk if we push?
+
+   The 3 walk-aways after a push all came from playbook's closing offer, so tactical's numbers should be shown separately. If early "finals" usually move and tactical rarely triggers walk-aways, allow one polite push after an early final in leverage and routine cases.
+
+3. **The 14 hidden timeouts on P05 are urgent.** The arena logged 14 buyer timeouts and our counter showed 0. In the final no one will be watching, so a timeout could cost a whole case. Ask Claude to establish:
+   - what causes them;
+   - what the arena does after a timeout;
+   - fix the counter.
+
+   This comes before any idea that uses more of the 60 seconds.
+
+## How to use the 60 seconds
+
+Spend them as an LLM budget for the reader and writer: 2–3 calls fit within the minute. But the LLM path already went over 60 seconds twice, once at 146 seconds. So you need a hard limit of about 30 seconds for the whole message, after which tactical's template is sent. Without that limit, using the time is more dangerous than leaving it unused.
+
+## What not to do
+
+Don't try to make conversations longer for their own sake. Longer threads don't correlate with higher scores. The comparison is also on 6–12 sessions per case and mixes strategies, so it proves nothing in either direction.
+
+## Order
+
+1. Timeouts.
+2. The "don't accept while it's still conceding" rule.
+3. Base rate for early "final".
+4. LLM with the 30-second limit, if there's time.
+</pasted_content id="2560">

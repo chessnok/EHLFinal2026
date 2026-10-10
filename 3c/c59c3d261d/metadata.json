@@ -1,0 +1,34 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "3cc59c3d261d",
+  "strategy": "manual-commit",
+  "branch": "fix/relationship-charge",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/src/negotiator/data.py",
+    "agent/src/negotiator/strategy/tactical.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/3c/c59c3d261d/0/metadata.json",
+      "transcript": "/3c/c59c3d261d/0/full.jsonl",
+      "compact_transcript": "/3c/c59c3d261d/0/transcript.jsonl",
+      "content_hash": "/3c/c59c3d261d/0/content_hash.txt",
+      "prompt": "/3c/c59c3d261d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 254,
+    "cache_creation_tokens": 354492,
+    "cache_read_tokens": 27809362,
+    "output_tokens": 140364,
+    "api_call_count": 123,
+    "subagent_tokens": {
+      "input_tokens": 68,
+      "cache_creation_tokens": 169092,
+      "cache_read_tokens": 3216240,
+      "output_tokens": 28710,
+      "api_call_count": 33
+    }
+  }
+}
