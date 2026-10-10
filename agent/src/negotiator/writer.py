@@ -62,7 +62,7 @@ CHECKS = {
         r"|(?:cannot|can ?not|can't|unable to|not able to) (?:go|pay|offer|accept)\b[^.!?]{0,25}"
         r"\b(?:above|over|more than|higher|beyond)"
         r"|the (?:most|maximum|highest) we|maximum price|approved (?:price|amount|limit)|(?:best|last) and final"
-        r"|\bour (?:best|final|last) (?:price|offer)\b|final offer|last offer",
+        r"|\bour (?:best|final|last) (?:price|offer|word)\b|(?:this|that|here) is (?:our|a|the) (?:final|last)\b",
         re.I,
     ),
     "urgency": re.compile(
@@ -79,14 +79,14 @@ CHECKS = {
         r"walk away|end (?:the|our|these) (?:negotiation|talks|discussion)|look elsewhere|\belsewhere\b"
         r"|(?:switch|move|turn|go) to (?:another|other|a different) (?:supplier|source|bidder)|last chance"
         r"|take it or leave it|otherwise we\b|\bor else\b|we will be forced|be forced to|non-?negotiable"
-        r"|\byou (?:must|have to|need to)\b|ultimatum|final demand|reconsider (?:our|the) (?:relationship|cooperation)"
+        r"|\byou (?:must|have to)\b|ultimatum|final demand|reconsider (?:our|the) (?:relationship|cooperation)"
         r"|consequences|no choice but|with or without you|lose (?:our|this|the) (?:business|order|contract)",
         re.I,
     ),
     # only the term sheets bind; a yes in prose is one tactical did not decide (conduct rule 9: keep our word)
     "commitment": re.compile(
         r"\bwe (?:\w+ ){0,3}?(?:accept|guarantee|promise|commit|undertake|pledge)\b"
-        r"|\bwe (?:\w+ ){0,2}?agree (?:to|with|on)\b|\bwe (?:\w+ ){0,2}?confirm (?:the|our|your|this|that)\b"
+        r"|\bwe (?:\w+ ){0,2}?agree (?:to|with)\b|\bwe (?:\w+ ){0,2}?confirm (?:the|our|your|this|that)\b"
         r"|plac(?:e|ing) (?:the|an|our) order|(?:can|will|shall|ready to|prepared to|happy to) sign\b"
         r"|deal is (?:done|closed)|you have (?:a|our) deal|consider it (?:done|agreed)|is acceptable to us"
         r"|we will (?:award|buy|order|purchase|take)\b",
@@ -371,7 +371,8 @@ class Writer:
                 limit,
             )
             text = reply.get("text") if isinstance(reply, dict) else None
-            problems = text_problems(parts, text, message["body"], self.settings.max_words)
+            known = f"{message['body']}\n{message.get('subject') or ''}"  # the part's name stands in the subject
+            problems = text_problems(parts, text, known, self.settings.max_words)
             reason = "validator" if problems else None
         except LLMError as e:
             problems = [str(e)[:200]]

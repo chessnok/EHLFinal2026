@@ -70,6 +70,7 @@ def test_a_good_text_passes_and_keeps_tacticals_frame() -> None:
         (GOOD + " [[FACT2]]", "facts"),
         (GOOD + " Our budget does not allow more.", "limit"),
         (GOOD + " This is the most we can do.", "limit"),
+        (GOOD + " This is our final offer.", "limit"),
         (GOOD + " We need an answer by the end of the week.", "urgency"),
         (GOOD + " We have no alternative for this part.", "urgency"),
         (GOOD + " Otherwise we will have to look elsewhere.", "threat"),
@@ -89,6 +90,16 @@ def test_a_good_text_passes_and_keeps_tacticals_frame() -> None:
 def test_validator_refuses(text: str, kind: str) -> None:
     found = problems(text)
     assert any(p.startswith(kind) for p in found), found
+
+
+def test_ordinary_sentences_about_the_supplier_pass() -> None:
+    """Refused on the sandbox although harmless (runs of 2026-10-11): each cost a fallback to the template."""
+    for more in (
+        " What would you need to change in Option B to move toward it?",
+        " Your last offer keeps the lead time, and so does Option A.",
+        " Once we agree on an option, its terms are binding.",
+    ):
+        assert problems(GOOD + more) == [], more
 
 
 def test_a_template_sentence_may_be_kept() -> None:
