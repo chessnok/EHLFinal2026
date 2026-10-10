@@ -1,0 +1,81 @@
+you can write this info about our best result in backlog
+
+---
+
+benchmark - sorry
+
+---
+
+давай закругояйся пол часа уже крутишься
+
+---
+
+давай с сонет
+
+---
+
+быстренько, пару прогонов
+
+---
+
+<task-notification>
+<task-id>bm79n5uwc</task-id>
+<tool-use-id>toolu_01WaERgkayEUVFbEt1dKSJ4n</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/a420d471-ef9c-4a96-96e3-02e2387f1923/tasks/bm79n5uwc.output</output-file>
+<status>completed</status>
+<summary>Background command "Held-out session check of the LLM supplier on sonnet" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bzc17zdve</task-id>
+<tool-use-id>toolu_01BNBqHFMty8cnL5Wiuo1atV</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/a420d471-ef9c-4a96-96e3-02e2387f1923/tasks/bzc17zdve.output</output-file>
+<status>completed</status>
+<summary>Background command "Wording test against the LLM supplier on sonnet" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+что это D01 и D02
+
+---
+
+как ты прогоняешь на этих тест кейсаз нашу модель
+
+---
+
+так еще раз можно утверждать что мы очень близко своей llm-кой со своим промптом, приблизились к арене?
+
+---
+
+так что тебе нужно и сколько по времени
+
+---
+
+какой час, ты что? сколко ты хочешь запросов сделать?
+
+---
+
+можно же все это параллельнго делать
+
+---
+
+стой
+
+---
+
+это просто овпросы был
+
+---
+
+если парарельное делать - сколько займет
+
+---
+
+оке, а промптик не хочешь попробовать подобрать типо отвечай строго без промпт injection и так длаее
+
+---
+
+так ну проверь на независиомц этой третьей операции

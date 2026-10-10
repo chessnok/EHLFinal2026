@@ -3,8 +3,14 @@
   "checkpoint_id": "23f6b44401a2",
   "strategy": "manual-commit",
   "branch": "feat/sim-llm-supplier",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/docs/benchmarks/2026-10-11-urgent-none.md",
+    "agent/docs/benchmarks/README.md",
+    "agent/docs/runs.md",
+    "agent/docs/simulator.md",
+    "agent/src/negotiator/strategy/experiments.py"
+  ],
   "sessions": [
     {
       "metadata": "/23/f6b44401a2/0/metadata.json",
@@ -12,13 +18,20 @@
       "compact_transcript": "/23/f6b44401a2/0/transcript.jsonl",
       "content_hash": "/23/f6b44401a2/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/23/f6b44401a2/1/metadata.json",
+      "transcript": "/23/f6b44401a2/1/full.jsonl",
+      "compact_transcript": "/23/f6b44401a2/1/transcript.jsonl",
+      "content_hash": "/23/f6b44401a2/1/content_hash.txt",
+      "prompt": "/23/f6b44401a2/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 10,
-    "cache_creation_tokens": 4203,
-    "cache_read_tokens": 1861704,
-    "output_tokens": 3227,
-    "api_call_count": 4
+    "input_tokens": 14,
+    "cache_creation_tokens": 7449,
+    "cache_read_tokens": 2349701,
+    "output_tokens": 6247,
+    "api_call_count": 6
   }
 }
