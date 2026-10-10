@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "e1097b1c495b",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 7,
+  "files_touched": [
+    "agent/README.md",
+    "agent/docs/baseline-report.ru.md",
+    "agent/src/negotiator/cli.py",
+    "agent/src/negotiator/runner.py",
+    "agent/src/negotiator/strategy/__init__.py",
+    "agent/src/negotiator/strategy/baseline.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/e1/097b1c495b/0/metadata.json",
+      "transcript": "/e1/097b1c495b/0/full.jsonl",
+      "content_hash": "/e1/097b1c495b/0/content_hash.txt",
+      "prompt": "/e1/097b1c495b/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 100,
+    "cache_creation_tokens": 84299,
+    "cache_read_tokens": 27862896,
+    "output_tokens": 49945,
+    "api_call_count": 50
+  }
+}
