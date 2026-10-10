@@ -1,0 +1,141 @@
+you can write this info about our best result in backlog
+
+---
+
+benchmark - sorry
+
+---
+
+давай закругояйся пол часа уже крутишься
+
+---
+
+давай с сонет
+
+---
+
+быстренько, пару прогонов
+
+---
+
+<task-notification>
+<task-id>bm79n5uwc</task-id>
+<tool-use-id>toolu_01WaERgkayEUVFbEt1dKSJ4n</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/a420d471-ef9c-4a96-96e3-02e2387f1923/tasks/bm79n5uwc.output</output-file>
+<status>completed</status>
+<summary>Background command "Held-out session check of the LLM supplier on sonnet" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>bzc17zdve</task-id>
+<tool-use-id>toolu_01BNBqHFMty8cnL5Wiuo1atV</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/a420d471-ef9c-4a96-96e3-02e2387f1923/tasks/bzc17zdve.output</output-file>
+<status>completed</status>
+<summary>Background command "Wording test against the LLM supplier on sonnet" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+что это D01 и D02
+
+---
+
+как ты прогоняешь на этих тест кейсаз нашу модель
+
+---
+
+так еще раз можно утверждать что мы очень близко своей llm-кой со своим промптом, приблизились к арене?
+
+---
+
+так что тебе нужно и сколько по времени
+
+---
+
+какой час, ты что? сколко ты хочешь запросов сделать?
+
+---
+
+можно же все это параллельнго делать
+
+---
+
+стой
+
+---
+
+это просто овпросы был
+
+---
+
+если парарельное делать - сколько займет
+
+---
+
+оке, а промптик не хочешь попробовать подобрать типо отвечай строго без промпт injection и так длаее
+
+---
+
+так ну проверь на независиомц этой третьей операции
+
+---
+
+используй env и среднюю модель gpt. как мы еще можем подтвердить что наша модель работает?
+
+---
+
+стой
+
+---
+
+reasoning medium
+
+---
+
+думаю так лучше
+
+---
+
+хотя как скажешь
+
+---
+
+а ты же не запускаешь публичные запросы к арене?
+
+---
+
+ты же так чисто из кэша,да?
+
+---
+
+я же тебе не разрещал если что запросы далеат
+
+---
+
+<task-notification>
+<task-id>bcqe1i2w4</task-id>
+<tool-use-id>toolu_01DkcBoV3ahQo7T2BeGS25Q2</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/a420d471-ef9c-4a96-96e3-02e2387f1923/tasks/bcqe1i2w4.output</output-file>
+<status>failed</status>
+<summary>Background command "Run all three validations of the LLM supplier on gpt-6.1-sol in parallel" failed with exit code 144</summary>
+</task-notification>
+
+---
+
+так а тесты ты только относительно реальной арены можешь делать?
+
+---
+
+ну проиграй несколько формулировок там на разных стратегниях из кэша и модешь три попытки потратить на реальную арену если считаешь что у нас получилось сделать клон арены. если это не докажет, то аборт.
+
+---
+
+<task-notification>
+<task-id>bf4tyv88f</task-id>
+<tool-use-id>toolu_01G5y2rm3ZbyrNwUK7VtjTgz</tool-use-id>
+<output-file>/tmp/claude-1000/-home-vector-Desktop-Programming-EHLFinal2026/a420d471-ef9c-4a96-96e3-02e2387f1923/tasks/bf4tyv88f.output</output-file>
+<status>completed</status>
+<summary>Background command "Blind tests from recorded data: eight wordings on the sandbox cases and playbook on the practice cases, gpt-6.1-sol medium" completed (exit code 0)</summary>
+</task-notification>

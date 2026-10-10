@@ -3,8 +3,10 @@
   "checkpoint_id": "b4ec530f9e5d",
   "strategy": "manual-commit",
   "branch": "feat/sim-llm-supplier",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 5,
+  "files_touched": [
+    "agent/docs/simulator.md"
+  ],
   "sessions": [
     {
       "metadata": "/b4/ec530f9e5d/0/metadata.json",
@@ -12,13 +14,20 @@
       "compact_transcript": "/b4/ec530f9e5d/0/transcript.jsonl",
       "content_hash": "/b4/ec530f9e5d/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/b4/ec530f9e5d/1/metadata.json",
+      "transcript": "/b4/ec530f9e5d/1/full.jsonl",
+      "compact_transcript": "/b4/ec530f9e5d/1/transcript.jsonl",
+      "content_hash": "/b4/ec530f9e5d/1/content_hash.txt",
+      "prompt": "/b4/ec530f9e5d/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 10,
-    "cache_creation_tokens": 6598,
-    "cache_read_tokens": 1885258,
-    "output_tokens": 2225,
-    "api_call_count": 4
+    "input_tokens": 46,
+    "cache_creation_tokens": 25091,
+    "cache_read_tokens": 5245091,
+    "output_tokens": 16425,
+    "api_call_count": 17
   }
 }
