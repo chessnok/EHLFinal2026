@@ -113,6 +113,7 @@ BIG_STEP = 0.04  # a supplier move of 4 %+ in one round says it had room
 UPPER_ROOM = 0.06  # the upper bound sits at least this far above our first ask
 STOP_MARGIN = 0.01  # we take an offer within 1 % of where we expect the supplier to stop
 MIN_STEP = 0.004  # every message moves at least 0.4 % of C: these bots punish a repeated offer
+STOP_ROOM, UPPER_ROOM_SHARE = 0.05, 0.15  # the upper bound under a margin charge, as shares of the room
 ANCHOR_SLACK = 0.25  # share of the room (quote to cost minimum) a deal on our deep first ask may cost
 RELATIONSHIP_STEP = 0.25  # stabilise / secure_supply: our step as a share of the usual one
 RELATIONSHIP_MIN_STEP = 0.05  # ... and at least this share of the room between its quote and our first ask
@@ -366,6 +367,12 @@ class TacticalStrategy(BaselineStrategy):
         cap = min(neg.c_alt, neg.cost(sid, terms) if terms else math.inf, plan.open_c)
         before = plan.upper_c
         plan.upper_c = min(max(stop_c * (1 + STOP_MARGIN), plan.target_c * (1 + UPPER_ROOM)), cap)
+        if neg.supplier_estimates.get(sid):
+            # where only the price moves, 1 % and 6 % of C are more than the whole room (P01: 5 %, P02: 2 %):
+            # the bound became the supplier's current offer and every offer counted as good enough - P01 took an
+            # alternative in round 3 at 134.80 while the supplier was still coming down (0.733, P-20)
+            room = max(0.0, plan.open_c - plan.target_c)
+            plan.upper_c = min(max(stop_c + STOP_ROOM * room, plan.target_c + UPPER_ROOM_SHARE * room), cap)
         neg.recorder.event(
             "belief",
             session_id=neg.session_id,
