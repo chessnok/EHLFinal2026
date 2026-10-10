@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "5041f7ae7068",
+  "session_id": "d1e2db49-c3f0-446b-b08e-937eff172651",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-10T16:33:14.258436114Z",
+  "branch": "feat/tactic-experiments",
+  "checkpoints_count": 4,
+  "save_step_count": 1,
+  "files_touched": [
+    "AGENTS.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "1166445c57a3",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 105,
+    "cache_creation_tokens": 252888,
+    "cache_read_tokens": 9356295,
+    "output_tokens": 84320,
+    "api_call_count": 49
+  },
+  "session_metrics": {
+    "turn_count": 4
+  }
+}
