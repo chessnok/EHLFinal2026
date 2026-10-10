@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "6c15c35f3b61",
+  "strategy": "manual-commit",
+  "branch": "feat/tactic-experiments",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".env.example",
+    "AGENTS.md",
+    "agent/src/negotiator/sim/cli.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/6c/15c35f3b61/0/metadata.json",
+      "transcript": "/6c/15c35f3b61/0/full.jsonl",
+      "compact_transcript": "/6c/15c35f3b61/0/transcript.jsonl",
+      "content_hash": "/6c/15c35f3b61/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
