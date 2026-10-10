@@ -10,7 +10,7 @@ are never rewritten - their words are the commitment.
 With `reader=True` a model also reads each new reply (`negotiator.reader`) before tactical decides, and may add a
 requested lever to `plan.requests` where the regular expressions missed it. It changes nothing else.
 
-All model calls of one outgoing e-mail share one wall-clock budget, `LLM_MESSAGE_BUDGET_S` (default 30 s): the
+All model calls of one outgoing e-mail share one wall-clock budget, `LLM_MESSAGE_BUDGET_S` (default 10 s): the
 arena allows 60 s per move. The budget also ends 45 s after the supplier's reply came in, whatever was spent before
 the strategy was asked. When it is spent the template goes out and `writer.fallback.deadline` counts it.
 

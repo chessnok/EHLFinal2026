@@ -88,3 +88,13 @@ alternative costs 0.14 on both cases.
 | tactical (`7143676`, margin charge in C) | **0.736** | 10 of 10 | [record](2026-10-11-tactical-none.md) |
 
 Two full runs, 20 practice sessions, and 22 sessions of partial runs (`../runs.md` P-16 to P-27).
+
+## 2026-10-11 · sandbox and two practice cases · `tactical-llm`
+
+| Strategy | D01 | D02 | Mean | Record |
+|---|---|---|---|---|
+| tactical (main `9d75396`) | 0.649 | 0.587 | 0.618 | [record](2026-10-11-tactical-llm-gpt-4o.md) |
+| tactical-llm, tactical-llm+reader (haiku, gpt-4o-mini, gpt-4o) | 0.649 | 0.587 | 0.618 | [record](2026-10-11-tactical-llm-gpt-4o.md) |
+
+Practice with gpt-4o: P11 0.672 (as `tactical`), P08 0.507 (`tactical` 0.550).
+

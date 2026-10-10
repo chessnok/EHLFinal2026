@@ -16,7 +16,7 @@ miss and nothing more:
                (docs/backlog.md 2.1).
 
 An error, a slow call or an answer of the wrong shape gives no hints (`reader.fallback`).
-Settings (environment): READER_TIMEOUT_S (default 8), within the e-mail's LLM_MESSAGE_BUDGET_S (writer.py).
+Settings (environment): READER_TIMEOUT_S (default 4), within the e-mail's LLM_MESSAGE_BUDGET_S (writer.py).
 """
 
 import os
@@ -54,7 +54,7 @@ Empty lists are a good answer."""
 
 
 def reader_timeout() -> float:
-    return float(os.environ.get("READER_TIMEOUT_S", "8"))
+    return float(os.environ.get("READER_TIMEOUT_S", "4"))
 
 
 def _squash(text: str) -> str:
