@@ -75,8 +75,16 @@ STALL_EPS = 0.0005  # a C move below 0.05 % is no move
 DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
 ANCHOR_WITH_LEVERS = 0.25  # first ask 25 % under the quote where competition, material or capacity give a lever
 ANCHOR_DATA_EXTRA = 0.05  # how much deeper the data may take the first ask
+# The supplier's full cost as a share of its own plant's should-cost. The margin charges the arena recorded on
+# P01, P02 and P03 (14 deals up to runs.md P-15) put it at 0.975-0.980; company.md gives the estimate an error of
+# about 5 %. Too high a cost only leaves price on the table, too low a cost scores 0 - so the upper end.
+SHOULD_COST_SHARE = 0.98
+# What money now is worth to a supplier short of cash, as a multiple of our rate: P01's charges at 14, 45 and
+# 60 days (runs.md P-2 to P-15) fit 9.6 % a year against our 8 %.
+CASH_SHORT_RATE = 1.2
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
+ANCHOR_ROUTINE = 0.13  # routine goal: a deeper first ask is answered with a final offer
 ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
 MAX_ANCHOR = 0.15  # (kept for the experiments that import it)
 MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D02, P05, P18), but a deeper first
@@ -107,7 +115,33 @@ BIG_STEP = 0.04  # a supplier move of 4 %+ in one round says it had room
 UPPER_ROOM = 0.06  # the upper bound sits at least this far above our first ask
 STOP_MARGIN = 0.01  # we take an offer within 1 % of where we expect the supplier to stop
 MIN_STEP = 0.004  # every message moves at least 0.4 % of C: these bots punish a repeated offer
+STOP_ROOM, UPPER_ROOM_SHARE = 0.05, 0.15  # the upper bound under a margin charge, as shares of the room
+ANCHOR_SLACK = 0.25  # share of the room (quote to cost minimum) a deal on our deep first ask may cost
+RELATIONSHIP_STEP = 0.25  # stabilise / secure_supply: our step as a share of the usual one
+RELATIONSHIP_MIN_STEP = 0.05  # ... and at least this share of the room between its quote and our first ask
 PATIENT_GAP = 0.01  # where we would meet its open offer early, we ask this far under it instead
+PERSIST_STEP = 0.6  # `persistent`: our step as a share of the usual one ...
+PERSIST_MIN = 0.006  # ... but never under 0.6 % of C: below 0.2 % the suppliers did not move at all (n 461)
+MUST_CLAUSE = re.compile(
+    r"must include an? [\w-]+ index clause|cannot offer a fixed price|requires? an? [\w-]+ "
+    r"index clause",
+    re.I,
+)
+FIGURES_ASKED = re.compile(
+    r"Which figures is that based on|Please (?:send us|provide) the data|data that forms the basis", re.I
+)
+FIELD_WORDS = {
+    "payment_days": "payment terms",
+    "contract_months": "the contract length",
+    "lead_time_days": "the lead time",
+    "incoterm": "the delivery terms",
+    "volume_per_year": "the volume",
+    "index_clause": "an index clause",
+    "effective_date": "the start date",
+    "ppm_commitment": "the quality commitment",
+    "chargeback_eur_per_complaint": "the chargeback",
+    "tooling_eur": "tooling",
+}
 MAX_SPREAD = 0.08  # options of one message stay within 8 % of each other's price
 EQUAL_C = 0.005  # ... and within 0.5 % of each other's C
 
@@ -162,6 +196,10 @@ class Plan:
     reanchored: bool = False
     asked_breakdown: bool = False
     breakdown_read: bool = False
+    stop_c: float = math.inf  # where the belief expects it to stop with us (C)
+    figures_asked: bool = False  # its last e-mail asked for the figures behind our proposal
+    figures_reply: bool = False
+    answered_fixed: set = field(default_factory=set)  # fixed fields whose request we have answered
 
 
 # Candidate changes, each switchable (`tactical+<flag>`) so practice can measure it on its own before it is
@@ -169,7 +207,16 @@ class Plan:
 # strict_final, belief_cap, probe_leader, anchor_cap25, dedupe_series, big_steps, floor_ask, wide_band,
 # all_claims (the arena reads at most 3 arguments per message), anchor_rel
 # (docs/benchmarks/2026-10-10-flags-paired.md).
-FLAGS: dict[str, str] = {}
+FLAGS: dict[str, str] = {
+    "alt_structure": "its alternative's structure goes into our next menu; its price only on an end signal or at "
+    "our stop estimate, never from a bidder behind the leader",
+    "fresh_claims": "from round 2 up to 3 fresh arguments (complaints, should-cost too); 'Which figures?' answered "
+    "with figures",
+    "persistent": "longer and steadier: our floor estimate ends nothing until two rounds are left, our steps are "
+    "60 % of the usual but never under 0.6 % of C",
+    "answers": "plain answers: the volume we need, an opener that matches its move, a fixed field said once, a "
+    "clause it must have kept, no 'pays early' that is not",
+}
 
 
 class TacticalStrategy(BaselineStrategy):
@@ -188,13 +235,15 @@ class TacticalStrategy(BaselineStrategy):
     def prepare(self, neg: Negotiation) -> None:
         buyer = neg.buyer
         goal = buyer.get("category_goal", "routine")
-        parts = neg.case.get("parts", [])
+        parts = neg.case.get("parts") or []
         current = buyer.get("current_unit_price")
         for sid, thread in neg.threads.items():
             _, terms = thread.standing
             profile = build_profile(self.data, sid, neg.case)
             policy = self._policy(goal, profile)
             full_cost = self._full_cost(parts, sid)
+            if full_cost and goal in RELATIONSHIP_GOALS:
+                full_cost = round(full_cost * SHOULD_COST_SHARE, 2)  # one cost for the charge and the floor
             self._estimate_supplier(neg, sid, full_cost, profile)
             floor = self._floor(neg, full_cost, policy)
             open_c = neg.cost(sid, terms)
@@ -209,6 +258,12 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief = FloorBelief(neg.case, terms, thread.standard_terms, gt.lower, rate)
                 plan.belief.ppm = profile.ppm  # scorecard ppm: what a chargeback really costs it
             plan.evidence = self._evidence(neg, sid, terms.get("unit_price"), current) if terms else []
+            body = thread.latest.get("body") or ""
+            clauses = [o for o in neg.case.get("term_options", {}).get("index_clause") or [] if o]
+            if "index_clause" in neg.case["negotiable"] and any(o.get("series") in body for o in clauses):
+                # it argues its price with the very index a clause would follow: the clause answers it. P02's
+                # supplier dropped its price by 15-22 for one and never went under 372.96 without (P-13, P-15, P-19)
+                plan.requests.add("index_clause")
             if profile.has("hedged"):
                 plan.banned_kinds.add("index")  # "not our reality" until its hedge runs out
             if gt.market_supports_ask:
@@ -274,8 +329,16 @@ class TacticalStrategy(BaselineStrategy):
     def _evidence(self, neg, sid, open_price, current):
         out = super()._evidence(neg, sid, open_price, current)
         if self.data:
-            out += self.data.evidence_orders(neg.case.get("parts", []), sid, open_price)
-            out += data_facts(self.data, neg.case.get("parts", []))
+            parts = neg.case.get("parts") or []
+            out += self.data.evidence_orders(parts, sid, open_price)
+            out += data_facts(self.data, parts)
+            if self.flags["fresh_claims"]:
+                later = self.data.evidence_complaints(parts, sid, since="2025-10-01")
+                if open_price and not any(e.kind == "should_cost" for e in out):
+                    later += self.data.evidence_should_cost(parts, open_price, margin=1.0)
+                for e in later:  # material for rounds 2+: round 1 already carries our best three
+                    e.meta = {**(e.meta or {}), "later": True}
+                out += later
         return sorted(out, key=lambda e: -e.strength)
 
     def _full_cost(self, parts: list[str], supplier_id: str) -> float | None:
@@ -291,20 +354,38 @@ class TacticalStrategy(BaselineStrategy):
         )
         return rows[0]["unit_cost"] if rows and rows[0]["unit_cost"] else None
 
+    def _standard_terms(self, neg: Negotiation, sid: str) -> dict:
+        """The supplier's standard terms for the relationship term: its quote PDF, then its master data, then its
+        opening sheet. The PDFs of P01, P02, P03 and P10 name neither payment nor Incoterm, which left the charge
+        out of C altogether (P02 closed at 345.39 with EUR 179k of it, score 0). What stays unknown is taken as
+        the value that charges most - too high a charge costs a little price, too low a charge scores 0."""
+        std = dict(neg.threads[sid].standard_terms)
+        master = (self.data.supplier(sid) if self.data else None) or {}
+        first = next((m for m in neg.threads[sid].supplier_messages if m.get("term_sheets")), None)
+        opening = first["term_sheets"][0]["terms"] if first else {}
+        fixed = neg.case.get("fixed_terms", {})
+        for name in ("payment_days", "incoterm"):
+            for source in (master, opening):
+                if std.get(name) is None and fixed.get(name) is None and source.get(name) is not None:
+                    std[name] = source[name]
+        freight = neg.buyer["freight_eur_per_unit"]
+        if std.get("incoterm") not in freight and fixed.get("incoterm") is None:
+            std["incoterm"] = max(freight, key=freight.get)
+        if std.get("payment_days") is None and fixed.get("payment_days") is None:
+            options = neg.case.get("term_options", {}).get("payment_days") or []
+            std["payment_days"] = min(options, default=neg.buyer["reference_payment_days"])
+        return std
+
     def _estimate_supplier(self, neg: Negotiation, sid: str, full_cost: float | None, p: SupplierProfile) -> None:
         """Our estimate of the supplier for the relationship term in C (stabilise, secure_supply)."""
         if neg.buyer.get("category_goal") not in RELATIONSHIP_GOALS or not full_cost:
             neg.supplier_estimates.pop(sid, None)
             return
-        std = neg.threads[sid].standard_terms
-        if not {"payment_days", "incoterm"} <= std.keys():
-            # no estimate without its standard terms: filling them in made the charge dominate every move (P01/P02
-            # stopped negotiating in a dry run) - the shallow strategic anchor guards against the squeeze instead
-            return
+        std = self._standard_terms(neg, sid)
         rate = neg.buyer.get("interest_rate", 0.08)
         neg.supplier_estimates[sid] = {
             "full_cost": full_cost,
-            "interest_rate": rate * 2 if p.has("cash_short") else rate,  # money now is dearer to it
+            "interest_rate": rate * CASH_SHORT_RATE if p.has("cash_short") else rate,  # money now is dearer to it
             "usual_rate": rate,
             "standard": std,
         }
@@ -326,7 +407,14 @@ class TacticalStrategy(BaselineStrategy):
         _, terms = neg.threads[sid].standing
         cap = min(neg.c_alt, neg.cost(sid, terms) if terms else math.inf, plan.open_c)
         before = plan.upper_c
+        plan.stop_c = stop_c
         plan.upper_c = min(max(stop_c * (1 + STOP_MARGIN), plan.target_c * (1 + UPPER_ROOM)), cap)
+        if neg.supplier_estimates.get(sid):
+            # where only the price moves, 1 % and 6 % of C are more than the whole room (P01: 5 %, P02: 2 %):
+            # the bound became the supplier's current offer and every offer counted as good enough - P01 took an
+            # alternative in round 3 at 134.80 while the supplier was still coming down (0.733, P-20)
+            room = max(0.0, plan.open_c - plan.target_c)
+            plan.upper_c = min(max(stop_c + STOP_ROOM * room, plan.target_c + UPPER_ROOM_SHARE * room), cap)
         neg.recorder.event(
             "belief",
             session_id=neg.session_id,
@@ -363,7 +451,15 @@ class TacticalStrategy(BaselineStrategy):
         price_only = bool(gt and gt.lower and gt.lower >= open_price * 0.95)  # the prior says: only the price moves
         depth = ANCHOR_PRICE_ONLY if price_only else ANCHOR_WITH_LEVERS
         extra = ANCHOR_DATA_EXTRA
-        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+        if neg.buyer.get("category_goal") == "routine":
+            # P07 (bundling, routine): a 13 % ask got 5.59 and four rounds (0.721, P-13); 25-26 % got "your
+            # target prices are not feasible", 5.69 and a final offer in round 2 (0.585 P-15, 0.663 P-22)
+            depth, extra = min(depth, ANCHOR_ROUTINE), 0.0
+        if neg.supplier_estimates.get(sid):
+            # the margin charge is in C: the ask may go as deep as a price-only talk, it stops at the price that
+            # costs us least (below). P01 came down to 132.20 after a 10 % ask, to 137.00 after a 3 % one
+            depth, extra = ANCHOR_PRICE_ONLY, 0.0
+        elif neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
             depth, extra = min(depth, ANCHOR_RELATIONSHIP), 0.0  # squeezing a strategic supplier costs us C
         # round 1 carries 67 % of all supplier movement and no supplier ever walked over a deep first offer
         # (0 of 917 replies); within a case deeper first offers went with better scores - so we open deep
@@ -379,6 +475,12 @@ class TacticalStrategy(BaselineStrategy):
         # our cost estimate can sit above its real one (P02: should-cost 380 over a 371 quote, C_best ~364)
         price = min(price, open_price)
         ideal = complete_offer(neg.case, self._optimise(neg, sid, {**terms, "unit_price": round(price, 2)}))
+        if neg.supplier_estimates.get(sid):
+            # with the margin charge in C, a price under the one that costs us least costs more charge than it
+            # saves - and the supplier may agree to it (P02 agreed to 345.39): the first ask stops there
+            for _ in range(2):
+                ideal["unit_price"] = max(ideal["unit_price"], round(self._cheapest_price(neg, sid, ideal), 2))
+                ideal = complete_offer(neg.case, self._optimise(neg, sid, ideal))
         return min(neg.cost(sid, ideal), neg.cost(sid, terms))
 
     def _bounds_c(self, neg, sid, terms, gt: GroundTruth, target_c: float, open_c: float) -> tuple[float, float]:
@@ -411,7 +513,7 @@ class TacticalStrategy(BaselineStrategy):
             if take := self._take_agreed(neg, supplier_id):
                 return take
             return Decision.hold(supplier_id, "agreed")
-        rounds_left = neg.case.get("round_limit", 10) - t.rounds_used
+        rounds_left = (neg.case.get("round_limit") or 10) - t.rounds_used
         if rounds_left <= 1:
             return Decision.hold(supplier_id, "last round: keep it for the close")
         if neg.seconds_to_deadline() < 120:
@@ -478,6 +580,14 @@ class TacticalStrategy(BaselineStrategy):
                     plan.banned_kinds.add(kind)
             if not plan.breakdown_read:
                 self._read_breakdown(neg, sid, plan, reply)
+            if FIGURES_ASKED.search(reply.get("body", "")):
+                plan.figures_asked = True
+            if (
+                self.flags["answers"]
+                and MUST_CLAUSE.search(reply.get("body", ""))
+                and "index_clause" in neg.case["negotiable"]
+            ):
+                plan.request_counts["index_clause"] = max(2, plan.request_counts.get("index_clause", 0))
             asked = {r for r in requests_in(reply.get("body", "")) if r in neg.case["negotiable"]}
             for r in asked:
                 plan.request_counts[r] = plan.request_counts.get(r, 0) + 1
@@ -572,6 +682,15 @@ class TacticalStrategy(BaselineStrategy):
             # a real counter-step: at least half of its last move (cent steps read as no movement)
             step = min(plan.policy.reciprocity * max(their_move, 0.0), max(by_time, 0.5 * max(their_move, 0.0)))
             step = max(step, min_step)
+            if self.flags["persistent"]:
+                step = min(step, max(PERSIST_STEP * step, PERSIST_MIN * last))
+        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+            # only the price moves here, and the room is narrow: 0.4 % of C is 8 % of what there is to win on
+            # P01 and 19 % on P02 - three such steps met the supplier in round 3 of 10 (P01 0.785, P02 0.421,
+            # runs.md P-17). A quarter of the step, at least a twentieth of the room; D01 answered a step of 1 %
+            # of the room in crumbs (0.809) and one of 5 % in full (0.957-0.969)
+            room = max(0.0, plan.open_c - plan.target_c)
+            step = max(RELATIONSHIP_STEP * step, min(min_step, RELATIONSHIP_MIN_STEP * room))
         return min(last + step, their_c, plan.upper_c)  # the upper bound is never asked for beyond
 
     def _supplier_done(self, neg: Negotiation, sid: str, plan: Plan) -> bool:
@@ -581,13 +700,13 @@ class TacticalStrategy(BaselineStrategy):
             t.status == "final_offer"
             or reply_signals(t.latest.get("body", ""))["firm"]
             or plan.stalls >= 1
-            or self._round_budget(neg, sid) - t.rounds_used <= 3
+            or self._round_budget(neg, sid) - t.rounds_used <= (2 if self.flags["persistent"] else 3)
         )
 
     def _round_budget(self, neg: Negotiation, sid: str) -> int:
         """Messages we can still expect to play in this thread: the round limit, or the clock."""
         t = neg.threads[sid]
-        limit = neg.case.get("round_limit", 10)
+        limit = neg.case.get("round_limit") or 10
         left = neg.seconds_to_deadline() - 120  # the runner closes before the cap
         if math.isfinite(left):
             per_round = max(15.0, neg.recorder.metrics.mean("supplier.reply_seconds") or 30.0) + 3.0
@@ -607,7 +726,7 @@ class TacticalStrategy(BaselineStrategy):
     def _may_probe(self, neg: Negotiation, sid: str, their_c: float) -> bool:
         """Push a final offer once - only when its walking away would cost us little."""
         t = neg.threads[sid]
-        if neg.case.get("round_limit", 10) - t.rounds_used < 2 or neg.seconds_to_deadline() < 180:
+        if (neg.case.get("round_limit") or 10) - t.rounds_used < 2 or neg.seconds_to_deadline() < 180:
             return False
         for other, ot in neg.threads.items():
             if other != sid and self.tplans[other].probed_final and ot.live:
@@ -649,6 +768,11 @@ class TacticalStrategy(BaselineStrategy):
             or plan.stalls >= 1
             or self._round_budget(neg, sid) - t.rounds_used <= 2
         )
+        if self.flags["alt_structure"]:
+            if len(neg.threads) > 1 and best_c > self._best_rival_c(neg, sid):
+                return None  # a bidder behind the leader keeps its alternative: it stays our lever (P05)
+            if not self.flags["persistent"]:  # persistent: only the supplier ends it (P18 gained from not taking 5.20)
+                closing = closing or best_c <= plan.stop_c * (1 + STOP_MARGIN)  # at our estimate of its stop (P10)
         if not closing:
             return None
         std = t.standard_terms
@@ -664,7 +788,7 @@ class TacticalStrategy(BaselineStrategy):
             [
                 f"Dear {plan.name} team,",
                 "",
-                "thank you. We accept your alternative as stated below and are ready to place the order on it.",
+                self._alternative_line(neg, sheet, best),
                 "",
                 f"Our proposal: {describe(neg.case, sheet)}",
                 "",
@@ -677,6 +801,26 @@ class TacticalStrategy(BaselineStrategy):
             message={"subject": neg.case.get("title", "Your quote"), "body": body, "term_sheets": [{"terms": sheet}]},
             rationale={"move": "take its alternative", "alternative": best_id, "c": neg.cost(sid, sheet)},
         )
+
+    def _alternative_line(self, neg, sheet: dict, best: dict) -> str:
+        if not self.flags["answers"]:
+            return "thank you. We accept your alternative as stated below and are ready to place the order on it."
+        diffs = [
+            f"{FIELD_WORDS.get(f, f.replace('_', ' '))} {sheet[f]} instead of {best[f]}"
+            for f in neg.case["negotiable"]
+            if f != "unit_price" and f in best and sheet.get(f) != best[f]
+        ]
+        return "thank you. We can accept your alternative on the terms below" + (
+            f" ({'; '.join(diffs)}, the nearest option we can sign)." if diffs else "."
+        )
+
+    def _best_rival_c(self, neg: Negotiation, sid: str) -> float:
+        """The cheapest acceptable standing offer of the other live suppliers (inf if none)."""
+        best = math.inf
+        for other, ot in neg.threads.items():
+            if other != sid and ot.live and ot.standing[0] and not accept_problems(neg, other, ot.standing[0]):
+                best = min(best, neg.cost(other, ot.standing[1]))
+        return best
 
     def _take_agreed(self, neg: Negotiation, sid: str) -> Decision | None:
         """It agreed to our terms: if no other live thread offers less, close now - holding it while others
@@ -732,7 +876,7 @@ class TacticalStrategy(BaselineStrategy):
 
     def _may_push(self, neg: Negotiation, sid: str) -> bool:
         t = neg.threads[sid]
-        return neg.case.get("round_limit", 10) - t.rounds_used >= 2 and neg.seconds_to_deadline() > 150
+        return (neg.case.get("round_limit") or 10) - t.rounds_used >= 2 and neg.seconds_to_deadline() > 150
 
     def _reanchor(self, neg, sid, plan: Plan, theirs: dict, their_c: float) -> Decision | None:
         """It came under a floor we only guessed: our guess was timid. Ask again under its new price, once."""
@@ -769,7 +913,14 @@ class TacticalStrategy(BaselineStrategy):
             t.status == "final_offer"
             or plan.stalls >= 2
             or self._round_budget(neg, sid) - t.rounds_used <= 2
-            or (gt.grounded and gt.lower is not None and price <= gt.lower * (1 + UNDER_FLOOR))  # at its floor
+            # at its floor - where we have one: with a margin charge the floor is only the prior of 1 % under
+            # its quote, and P01 came down 4.4 % (132.50); matching 133.50 in round 3 ended that run at 0.728
+            or (
+                not neg.supplier_estimates.get(sid)
+                and gt.grounded
+                and gt.lower is not None
+                and price <= gt.lower * (1 + UNDER_FLOOR)
+            )
         )
         if not at_risk:
             return None  # the upper bound is our emergency line, not an early yes
@@ -829,7 +980,8 @@ class TacticalStrategy(BaselineStrategy):
         if not sheets:
             return Decision.hold(sid, "no valid term sheet below their offer")
         plan.last_keys = self._keys(sheets)
-        plan.our_c.append(neg.cost(sid, sheets[0]["terms"]))
+        # with a margin charge the sheets of a deep ask cost more than the ask they stand for (`_sheets`)
+        plan.our_c.append(ask_c if neg.supplier_estimates.get(sid) else neg.cost(sid, sheets[0]["terms"]))
         claims = self._choose_claims(neg, sid, plan, first=not plan.last_claims and neg.threads[sid].rounds_used == 0)
         plan.last_claims = claims
         message = self._write(neg, plan, sheets, claims, probe)
@@ -861,15 +1013,55 @@ class TacticalStrategy(BaselineStrategy):
         B  the structure the supplier takes most readily (its requests answered, closest to its own);
         C  the next most acceptable structure of a different kind (another clause, term or payment)."""
         case = neg.case
-        menu = priced_menu(case, theirs, lambda terms: self._iso_cost_price(neg, sid, terms, ask_c))
+        # Under a margin charge every C above the minimum has two prices. While our ask is within ANCHOR_SLACK
+        # of the minimum we send the lower one: a deep first ask whose every step up is a move the supplier sees
+        # and a gain for us, and if it agrees we pay at most the slack. After that, the usual side.
+        slack = ANCHOR_SLACK * max(0.0, plan.open_c - plan.target_c) if neg.supplier_estimates.get(sid) else 0.0
+        spent = max(0.0, ask_c - plan.target_c)
+        under = spent < slack
+
+        def least(terms: dict) -> float:
+            return neg.cost(sid, {**terms, "unit_price": self._cheapest_price(neg, sid, terms)})
+
+        def asked(terms: dict) -> bool:
+            return any(satisfies(case, terms, theirs, r, plan.proposed) for r in plan.requests)
+
+        # a dearer structure the supplier asked for (an index clause) is offered at the price that costs us
+        # least - the cheapest such structure only (P02: deadband 5, not 3 or 0)
+        asked_least = min(
+            (least(t) for t in priced_menu(case, theirs, lambda _t: theirs["unit_price"]) if asked(t)), default=math.inf
+        )
+
+        def price_for(terms: dict) -> float:
+            if not under:
+                return self._iso_cost_price(neg, sid, terms, ask_c - slack)
+            floor_c = least(terms)
+            if floor_c > plan.target_c + 0.25 * slack:
+                # only the structures about as cheap for us as the best one go deep: P03's deep ask went out on
+                # a volume below our need, P02's on an index clause, and the supplier agreed to both (P-18)
+                if asked(terms) and floor_c <= asked_least * (1 + STALL_EPS):
+                    return self._cheapest_price(neg, sid, terms)
+                return 0.0
+            return self._iso_cost_price(neg, sid, terms, floor_c + slack - spent, under=True)
+
+        menu = priced_menu(case, theirs, price_for)
         valid, under_floor = [], []
         for terms in menu:
             if not neg.keeps_must_haves(sid, terms) or neg.cost(sid, terms) >= their_c:
+                continue
+            if under:
+                valid.append(terms)
                 continue
             if plan.floor_price and terms["unit_price"] < plan.floor_price * (1 - UNDER_FLOOR - 0.01):
                 under_floor.append(terms)  # far below what it can sell at: an insult
                 continue
             valid.append(terms)
+        if neg.supplier_estimates.get(sid) and valid and not under:
+            # under a margin charge a structure cannot cost less than at its cheapest price. One that misses
+            # `ask_c` there stays only while it is nearer to our ask than to the supplier's offer (P02: the index
+            # clause costs us 0.8 % and is the one structure it lowers its price for)
+            limit = max(ask_c, min(neg.cost(sid, t) for t in valid), (ask_c + their_c) / 2)
+            valid = [t for t in valid if neg.cost(sid, t) <= limit * (1 + STALL_EPS)]
         pool = valid or under_floor  # never go silent: an offer under its floor beats none
         if not pool:
             return []
@@ -928,6 +1120,8 @@ class TacticalStrategy(BaselineStrategy):
                 bumped = round(before * (1 + MIN_STEP), 2)
                 if bumped < theirs.get("unit_price", bumped + 1):
                     t["unit_price"] = bumped
+        if self.flags["alt_structure"]:
+            picked = self._with_alternative_structure(neg, sid, valid or under_floor, picked)  # before "refused twice"
         # every option of a message costs us the same: floors and bumps can lift one above our ask, and the supplier
         # then picks the one dearest to us (P02 agreed at once to an index clause at the same price, EUR 39k more C;
         # without it practice P02 0.167 -> 0.731)
@@ -940,6 +1134,39 @@ class TacticalStrategy(BaselineStrategy):
                 out.append({"terms": t})
                 plan.offered[structure_key(t)] = max(plan.offered.get(structure_key(t), 0.0), t["unit_price"])
         return out[:3]
+
+    @staticmethod
+    def _with_alternative_structure(neg, sid, pool: list[dict], picked: list[dict]) -> list[dict]:
+        """Its alternative sheet says on which structure it moves: that structure (snapped to the options we may
+        sign, 54 days -> 56) goes into our menu at our ask (P10 dropped its 31.70 at 54 days when we left it out)."""
+        t, options = neg.threads[sid], neg.case.get("term_options", {})
+        primary_id = t.standing[0]
+        keys = {structure_key(x) for x in picked}
+        for offer_id, terms in t.offers:
+            if offer_id == primary_id:
+                continue
+            want = {}
+            for f, v in terms.items():
+                if f == "unit_price" or f not in neg.case["negotiable"]:
+                    continue
+                opts = [o for o in options.get(f) or [] if o is not None]
+                if (
+                    opts
+                    and v not in opts
+                    and isinstance(v, int | float)
+                    and all(isinstance(o, int | float) for o in opts)
+                ):
+                    v = min(opts, key=lambda o: abs(o - v))
+                want[f] = v
+            match = [x for x in pool if all(x.get(f) == v for f, v in want.items())]
+            if match and not any(structure_key(m) in keys for m in match):
+                chosen = max(match, key=lambda x: x["unit_price"])
+                if len(picked) < 3:
+                    picked.append(chosen)
+                else:
+                    picked[1] = chosen
+                keys.add(structure_key(chosen))
+        return picked
 
     def _trade_terms(self, neg, sid, plan, ideal: dict) -> dict | None:
         """Our terms with the levers the supplier values given to it (the price pays for them)."""
@@ -985,6 +1212,11 @@ class TacticalStrategy(BaselineStrategy):
         pool.sort(key=lambda e: (e not in fresh, e.kind not in prefer, -e.strength))
         picked, kinds = [], set()
         limit = plan.policy.claims_first if first else (2 if fresh else 1)
+        if self.flags["fresh_claims"] and not first:
+            limit = 3  # the arena reads up to 3 per message, and every round anew (P01's best session)
+            if plan.figures_asked:
+                order = ["should_cost", "recent_drop", "index", "notice", "quality", "complaint", "orders"]
+                pool.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
         for e in pool:
             if len(picked) >= limit:
                 break
@@ -993,9 +1225,19 @@ class TacticalStrategy(BaselineStrategy):
                     continue
             elif any(r in self.used_refs for r in e.refs) or (e.kind in kinds and e.kind != "recent_drop"):
                 continue
+            if first and (e.meta or {}).get("later"):
+                continue
+            if self.flags["answers"] and e.kind == "forecast" and not self._forecast_fits(neg, e):
+                continue  # a forecast of another quantity (P18: 118,500 against 23,700) only raises the volume question
+            if self.flags["fresh_claims"] and not first and set(e.refs) & {r for x in picked for r in x.refs}:
+                continue  # the same index point twice in one e-mail reads as a duplicate
             picked.append(e)
             kinds.add(e.kind)
             plan.used_sentences.add(e.sentence)
+        plan.figures_reply, plan.figures_asked = (
+            self.flags["fresh_claims"] and plan.figures_asked and bool(picked),
+            False,
+        )
         for e in picked:
             if e.kind == "rival_offer":
                 self.used_rival_refs.update((sid, r) for r in e.refs)
@@ -1008,7 +1250,8 @@ class TacticalStrategy(BaselineStrategy):
         first = neg.threads[plan.supplier_id].rounds_used == 0
         lines = [f"Dear {plan.name} team,", ""]
         if first:
-            if p.has("relationship") or neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+            rfq_newcomer = self.flags["answers"] and len(neg.threads) > 1 and not p.has("relationship")
+            if (p.has("relationship") or neg.buyer.get("category_goal") in RELATIONSHIP_GOALS) and not rfq_newcomer:
                 lines.append("thank you for your quote and for the reliable cooperation we value.")
             else:
                 lines.append("thank you for your quote. We have reviewed it carefully against our data.")
@@ -1022,29 +1265,49 @@ class TacticalStrategy(BaselineStrategy):
                 f"thank you for your reply. We understand that {pressure}; to meet you, we propose a different "
                 "structure."
             )
+        elif self.flags["answers"] and not self._their_price_fell(neg, plan):
+            lines.append("thank you for your reply. We move towards you.")  # it held or raised: no thanks for a step
         else:
             lines.append("thank you for your reply and the step towards us. We move as well.")
-        lines += [c.sentence for c in claims]
+        if plan.figures_reply and claims:
+            lines.append("You asked for the figures behind our proposal:")
+        said = [c.sentence for c in claims]
+        if self.flags["answers"]:
+            said = [
+                s.replace(
+                    "market moves do not reach your costs before then.",
+                    "the rise you cite does not reach your costs before then either.",
+                )
+                for s in said
+            ]
+            said += self._fixed_field_answers(neg, plan)
+        lines += said
         if not plan.asked_breakdown and p.has("open_book") and not plan.breakdown_read:
             lines.append("Could you send us a cost breakdown for this part?")
             plan.asked_breakdown = True
         if len(sheets) > 1:
-            if p.has("cash_short") and any(
-                (sh["terms"].get("payment_days") or 999)
-                < (neg.threads[plan.supplier_id].standing[1].get("payment_days") or 0)
-                for sh in sheets
-            ):
+            reference = neg.threads[plan.supplier_id].standing[1].get("payment_days") or 0
+            if self.flags["answers"]:  # early against its standard terms, not just against its last sheet
+                reference = min(
+                    reference, (neg.threads[plan.supplier_id].standard_terms or {}).get("payment_days") or 999
+                )
+            if p.has("cash_short") and any((sh["terms"].get("payment_days") or 999) < reference for sh in sheets):
                 lines.append("If faster payment helps you, one option below pays early.")
             elif any(
                 f in plan.policy.trade_first and f in case["negotiable"] for f in ("contract_months", "volume_per_year")
-            ):
+            ) and not (self.flags["answers"] and "commit-longer" in plan.used_sentences):
                 lines.append("We are ready to commit for longer if the price reflects it.")
+                plan.used_sentences.add("commit-longer")
         theirs = neg.threads[plan.supplier_id].standing[1]
         for i, sheet in enumerate(sheets if plan.requests else []):
             if said := self._answered(neg, plan, sheet["terms"], theirs, f"Option {chr(65 + i)}").strip():
-                lines.append(said)
+                lines.append(
+                    ("Yes - " + said.strip()) if self.flags["answers"] else said
+                )  # its requests met, said as a yes
                 break
-        volume = self._volume_proof(neg, plan, sheets)
+        volume = (
+            self._volume_answer(neg, plan, sheets) if self.flags["answers"] else self._volume_proof(neg, plan, sheets)
+        )
         if volume:
             lines.append(volume[0])
         lines += ["", "We can award on any of these options:" if len(sheets) > 1 else "Our proposal:"]
@@ -1056,8 +1319,51 @@ class TacticalStrategy(BaselineStrategy):
             "subject": case.get("title", "Your quote"),
             "body": "\n".join(lines),
             "term_sheets": sheets,
-            "refs": sorted({r for c in claims for r in c.refs} | ({volume[1]} if volume else set())),
+            "refs": sorted({r for c in claims for r in c.refs} | ({volume[1]} if volume and volume[1] else set())),
         }
+
+    def _forecast_fits(self, neg, e: Evidence) -> bool:
+        """The forecast's volume is this contract's need (within 5 %)."""
+        fact = self.data.facts.get(e.refs[0]) if self.data and e.refs else None
+        need = neg.buyer.get("need_per_year")
+        volume = (fact or {}).get("volume_per_year")
+        return bool(need and isinstance(volume, int | float) and abs(volume - need) <= 0.05 * need)
+
+    def _their_price_fell(self, neg, plan: Plan) -> bool:
+        """Did its last offer come down in price? (P01 R2 raised 138.55 -> 141.30 and got thanked for a step)"""
+        prices = [
+            (m.get("term_sheets") or [{}])[0].get("terms", {}).get("unit_price")
+            for m in neg.threads[plan.supplier_id].supplier_messages
+        ]
+        prices = [p for p in prices if p]
+        return len(prices) >= 2 and prices[-1] < prices[-2] - 1e-9
+
+    def _fixed_field_answers(self, neg, plan: Plan) -> list[str]:
+        """It asks for a lever this case does not let us move: say so once, and name what can move (P11 asked for
+        faster payment four times and never got an answer)."""
+        body = neg.threads[plan.supplier_id].latest.get("body", "")
+        fixed = [f for f in requests_in(body) if f not in neg.case["negotiable"] and f not in plan.answered_fixed]
+        fixed = [f for f in fixed if f != "volume_per_year"]  # answered by the volume sentence
+        if not fixed:
+            return []
+        plan.answered_fixed.update(fixed)
+        movable = [FIELD_WORDS.get(f, f) for f in neg.case["negotiable"] if f != "unit_price"]
+        what = " and ".join(FIELD_WORDS.get(f, f.replace("_", " ")) for f in fixed)
+        can = "the price" + (f", {', '.join(movable)}" if movable else "")
+        return [f"We cannot change {what} in this contract; we can move on {can}."]
+
+    def _volume_answer(self, neg, plan: Plan, sheets: list[dict]) -> tuple[str, str | None] | None:
+        """ "Which volume can you commit to?" answered with the volume of this contract - the forecast's figure was
+        another quantity in five cases (P18: 118,500 against a need of 23,700) and it kept asking."""
+        body = neg.threads[plan.supplier_id].latest.get("body", "")
+        if plan.volume_proved or not requests_in(body) & {"volume_per_year"}:
+            return None
+        plan.volume_proved = True
+        volumes = {sh["terms"].get("volume_per_year") for sh in sheets}
+        if len(volumes) == 1 and None not in volumes:
+            return f"We commit to {volumes.pop():,} units a year on every option below.", None
+        need = neg.buyer.get("need_per_year")
+        return (f"Our requirement is {need:,} units a year, the full volume of this contract.", None) if need else None
 
     def _volume_proof(self, neg, plan: Plan, sheets: list[dict]) -> tuple[str, str] | None:
         """ "Which volume can you commit to?" (the bots' most common question) - answered once, with the
@@ -1113,7 +1419,7 @@ class TacticalStrategy(BaselineStrategy):
     def keepalive(self, neg: Negotiation, supplier_id: str) -> dict | None:
         """A held thread's clock runs while others negotiate: a harmless question keeps it alive."""
         t = neg.threads[supplier_id]
-        if neg.case.get("round_limit", 10) - t.rounds_used <= 2:
+        if (neg.case.get("round_limit") or 10) - t.rounds_used <= 2:
             return None
         plan = self.tplans[supplier_id]
         asks = [

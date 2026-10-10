@@ -225,23 +225,55 @@ class WorldData:
                 ]
         return []
 
-    def evidence_should_cost(self, part_ids: list[str], price: float) -> list[Evidence]:
+    def evidence_should_cost(
+        self, part_ids: list[str], price: float, supplier_id: str | None = None, margin: float = 1.12
+    ) -> list[Evidence]:
         out = []
         for row in self.query(
-            f"SELECT id, unit_cost FROM should_cost WHERE part_id IN ({','.join('?' for _ in part_ids)})",
+            f"SELECT id, unit_cost, supplier_id FROM should_cost WHERE part_id IN ({','.join('?' for _ in part_ids)})",
             tuple(part_ids),
         ):
-            if row["unit_cost"] and price > row["unit_cost"] * 1.12:
+            # the estimate of this supplier's own plant counts from 3 % under its quote: P10's supplier "took
+            # it into account", the arena's worked example on P01 cites it at 4.5 % (competitions-info.md).
+            # Another plant's estimate (error 5-15 %) only from `margin`
+            own = bool(supplier_id) and row["supplier_id"] == supplier_id
+            if row["unit_cost"] and price > row["unit_cost"] * (min(margin, 1.03) if own else margin):
                 out.append(
                     Evidence(
                         kind="should_cost",
                         refs=[row["id"]],
                         sentence=f"Our should-cost estimate for this part is EUR {row['unit_cost']:.2f} ({row['id']}).",
-                        strength=(price / row["unit_cost"] - 1) * 5,
+                        # under 12 % it is a weak argument and goes last: ahead of the forecast it took P01's
+                        # fourth round and the final offer came at 131.80 instead of 131.30 (P-26)
+                        strength=(price / row["unit_cost"] - 1) * 5 if price > row["unit_cost"] * 1.12 else 0.1,
                         meta={"unit_cost": row["unit_cost"]},
                     )
                 )
         return out
+
+    def evidence_complaints(self, part_ids: list[str], supplier_id: str, since: str) -> list[Evidence]:
+        """Our quality notifications on these parts from this supplier since `since`, newest first: each one
+        a fresh, checkable argument (its own ID, date and ppm) for a later round."""
+        parts = set(part_ids)
+        rows = [
+            (ref, f)
+            for ref, f in self.facts.items()
+            if ref.startswith("qn:")
+            and f.get("part") in parts
+            and f.get("supplier") == supplier_id
+            and (f.get("date") or "") >= since
+            and f.get("ppm")
+        ]
+        rows.sort(key=lambda r: r[1]["date"], reverse=True)
+        return [
+            Evidence(
+                kind="complaint",
+                refs=[ref],
+                sentence=f"Our quality notification of {f['date']} on this part found {f['ppm']:,} ppm ({ref}).",
+                strength=1.5,
+            )
+            for ref, f in rows
+        ]
 
     def evidence_forecast(self, part_ids: list[str]) -> list[Evidence]:
         """Our latest demand forecast per part (shared with suppliers): the answer to "which volume can you commit to?"

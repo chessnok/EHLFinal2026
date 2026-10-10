@@ -118,7 +118,53 @@ did not fire.
 | 3 | Lower the upper bound for leverage cases, or stop using it as a reason to close | P05, P18, P08, P07 | 2.2 |
 | 4 | When a supplier names a lever twice, send a sheet that gives it (shortest payment, no chargeback) at its price | P11, P07 | 2.3 |
 | 5 | Drop the price-history argument from the first e-mail; never cite one ID twice | all | 2.4 |
-| 6 | In `stabilise` and `secure_supply` cases, estimate the supplier's cost before pushing the price down, and stop where the relationship charge outweighs the price | P02, P01, P03, P10 | 2.7 |
+| 6 | ~~In `stabilise` and `secure_supply` cases, estimate the supplier's cost before pushing the price down, and stop where the relationship charge outweighs the price~~ - done, see 3a | P02, P01, P03, P10 | 2.7 |
+
+## 3a. Done tasks (10-11 October, runs.md P-16 to P-27)
+
+State after it: `tactical` on `6bb73d1`, full pass `20261011-010356-practice-tactical`, mean 0.746, 10 of 10 deals
+(0.695 in the run this backlog was written from).
+
+| Item | What was done | Measured |
+|---|---|---|
+| 6 (margin charge) | the charge is in our C: supplier's standard terms from its master data, full cost 0.98 x own-plant should-cost; no ask under the price that minimises C; a deal worse than the opening is refused with the charge counted | no deal above C_open in 42 sessions; recorded charges reproduced to within EUR 56 |
+| 6 | deep first ask on the low-price side of the cost curve, a quarter of the usual step, minimum step and upper bound as shares of the room | P01 0.856 → 0.969 |
+| 6 | index clause offered at our cost minimum when the supplier argues with that index | P02 0.686 → 0.733 |
+| 2 (do not hold while `open`) | where a margin charge is estimated: no early price match at the assumed floor, no alternative taken because the bound had shrunk to the supplier's own offer; main's `b3f06da` added one more ask under an open offer | part of P01's gain; P03 still closes in round 2 when the supplier repeats 432.15 |
+| 5 (arguments) | own-plant should-cost cited from 3 % under the quote, ranked last | P03 0.903 → 0.923 |
+| new | first ask at most 13 % under the quote for a `routine` goal | P07 0.663 → 0.740 |
+| new | brief reading: `C_open` when no opening keeps the must-haves (P10, P11), must-haves read on the supplier's standard terms in the send guard, null `parts` / `round_limit`; `tests/test_brief_variants.py` runs the planning step on 100 changed copies of the recorded cases | 241 tests pass, 8 expected failures on briefs outside the API description |
+| tried, dropped | complaints as further quality arguments (P11: `duplicate`); the contract's index clause against the supplier's index argument (P08, P18: not read as an argument); first ask at the cost minimum with the 0.4 % of C step (P02 0.421) | [`TRYED.md`](TRYED.md) |
+
+Not done, with what the records say:
+
+| Item | State |
+|---|---|
+| 3 (upper bound in leverage cases) | untouched; P08 0.550, P18 0.618, P05 0.742 |
+| 4 (give the lever the supplier names) | P11's lever is faster payment, which the case fixes at 60 days; three sheets at chargeback 0 with ppm 300 / 800 / 1500 were not played |
+| P05 lost offers after a buyer timeout | fixed on branch `fix/timeout-moves` (own call queue per session, the arena's timeout answers read into the thread, the counter counts what the arena counts); tested on a fake arena and sandbox D02, not on a three-supplier practice case; not merged |
+| LLM as reader and writer around `tactical` | in work on `feat/llm-writer`, sandbox only |
+| One push after an early final offer | not supported by the records: the only three such pushes in leverage and routine cases were `playbook`'s and all three suppliers walked away ([`final-offer-stats-2026-10-11.md`](final-offer-stats-2026-10-11.md) on `fix/timeout-moves`) |
+
+## 3b. Todo (as of 11 October, 01:40)
+
+In this order:
+
+1. **Decide which commit plays the final.** `gameplan-2026-10-11.md` names the tag `final-candidate-2026-10-11`
+   (`b3f06da`); main is now `9e64347` with the margin charge in C and other changed defaults.
+2. **Control run of main on practice, all 10 cases** (10 sessions; confirm first). The last full pass (0.746, P-27)
+   was on `6bb73d1`; since then main took `a6ec26c` (flags off by default, changes in `belief.py`, `guards.py`,
+   `data.py` not reviewed) and the reply clock counted from the reply's arrival (`ad5e54f`).
+3. **Timeouts on P05:** review and merge `fix/timeout-moves`, then one P05 practice session - compare
+   `outcome.timeouts` with the arena's trace and check that no e-mail follows a timeout answer without a
+   `move_withdrawn`.
+4. **`tactical-llm`:** sandbox comparison with `tactical` (D01, D02, three repetitions), check that the whole message
+   has a hard deadline of about 30 s and that the template goes out after it; a benchmark record. No practice run
+   before that.
+5. **Final checks:** `NEGOTIATOR_FINAL=1`, the 8-minute wave timing, `negotiator me`, no open sessions.
+
+If time is left: P11 with three sheets at chargeback 0 and ppm 300 / 800 / 1500; a case without an own-plant
+should-cost still has no margin charge in our C (sandbox D01).
 
 ## 4. How to test changes
 

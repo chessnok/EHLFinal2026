@@ -82,6 +82,30 @@ uv run negotiator run --set sandbox --strategy llm
 uv run negotiator play case:P05 --strategy llm --llm anthropic:claude-haiku-4-5
 ```
 
+### `tactical-llm`: tactical's numbers, a model for the words
+
+`--strategy tactical-llm` runs `tactical` unchanged and lets a model reword the text of its ordinary offer e-mails
+(`writer.py`): the reason, one question, the tone of the case goal. The sheets, the cited IDs, hold and accept stay
+tactical's; e-mails that accept or promise something are never rewritten. Code checks every text before it is sent
+(`writer.text_problems`, then the send guard): figures, dates and IDs only as tactical wrote them, the fact lines
+letter for letter, nothing about our limit or hurry, no threat, no promise, no claim without a source. A failed check,
+an error or a slow call sends tactical's template. `tactical-llm+reader` adds a model reading of each reply
+(`reader.py`) that may only add a requested lever the regular expressions missed.
+
+| Setting | Default | What |
+|---|---|---|
+| `LLM_MESSAGE_BUDGET_S` | 30 | wall clock for all model calls of one e-mail together (reader, writer, queueing); it also ends 45 s after the supplier's reply came in. Then the template goes out |
+| `WRITER_TIMEOUT_S` · `READER_TIMEOUT_S` | 20 · 8 | one call, never more than what is left of the budget |
+| `WRITER_TEMPERATURE` | 0.2 | where the provider takes one (`claude-code` and `openai` do not) |
+
+Telemetry: counters `writer.calls`, `writer.used`, `writer.fallback` and `writer.fallback.<validator|guard|error|
+timeout|deadline>`, `reader.calls`, `reader.fallback.*`, `reader.levers_added`; the timing `writer.message_seconds`;
+a `writer` event per e-mail (used or the reasons, the model's text, seconds) and a `reader` event per reply.
+
+```sh
+uv run negotiator run --set sandbox --strategy tactical-llm --llm claude-code:haiku
+```
+
 ## Langfuse (optional)
 
 Set `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` in the root `.env` (and `LANGFUSE_HOST` for a self-hosted or
@@ -117,6 +141,8 @@ guards.py      hard rules before every send and accept: must-haves, alternative,
 lessons.py     lessons.md: what each case taught
 session.py     Negotiation: threads, documents, costs (kit's C), send/accept/walk away, transcript
 llm.py         one client for OpenAI-compatible and Anthropic APIs, switched by `provider:model`; telemetry
+writer.py      a model words tactical's offer e-mails; the check on its text; the per-e-mail time budget
+reader.py      a model reads a reply into hints; code keeps only levers the e-mail and the sheets bear out
 sim/           the supplier simulator: pricing fit, supplier model, calibration from runs/, local arena, bench
 strategy/      Strategy protocol (prepare, decide, conclude, keepalive), baseline, llm_strategy
 runner.py      play_case (one worker per thread, keepalive, deadline), play_many, play_final
