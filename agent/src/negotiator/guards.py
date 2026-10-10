@@ -126,9 +126,7 @@ def clean_message(neg, supplier_id: str, message: dict) -> tuple[dict, list[str]
         for s in m.get("term_sheets") or []
     }
     rival_cited = any(r in rival_ids or r.startswith("quote:") for r in refs)
-    body, unsupported = unsupported_sentences(
-        message.get("body") or "", ID_RE, lambda i: known_id(neg, i), rival_cited
-    )
+    body, unsupported = unsupported_sentences(message.get("body") or "", ID_RE, lambda i: known_id(neg, i), rival_cited)
     removed += [f"unsupported sentence: {s}" for s in unsupported]
     body = ID_RE.sub(keep, body)
     body = re.sub(r"\s*\(\s*[,;\s]*\)", "", body)

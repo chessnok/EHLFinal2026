@@ -305,8 +305,10 @@ class BaselineStrategy:
         return best
 
     def _iso_cost_price(self, neg: Negotiation, sid: str, terms: dict, target_c: float) -> float:
-        """The price at which these terms cost us `target_c` (C rises with the price)."""
-        lo, hi = 0.0, terms["unit_price"] * 1.5
+        """The price at which these terms cost us `target_c`. C rises with the price - except where a margin
+        charge is estimated (stabilise, secure_supply): there C falls again below the price that costs us least,
+        and we never ask under that price."""
+        lo, hi = self._cheapest_price(neg, sid, terms), terms["unit_price"] * 1.5
         for _ in range(40):
             mid = (lo + hi) / 2
             if neg.cost(sid, {**terms, "unit_price": mid}) > target_c:
@@ -314,6 +316,20 @@ class BaselineStrategy:
             else:
                 lo = mid
         return round(lo, 2)
+
+    def _cheapest_price(self, neg: Negotiation, sid: str, terms: dict) -> float:
+        """The price that minimises C on these terms: 0 without a margin charge; with one, the price below
+        which the charge grows faster than the spend falls (C is convex in the price)."""
+        if not neg.supplier_estimates.get(sid):
+            return 0.0
+        lo, hi = 0.0, terms["unit_price"] * 1.5
+        for _ in range(60):
+            a, b = lo + (hi - lo) / 3, hi - (hi - lo) / 3
+            if neg.cost(sid, {**terms, "unit_price": a}) < neg.cost(sid, {**terms, "unit_price": b}):
+                hi = b
+            else:
+                lo = a
+        return (lo + hi) / 2
 
     def _pick_claims(self, neg: Negotiation, sid: str, plan: SupplierPlan, first: bool) -> list[Evidence]:
         pool = list(plan.evidence)

@@ -286,3 +286,19 @@ def test_ledger_turns_a_cited_driver_and_reads_a_hedge(world) -> None:
     drops = [f for f in facts if f.kind == "recent_drop"]
     assert drops and drops[0].sentence.startswith("You cite AS-14404") and " fell -" not in drops[0].sentence
     assert all(world.fact(r) for f in drops for r in f.refs)  # every figure checkable by ID
+
+
+def test_margin_charge_is_priced_without_payment_terms_in_the_quote_pdf(tmp_path) -> None:
+    # P02: the quote PDF named no payment terms, the charge stayed out of C and a deal at 345.39 scored 0
+    c = case(category_goal="stabilise", sustainable_margin_pct=3, relationship_eur_per_point=15000)
+    neg, sid = negotiation(tmp_path, None, c, {"unit_price": 17.47, "payment_days": 30}, std_text="")
+    strategy = TacticalStrategy()
+    strategy._estimate_supplier(neg, sid, 16.5, build_profile(None, sid, c))
+    assert neg.supplier_estimates[sid]["standard"]["payment_days"] == 30  # from its opening sheet
+    terms = {"unit_price": 17.47, "payment_days": 60}
+    assert neg.breakdown(sid, {**terms, "unit_price": 15.0})["relationship"] > 0
+    cheapest = strategy._cheapest_price(neg, sid, terms)
+    assert 15.0 < cheapest < 17.47
+    # an ask no price can reach: we stop at the price that costs us least, not under it
+    assert strategy._iso_cost_price(neg, sid, terms, 0.0) >= round(cheapest, 2) - 0.01
+    assert neg.cost(sid, {**terms, "unit_price": cheapest}) < neg.cost(sid, {**terms, "unit_price": 15.0})

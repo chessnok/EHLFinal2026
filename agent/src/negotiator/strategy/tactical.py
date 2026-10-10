@@ -74,6 +74,13 @@ STALL_EPS = 0.0005  # a C move below 0.05 % is no move
 DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
 ANCHOR_WITH_LEVERS = 0.25  # first ask 25 % under the quote where competition, material or capacity give a lever
 ANCHOR_DATA_EXTRA = 0.05  # how much deeper the data may take the first ask
+# The supplier's full cost as a share of its own plant's should-cost. The margin charges the arena recorded on
+# P01, P02 and P03 (14 deals, runs.md P-16) put it at 0.975-0.980; company.md gives the estimate an error of
+# about 5 %. Too high a cost only leaves price on the table, too low a cost scores 0 - so the upper end.
+SHOULD_COST_SHARE = 0.98
+# What money now is worth to a supplier short of cash, as a multiple of our rate: P01's charges at 14, 45 and
+# 60 days (runs.md P-16) fit 9.6 % a year against our 8 %.
+CASH_SHORT_RATE = 1.2
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
 ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
@@ -197,6 +204,8 @@ class TacticalStrategy(BaselineStrategy):
             profile = build_profile(self.data, sid, neg.case)
             policy = self._policy(goal, profile)
             full_cost = self._full_cost(parts, sid)
+            if full_cost and goal in RELATIONSHIP_GOALS:
+                full_cost = round(full_cost * SHOULD_COST_SHARE, 2)  # one cost for the charge and the floor
             self._estimate_supplier(neg, sid, full_cost, profile)
             floor = self._floor(neg, full_cost, policy)
             open_c = neg.cost(sid, terms)
@@ -294,20 +303,38 @@ class TacticalStrategy(BaselineStrategy):
         )
         return rows[0]["unit_cost"] if rows and rows[0]["unit_cost"] else None
 
+    def _standard_terms(self, neg: Negotiation, sid: str) -> dict:
+        """The supplier's standard terms for the relationship term: its quote PDF, then its master data, then its
+        opening sheet. The PDFs of P01, P02, P03 and P10 name neither payment nor Incoterm, which left the charge
+        out of C altogether (P02 closed at 345.39 with EUR 179k of it, score 0). What stays unknown is taken as
+        the value that charges most - too high a charge costs a little price, too low a charge scores 0."""
+        std = dict(neg.threads[sid].standard_terms)
+        master = (self.data.supplier(sid) if self.data else None) or {}
+        first = next((m for m in neg.threads[sid].supplier_messages if m.get("term_sheets")), None)
+        opening = first["term_sheets"][0]["terms"] if first else {}
+        fixed = neg.case.get("fixed_terms", {})
+        for name in ("payment_days", "incoterm"):
+            for source in (master, opening):
+                if std.get(name) is None and fixed.get(name) is None and source.get(name) is not None:
+                    std[name] = source[name]
+        freight = neg.buyer["freight_eur_per_unit"]
+        if std.get("incoterm") not in freight and fixed.get("incoterm") is None:
+            std["incoterm"] = max(freight, key=freight.get)
+        if std.get("payment_days") is None and fixed.get("payment_days") is None:
+            options = neg.case.get("term_options", {}).get("payment_days") or []
+            std["payment_days"] = min(options, default=neg.buyer["reference_payment_days"])
+        return std
+
     def _estimate_supplier(self, neg: Negotiation, sid: str, full_cost: float | None, p: SupplierProfile) -> None:
         """Our estimate of the supplier for the relationship term in C (stabilise, secure_supply)."""
         if neg.buyer.get("category_goal") not in RELATIONSHIP_GOALS or not full_cost:
             neg.supplier_estimates.pop(sid, None)
             return
-        std = neg.threads[sid].standard_terms
-        if not {"payment_days", "incoterm"} <= std.keys():
-            # no estimate without its standard terms: filling them in made the charge dominate every move (P01/P02
-            # stopped negotiating in a dry run) - the shallow strategic anchor guards against the squeeze instead
-            return
+        std = self._standard_terms(neg, sid)
         rate = neg.buyer.get("interest_rate", 0.08)
         neg.supplier_estimates[sid] = {
             "full_cost": full_cost,
-            "interest_rate": rate * 2 if p.has("cash_short") else rate,  # money now is dearer to it
+            "interest_rate": rate * CASH_SHORT_RATE if p.has("cash_short") else rate,  # money now is dearer to it
             "usual_rate": rate,
             "standard": std,
         }
@@ -384,6 +411,12 @@ class TacticalStrategy(BaselineStrategy):
         # our cost estimate can sit above its real one (P02: should-cost 380 over a 371 quote, C_best ~364)
         price = min(price, open_price)
         ideal = complete_offer(neg.case, self._optimise(neg, sid, {**terms, "unit_price": round(price, 2)}))
+        if neg.supplier_estimates.get(sid):
+            # with the margin charge in C, a price under the one that costs us least costs more charge than it
+            # saves - and the supplier may agree to it (P02 agreed to 345.39): the first ask stops there
+            for _ in range(2):
+                ideal["unit_price"] = max(ideal["unit_price"], round(self._cheapest_price(neg, sid, ideal), 2))
+                ideal = complete_offer(neg.case, self._optimise(neg, sid, ideal))
         return min(neg.cost(sid, ideal), neg.cost(sid, terms))
 
     def _bounds_c(self, neg, sid, terms, gt: GroundTruth, target_c: float, open_c: float) -> tuple[float, float]:
@@ -876,6 +909,11 @@ class TacticalStrategy(BaselineStrategy):
                 under_floor.append(terms)  # far below what it can sell at: an insult
                 continue
             valid.append(terms)
+        if neg.supplier_estimates.get(sid) and valid:
+            # under a margin charge a structure cannot cost less than at its cheapest price: one that misses
+            # `ask_c` even there is no equal offer, it is a dearer one (and its price is the highest of all)
+            reach = min(neg.cost(sid, t) for t in valid)
+            valid = [t for t in valid if neg.cost(sid, t) <= max(ask_c, reach) * (1 + STALL_EPS)]
         pool = valid or under_floor  # never go silent: an offer under its floor beats none
         if not pool:
             return []

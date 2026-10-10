@@ -411,7 +411,8 @@ class LLMStrategy(TacticalStrategy):
             if said := self._answered(neg, plan, sheet["terms"], theirs, f"Option {chr(65 + i)}").strip():
                 lines.append(said)
                 break
-        volume = self._volume_proof(neg, plan, sheets)  # "which volume can you commit to?" answered by the shared forecast
+        # "which volume can you commit to?" answered by the shared forecast
+        volume = self._volume_proof(neg, plan, sheets)
         if volume:
             lines.append(volume[0])
         lines += ["", "We can award on any of these options:" if len(sheets) > 1 else "Our proposal:"]
