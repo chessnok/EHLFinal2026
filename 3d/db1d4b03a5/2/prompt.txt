@@ -11,3 +11,7 @@ so are the middle layer is going to be right or not? how about to test it and sp
 ---
 
 can we set up LangFuse?
+
+---
+
+do commit, git pull
