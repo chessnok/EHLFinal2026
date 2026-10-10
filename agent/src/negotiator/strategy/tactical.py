@@ -216,12 +216,7 @@ FLAGS: dict[str, str] = {
     "60 % of the usual but never under 0.6 % of C",
     "answers": "plain answers: the volume we need, an opener that matches its move, a fixed field said once, a "
     "clause it must have kept, no 'pays early' that is not",
-    "band_steps": "outside strategic cases every counter-step is 1-3 % of C: under 1 % the supplier held its price "
-    "in 34 % of replies, over 3 % it agreed to ours in 34 % (docs/bot-mechanics.md section 3)",
-    "rival_rest": "after a big step answering a rival quote we cited, the smallest visible move: the supplier gives "
-    "the rest of its step after checking the quote, whatever we send (docs/bot-mechanics.md section 1)",
 }
-BAND_STEP = (0.01, 0.03)  # band_steps: a counter-step between these shares of our last C
 
 
 class TacticalStrategy(BaselineStrategy):
@@ -694,8 +689,6 @@ class TacticalStrategy(BaselineStrategy):
             step = max(step, min_step)
             if self.flags["persistent"]:
                 step = min(step, max(PERSIST_STEP * step, PERSIST_MIN * last))
-        if self.flags["band_steps"] and neg.buyer.get("category_goal") not in RELATIONSHIP_GOALS:
-            step = min(max(step, BAND_STEP[0] * last), BAND_STEP[1] * last)
         if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
             # only the price moves here, and the room is narrow: 0.4 % of C is 8 % of what there is to win on
             # P01 and 19 % on P02 - three such steps met the supplier in round 3 of 10 (P01 0.785, P02 0.421,
@@ -706,11 +699,12 @@ class TacticalStrategy(BaselineStrategy):
         return min(last + step, their_c, plan.upper_c)  # the upper bound is never asked for beyond
 
     def _rest_pending(self, neg: Negotiation, sid: str, plan: Plan) -> bool:
-        """rival_rest: it just answered a rival quote we cited with a big step. "I give half the step now and check
+        """It just answered a rival quote we cited with a big step. "I give half the step now and check
         the rest" - "Checked: give the rest of the step" (P05 back office, 47 of 50): the rest comes in its next
         reply whatever we send, so a step of ours now - or a re-anchor's halfway ask - only pays for it (P05: 28.79
-        agreed at once, against 27.85 where we held)."""
-        if not self.flags["rival_rest"] or not plan.our_c:
+        agreed at once; holding gave 0.742 -> 0.824, runs.md P-31). The same back-office rule ran for four
+        suppliers in two cases (P05, D02), so it is the arena's, not one supplier's (docs/bot-mechanics.md)."""
+        if not plan.our_c:
             return False
         path = self._their_c_path(neg, sid)
         return (
