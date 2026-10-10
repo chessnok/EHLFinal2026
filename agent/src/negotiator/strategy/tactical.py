@@ -28,6 +28,7 @@ Closing: the cheapest standing sheet that passes the guards (guards.py), else wa
 """
 
 import math
+import re
 from dataclasses import dataclass, field
 
 from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer
@@ -69,6 +70,26 @@ STALL_EPS = 0.0005  # a C move below 0.05 % is no move
 DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
 MAX_ANCHOR = 0.15  # the first ask never lies more than 15 % below the supplier's quote
 UNDER_FLOOR = 0.02  # the first ask sits this far under the supplier's estimated floor
+# what a supplier's e-mail says between the lines (the replay of case:D01/D02 showed both kinds)
+ROOM_SIGNALS = re.compile(
+    r"can move further|come back to you on price|free capacity|step from your side|bridge the (?:remaining )?gap"
+    r"|clarify this internally|happy to discuss|open to|we could consider|room to",
+    re.I,
+)
+FIRM_SIGNALS = re.compile(
+    r"cannot (?:reduce|lower|go) (?:the price )?(?:any )?further|all possible concessions"
+    r"|no further (?:room|concession)|our (?:absolute )?limit|not able to move|this is our last",
+    re.I,
+)
+REANCHOR = 0.10  # an ungrounded floor the supplier undercuts at once: ask again this far under its price
+BIG_STEP = 0.04  # a supplier move of 4 %+ in one round says it had room
+
+
+def reply_signals(body: str) -> dict:
+    """Room or firmness in the supplier's own words - a `final_offer` that asks for our step is no last word."""
+    return {"room": bool(ROOM_SIGNALS.search(body or "")), "firm": bool(FIRM_SIGNALS.search(body or ""))}
+
+
 EVIDENCE_FIRST = {  # profile trait / goal -> evidence kinds to put first
     "not_tracking_costs": ["index"],
     "open_book": ["should_cost"],
@@ -97,6 +118,7 @@ class Plan:
     stalls: int = 0
     probed_final: bool = False
     price_matched: bool = False
+    reanchored: bool = False
     asked_breakdown: bool = False
     breakdown_read: bool = False
 
@@ -278,13 +300,23 @@ class TacticalStrategy(BaselineStrategy):
             return Decision.hold(supplier_id, "the deadline is near")
 
         their_c = neg.cost(supplier_id, theirs)
-        if their_c <= plan.lower_c:
-            return Decision.hold(supplier_id, "at the supplier's estimated floor", their_c=their_c)
+        signals = reply_signals(t.latest.get("body", ""))
+        # the lower bound is where we anchor, not where we stop: below it we keep asking - the supplier
+        # ends it with a stall or a final offer, and only it knows its real floor
+        if their_c <= plan.lower_c or self._undercut_after_big_step(neg, supplier_id, plan, theirs):
+            if reanchor := self._reanchor(neg, supplier_id, plan, theirs, their_c):
+                return reanchor
         if match := self._price_match(neg, supplier_id, plan, theirs, their_c):
             return match
         if t.status == "final_offer":
-            if their_c <= plan.upper_c:
+            soft = signals["room"] and not signals["firm"]
+            if their_c <= plan.upper_c and not (soft and not plan.probed_final and self._may_push(neg, supplier_id)):
                 return Decision.hold(supplier_id, "final offer within our upper bound", their_c=their_c)
+            if soft and not plan.probed_final and self._may_push(neg, supplier_id):
+                plan.probed_final = True  # its words ask for our step: answer it, once - and visibly
+                last = plan.our_c[-1] if plan.our_c else plan.target_c
+                ask_c = min(last + 0.5 * max(0.0, their_c - last), plan.upper_c)
+                return self._offer(neg, supplier_id, plan, theirs, ask_c, their_c, probe=True)
             if plan.probed_final or not self._may_probe(neg, supplier_id, their_c):
                 return Decision.hold(supplier_id, "final offer above our upper bound", their_c=their_c)
             plan.probed_final = True
@@ -334,6 +366,13 @@ class TacticalStrategy(BaselineStrategy):
                 continue
             plan.breakdown_read = True
             plan.full_cost = full
+            if plan.gt and neg.buyer.get("category_goal") not in RELATIONSHIP_GOALS:
+                floor = round(full * (1 + plan.policy.markup), 2)
+                if plan.gt.lower is None or floor < plan.gt.lower:  # it told us it has more room: use it
+                    plan.gt.lower, plan.gt.grounded = floor, True
+                    _, theirs = neg.threads[sid].standing
+                    plan.lower_c = neg.cost(sid, self._ideal(neg, sid, theirs, floor))
+                    plan.target_c = min(plan.target_c, plan.lower_c)
             # where its margin costs us C, the relationship term now prices it exactly; elsewhere the
             # breakdown is its own account of cost - information, not a floor that forces our hand
             self._estimate_supplier(neg, sid, full, plan.profile)
@@ -392,9 +431,41 @@ class TacticalStrategy(BaselineStrategy):
                 return True  # a rival offer we could take instead
         if math.isfinite(neg.c_alt) and neg.c_alt <= their_c * 1.01:
             return True
-        return their_c > self.tplans[sid].upper_c * 1.02  # clearly above what the data supports: one push
+        # above our upper bound alone is no reason to risk the deal: the practice calibration showed the
+        # upper bound below the real C_best in P01 and P04 - push only on a rival, a cheap alternative or room
+        return reply_signals(t.latest.get("body", ""))["room"]
 
     # ------------------------------------------------------------------ the offer
+    def _undercut_after_big_step(self, neg: Negotiation, sid: str, plan: Plan, theirs: dict) -> bool:
+        """It came down to (or under) our own ask in one big step: the back office of case:D02 read
+        "I give half the step now and check the rest" - there is more to get."""
+        prices = neg.threads[sid].price_path()
+        ours = neg.threads[sid].our_price_path()
+        if len(prices) < 2 or not ours or theirs.get("unit_price") is None:
+            return False
+        step = (prices[-2] - prices[-1]) / prices[-2]
+        return theirs["unit_price"] <= ours[-1] * 1.005 and step >= BIG_STEP
+
+    def _may_push(self, neg: Negotiation, sid: str) -> bool:
+        t = neg.threads[sid]
+        return neg.case.get("round_limit", 10) - t.rounds_used >= 2 and neg.seconds_to_deadline() > 150
+
+    def _reanchor(self, neg, sid, plan: Plan, theirs: dict, their_c: float) -> Decision | None:
+        """It came under a floor we only guessed: our guess was timid. Ask again under its new price, once."""
+        if plan.reanchored or not self._may_push(neg, sid):
+            return None
+        plan.reanchored = True
+        price = theirs["unit_price"] * (1 - REANCHOR)
+        new_target = neg.cost(sid, self._ideal(neg, sid, theirs, price))
+        plan.target_c = min(plan.target_c, new_target)
+        plan.lower_c = new_target
+        if plan.gt:
+            plan.gt.lower = round(price, 2)
+        neg.recorder.event("reanchor", session_id=neg.session_id, supplier_id=sid, price=round(price, 2))
+        log.info("%s: undercut our guessed floor - re-anchoring at %.2f", sid, price)
+        ask_c = new_target + 0.5 * (their_c - new_target)  # meet halfway to the new anchor: credible, not greedy
+        return self._offer(neg, sid, plan, theirs, ask_c, their_c)
+
     def _price_match(self, neg, sid, plan: Plan, theirs: dict, their_c: float) -> Decision | None:
         """Its price is within our upper bound but its other terms cost us: take the price, fix the terms.
 

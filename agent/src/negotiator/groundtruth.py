@@ -19,7 +19,8 @@ from negotiator.data import WorldData
 # full cost relative to a German cost base (company.md, should-cost rule of thumb)
 COUNTRY_FACTOR = {"DE": 1.0, "AT": 1.05, "CH": 1.05, "CZ": 0.82, "PL": 0.82, "HU": 0.82, "TR": 0.75, "CN": 0.7}
 BELOW_COST_FLOOR = 0.95  # a supplier that sold below full cost may do so again, not by much
-NO_COST_FLOOR = 0.90  # without a should-cost: at most 10 % under the lower of its quote and our price
+NO_COST_FLOOR = 0.90  # without a should-cost: 10 % under its quote
+NO_COST_FLOOR_RELATIONSHIP = 0.95  # ... 5 % where squeezing a strategic supplier costs us
 DEFAULT_GIVE_PCT = 2.5  # renewals settled 2.5 points under the ask on average (negotiation_history)
 
 
@@ -45,6 +46,7 @@ class GroundTruth:
     justified_pct: float | None = None  # what the cost drivers support over the last 12 months
     give_pct: float = DEFAULT_GIVE_PCT
     drivers: list[Driver] = field(default_factory=list)
+    grounded: bool = False  # the floor rests on a cost estimate (should-cost, breakdown), not a guess
     notes: list[str] = field(default_factory=list)
 
     @property
@@ -67,6 +69,7 @@ class GroundTruth:
             "justified_pct": self.justified_pct,
             "give_pct": self.give_pct,
             "market_supports_ask": self.market_supports_ask,
+            "grounded": self.grounded,
             "notes": self.notes,
         }
 
@@ -159,14 +162,17 @@ def estimate(data: WorldData | None, case: dict, supplier_id: str, open_price: f
         gt.asked_pct = round((open_price / current - 1) * 100, 2)
 
     # lower bound: the supplier's floor
-    base = min(open_price, current) if current else open_price
     if gt.full_cost:
         floor = gt.full_cost * (
             BELOW_COST_FLOOR if "below_cost" in traits or (current and current < gt.full_cost) else 1.0
         )
         gt.notes.append(f"full cost {gt.full_cost} ({gt.full_cost_source})")
+        gt.grounded = True
     else:
-        floor = base * NO_COST_FLOOR
+        # no cost estimate: a guess around its quote, gentler where the relationship counts - a deep
+        # anchor on a guess reads as an insult (case:D01: 17 % under the quote, the owner withdrew)
+        relationship = case.get("buyer", {}).get("category_goal") in ("stabilise", "secure_supply")
+        floor = open_price * (NO_COST_FLOOR_RELATIONSHIP if relationship else NO_COST_FLOOR)
         gt.notes.append("no should-cost: floor from prices")
     gt.lower = round(min(floor, open_price), 2)
 

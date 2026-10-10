@@ -211,3 +211,13 @@ def test_accept_guard_refuses_worse_than_opening_when_walking_is_safe(tmp_path, 
         }
     )
     assert any("opening" in p for p in accept_problems(neg, sid, "offer:x-1"))
+
+
+def test_reply_signals_tell_room_from_a_last_word() -> None:
+    from negotiator.strategy.tactical import reply_signals
+
+    soft = "We now look forward to a more significant step from your side to bridge the remaining gap."
+    firm = "We have made all possible concessions to reach this point and cannot reduce the price further."
+    assert reply_signals(soft) == {"room": True, "firm": False}
+    assert reply_signals(firm)["firm"] and not reply_signals(firm)["room"]
+    assert reply_signals("We have free capacity for your parts.")["room"]
