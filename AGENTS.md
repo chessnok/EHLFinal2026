@@ -99,6 +99,14 @@ when they inform a decision. One row per run, with these columns:
 
 Add the row in the same change that discusses the result.
 
+## Ideas tried
+
+[`agent/docs/TRYED.md`](agent/docs/TRYED.md) lists every idea we have tried: what it was, where it was measured, and
+the result - worked (and why), failed (and why), or unknown. Read it before proposing a change, so nobody tests the
+same idea twice. Add or update a row in the same change that tries an idea: when the code for it lands (result
+"unknown") and again when a run has settled it. Ideas that came from reading replays and were never played go in as
+"unknown" too.
+
 ## Case triage: where to spend work and attempts
 
 Before working on a strategy or asking for practice sessions, fill this table from the arena's live page
@@ -159,6 +167,7 @@ Read the file for the area you touch before changing it:
 - [`agent/docs/benchmarks/`](agent/docs/benchmarks/) — one record per benchmark run (see Benchmarks above)
 - [`agent/docs/knowledge/competitions-info.md`](agent/docs/knowledge/competitions-info.md) — scoring, practice and
   final rules from the arena's FAQ that the brief does not state; read it before changing how we score, close or run
+- [`agent/docs/TRYED.md`](agent/docs/TRYED.md) — every idea tried and what came of it (see Ideas tried above)
 - [`agent/docs/backlog.md`](agent/docs/backlog.md) — where the current strategy loses score, and the 7/3 holdout
 
 Files hold measured data only: a number in a doc, a benchmark record or a comment is something a run on the arena
