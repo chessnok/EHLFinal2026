@@ -99,6 +99,57 @@ when they inform a decision. One row per run, with these columns:
 
 Add the row in the same change that discusses the result.
 
+## Case triage: where to spend work and attempts
+
+Before working on a strategy or asking for practice sessions, fill this table from the arena's live page
+(`https://arena.tacto.ai/live`) and `negotiator me`. Five numbers per case: **ours** (our best score), **house**
+(Tacto's house agent), **best** (the best team), **tried** (teams that played it), **beaten** (teams above the house).
+
+Put each case in the first category that fits, and sort inside a category by the gap `best − ours`:
+
+1. **Below the house.** A fault in our agent. First priority.
+2. **Above the house, far from the best, and many of the teams that tried beat the house.** There is a known lever
+   we do not use. Second priority.
+3. **Close to the best, or a high house score that few teams beat.** A ceiling. Spend no attempts.
+
+As of 10 October 2026: house, best, tried and beaten from the live page at about 21:05; ours from `negotiator me` at
+22:30. Refresh both before using it.
+
+| Category | Case | Lever, goal | Ours | House | Best | Tried | Beaten | Gap to best |
+|---|---|---|---|---|---|---|---|---|
+| 1 | P08 | raw material, leverage | 0.626 | 0.75 | 0.91 | 22 | 1 | 0.284 |
+| 1 | P02 | price increase, stabilise | 0.686 | 0.74 | 0.85 | 21 | 1 | 0.164 |
+| 1 | P07 | bundling, routine | 0.721 | 0.78 | 0.81 | 21 | 1 | 0.089 |
+| 1 | P01 | price increase, stabilise | 0.917 | 0.97 | 0.99 | 22 | 2 | 0.073 |
+| 1 | P10 | capacity, secure_supply | 0.647 | 0.69 | 0.70 | 22 | 3 | 0.053 |
+| 1 | P03 | renewal, stabilise | 0.905 | 0.92 | 0.94 | 21 | 1 | 0.035 |
+| 2 | P11 | quality, quality_first | 0.692 | 0.31 | 0.81 | 20 | 17 | 0.118 |
+| 2 | P05 | RFQ, leverage | 0.839 | 0.56 | 0.92 | 21 | 12 | 0.081 |
+| 2 | P18 | raw material, leverage | 0.618 | 0.39 | 0.68 | 20 | 17 | 0.062 |
+| 3 | P04 | renewal, routine | 0.860 | 0.86 | 0.87 | 21 | 14 | 0.010 |
+
+We are below the house on six cases. Four of them are `stabilise` or `secure_supply` cases (see the next section).
+P01, P10 and P03 are in category 1 by the rule and within 0.08 of the best team.
+
+## Firmness follows the case goal
+
+How hard the agent pushes on price depends on the case's `category_goal`, not on the supplier's opening:
+
+- **`leverage`** (raw material, RFQ): push. Only price and terms count in C.
+- **`stabilise` and `secure_supply`:** do not push the price below what the supplier can live on. C carries a
+  relationship charge for every margin point the deal leaves the supplier below its sustainable margin
+  (`RELATIONSHIP_GOALS` in `arena_kit/cost.py`), so a lower price can cost more than it saves.
+
+Measured on P02 (`stabilise`), [`agent/docs/runs.md`](agent/docs/runs.md) P-13 and P-15:
+
+| Deal price | Relationship charge | Score |
+|---|---|---|
+| EUR 358.45 | 56,127 | 0.686 |
+| EUR 345.39 | 179,204 | 0.000 (C above C_open) |
+
+Our own cost estimate had the charge at 0 in both deals. Until that estimate is fixed, a strategy change that lowers
+prices must be checked on the `stabilise` and `secure_supply` cases before it is used anywhere.
+
 ## Rules
 
 Read the file for the area you touch before changing it:
