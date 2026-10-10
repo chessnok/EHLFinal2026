@@ -1,0 +1,67 @@
+<pasted_content id="18f3">
+Hey everyone 👋 Adrian from Tacto here.
+
+**Tacto Negotiation Arena:** you build an AI buyer that negotiates by e-mail with our suppliers. They're agents too, and they don't give anything away for free. Sunday at 12:00 your agent goes up against suppliers it has never met. Whoever gets the best deals wins.
+
+**Start here:** https://arena.tacto.ai
+Brief, starter kit and data: https://github.com/tacto-ai/negotiation-arena-kit
+
+**Get your key**
+1. Apply on https://arena.tacto.ai/apply
+2. Come to the Tacto table and show us your match code
+3. Copy the key. It's shown once
+
+No key yet? Run the Hello World from the README locally. Three commands.
+
+**How you win**
+Sunday's Live Final: five waves, eight minutes each, every team at once. We score total cost, not price. The top 10 pitch at 13:00, 5 min + 2 min questions.
+
+You don't need big credits. Our own reference agent runs on a small, cheap model. Reading the data beats a bigger model.
+
+**Find us**
+Deep dive today 12:00–13:00, ground floor. After that we're at the Tacto table, and here on Discord until 23:00.
+One thread per question, please. And never post your key.
+
+Have fun, and go get some good deals.
+</pasted_content id="18f3">
+
+ 
+
+<pasted_content id="18f3">
+Tacto
+Negotiation Arena
+Apply
+Live
+Results
+FAQ
+Discord
+Onboarded
+You're in.
+Your key works now. Next: the starter kit's quickstart, first agent on the board in 15 minutes.
+
+# starter-kit/.env
+ARENA_URL=https://arena.tacto.ai
+ARENA_API_KEY=<your key>
+
+uv run arena me
+uv run arena play case:P01 -v
+Tacto · EHL Grand Finale 2026
+</pasted_content id="18f3">
+
+ - do init. i created .env
+
+---
+
+<pasted_content id="18f3">
+)
+    ~/Des/Pr/EHLFinal2026    entire/checkpoints/v1 ?3  source ~/.zshrc       2 ✘
+    ~/Des/Pr/EHLFinal2026    entire/checkpoints/v1 ?3                          ✔
+    ~/Des/Pr/EHLFinal2026    entire/checkpoints/v1 ?3                          ✔
+    ~/Des/Pr/EHLFinal2026    entire/checkpoints/v1 ?3                          ✔
+uv run arena me
+uv run arena play case:P01 -v
+error: Failed to spawn: `arena`
+  Caused by: No such file or directory (os error 2)
+error: Failed to spawn: `arena`
+  Caused by: No such file or directory (os error 2)
+</pasted_content id="18f3">

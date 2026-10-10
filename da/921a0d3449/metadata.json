@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "da921a0d3449",
+  "strategy": "manual-commit",
+  "branch": "feat/llm-probe",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/src/negotiator/llm.py",
+    "agent/src/negotiator/strategy/llm.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/da/921a0d3449/0/metadata.json",
+      "transcript": "/da/921a0d3449/0/full.jsonl",
+      "compact_transcript": "/da/921a0d3449/0/transcript.jsonl",
+      "content_hash": "/da/921a0d3449/0/content_hash.txt",
+      "prompt": "/da/921a0d3449/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 98,
+    "cache_creation_tokens": 224570,
+    "cache_read_tokens": 4303051,
+    "output_tokens": 36228,
+    "api_call_count": 42
+  }
+}
