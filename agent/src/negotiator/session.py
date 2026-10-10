@@ -367,16 +367,42 @@ class Negotiation:
             return
         thread = self.client.thread(self.session_id, supplier_id)
         t = self.threads[supplier_id]
+        known = {m.get("message_id"): m for m in t.messages if m.get("message_id")}
+        messages = []
+        for m in thread.get("messages", []):
+            if m.get("from") == "buyer":
+                messages.append(m)
+            elif m.get("message_id") in known:  # keep the documents we already downloaded and read
+                messages.append(known[m["message_id"]])
+            else:
+                messages.append(self._with_documents(m, supplier_id))
+        timeouts = thread.get("timeouts") or []
+        # The supplier's answer to a late move sits in `timeouts`; its offer is the thread's standing offer
+        # even when the last message carries no term sheet - without this the best offer would vanish.
+        if timeouts and thread.get("offer_id") and messages and not messages[-1].get("term_sheets"):
+            last = timeouts[-1]
+            messages[-1] = {
+                **messages[-1],
+                "status": last.get("status", messages[-1].get("status")),
+                "term_sheets": [{"term_sheet_id": thread["offer_id"], "terms": last.get("terms", {})}],
+                "missing_fields": last.get("missing_fields", []),
+            }
         with t.lock:
-            t.messages = [
-                self._with_documents(m, supplier_id) if m.get("from") != "buyer" else m
-                for m in thread.get("messages", [])
-            ]
-            t.timeouts = len(thread.get("timeouts") or [])
+            t.messages = messages
+            t.timeouts = len(timeouts)
             t.closed = thread.get("closed")
             t.last_reply_at = time.monotonic()
         if t.timeouts:
             self.recorder.metrics.incr("moves.timeouts")
+        self.recorder.event(
+            "thread_refreshed",
+            session_id=self.session_id,
+            supplier_id=supplier_id,
+            offer_id=t.standing[0],
+            status=t.status,
+            timeouts=t.timeouts,
+            closed=t.closed,
+        )
 
     def accept(self, supplier_id: str, term_sheet_id: str, rationale: dict | None = None) -> dict:
         if problems := accept_problems(self, supplier_id, term_sheet_id):
@@ -409,6 +435,15 @@ class Negotiation:
             except ArenaError as e:
                 if e.status != 409:
                     raise
+                self.recorder.metrics.incr("moves.close_conflict")
+                self.recorder.event(
+                    "close_conflict",
+                    session_id=self.session_id,
+                    supplier_id=supplier_id,
+                    action=message.get("action"),
+                    detail=e.detail,
+                )
+                log.error("%s: closing move refused: %s", supplier_id, e.detail)
                 state = self.client.session(self.session_id)
                 self.result = state.get("result") or {"deal": False, "end_reason": state.get("end_reason")}
             self.ended.set()
@@ -483,6 +518,15 @@ class Negotiation:
         url = state.get("replay_url") or (self.client.replay_url(self.session_id) if self.session_id else None)
         return _absolute(self.client.settings.arena_url, url)
 
+    def _model_decisions(self) -> list[dict]:
+        """Moves a decision model chose (strategy `decided`): level, probabilities, confidence, extra signals."""
+        out = []
+        for d in self.decisions:
+            meta = (d.get("rationale") or {}).get("decided") if isinstance(d.get("rationale"), dict) else None
+            if d.get("action") == "message" and meta:
+                out.append({"supplier_id": d["supplier_id"], "round": d.get("round"), **meta})
+        return out
+
     def outcome(self, result: dict, state: dict, duration: float) -> dict:
         threads = {}
         for sid, t in self.threads.items():
@@ -523,6 +567,13 @@ class Negotiation:
             else None,
             "cost_breakdown": result.get("cost_breakdown"),
             "rounds": sum(t.rounds_used for t in self.threads.values()),
+            "model_decisions": [
+                {"supplier_id": d["supplier_id"], "round": d.get("round"), **d["rationale"]["decided"]}
+                for d in self.decisions
+                if d.get("action") == "message"
+                and isinstance(d.get("rationale"), dict)
+                and d["rationale"].get("decided")
+            ],
             "threads": threads,
             "claims": claims,
             "seconds": round(duration, 1),

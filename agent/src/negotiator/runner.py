@@ -17,7 +17,9 @@ from negotiator.session import GuardRefused, Negotiation
 from negotiator.strategy.base import Decision, Strategy
 from negotiator.telemetry import Recorder, log
 
-KEEPALIVE_AFTER_S = 42.0  # a held thread's clock: answer well before 60 s
+# A held thread's clock: answer well before 60 s. We see a reply only when our HTTP call returns, and the arena
+# serves one session's calls one after another - a reply can reach us long after the supplier's clock started.
+KEEPALIVE_AFTER_S = 20.0
 CLOSE_BEFORE_DEADLINE_S = 90.0
 POLL_S = 0.5
 
