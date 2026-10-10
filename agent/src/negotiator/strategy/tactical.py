@@ -298,6 +298,10 @@ class TacticalStrategy(BaselineStrategy):
         if self.data:
             out += self.data.evidence_orders((neg.case.get("parts") or []), sid, open_price)
             out += data_facts(self.data, (neg.case.get("parts") or []))
+            if neg.buyer.get("category_goal") == "quality_first":
+                # P11 gave 0.50 for every argument it had not seen and a final offer in the first round without
+                # one (round 4, P-22): its complaints are arguments of their own
+                out += self.data.evidence_complaints(sid, neg.case.get("parts") or [])
         return sorted(out, key=lambda e: -e.strength)
 
     def _full_cost(self, parts: list[str], supplier_id: str) -> float | None:

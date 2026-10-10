@@ -21,7 +21,7 @@ MAX_ROWS = 500
 class Evidence:
     """One checkable argument: a sentence with its figure next to the IDs it rests on."""
 
-    kind: str  # index | scorecard | quality | rival_offer | quote | should_cost | notice | forecast
+    kind: str  # index | scorecard | quality | complaint | rival_offer | quote | should_cost | notice | forecast
     refs: list[str]
     sentence: str
     strength: float = 0.0  # how much it should help us, for ranking
@@ -201,6 +201,32 @@ class WorldData:
                     f"({sc['id']}).",
                     strength=sc["ppm"] / 1000,
                     meta={"ppm": sc["ppm"]},
+                )
+            )
+        return out
+
+    def evidence_complaints(self, supplier_id: str, part_ids: list[str], limit: int = 4) -> list[Evidence]:
+        """The supplier's latest complaints on the case's parts, one argument each: every one is a fact of its
+        own with its own ID, so a quality case does not run out of arguments after three rounds."""
+        if not part_ids:
+            return []
+        rows = self.query(
+            "SELECT id, qn_date, supplier_caused FROM quality_notifications WHERE supplier_id = ? "
+            f"AND part_id IN ({','.join('?' for _ in part_ids)}) ORDER BY qn_date DESC",
+            (supplier_id, *part_ids),
+        )
+        out: list[Evidence] = []
+        for row in rows:
+            ppm = (self.fact(row["id"]) or {}).get("ppm")
+            if not ppm or len(out) >= limit or str(row["supplier_caused"]).lower() in ("0", "false", "no", ""):
+                continue
+            out.append(
+                Evidence(
+                    kind="complaint",
+                    refs=[row["id"]],
+                    sentence=f"Your delivery complained about on {row['qn_date']} ran at {ppm:.0f} ppm ({row['id']}).",
+                    strength=0.15 - 0.01 * len(out),  # after the scorecard, the indices and the forecast
+                    meta={"ppm": ppm},
                 )
             )
         return out
