@@ -26,7 +26,7 @@ uv run negotiator me
 | `negotiator attachment <sid> <attachment_id> -o FILE` | a supplier document |
 | `negotiator board` | leaderboard (for people; refused in final mode) |
 | `negotiator data` | download package v1 and the Sunday release into `agent/data/` |
-| `negotiator play <case_id> [--strategy tactical\|baseline]` | play one case, with telemetry and a report |
+| `negotiator play <case_id> [--strategy tactical\|baseline\|playbook]` | play one case, with telemetry and a report |
 | `negotiator run --set sandbox\|practice [--cases …] [--parallel N]` | many cases in parallel (default: every hosted case of the set) |
 | `negotiator final [--parallel 10]` | the Live Final: waits for each wave, plays its cases within the cap |
 | `negotiator report [run_id\|latest]` · `stats` | rebuild a run's report · best/mean score per case across all runs |
@@ -145,6 +145,11 @@ should-cost, alternative quote, a cheaper rival in an RFQ); a concession schedul
 (C-optimal terms, a pure price move on the supplier's terms, a shorter-payment variant at equal C); it holds a
 thread on agreed / final offer / stall / close enough / last round and accepts the cheapest standing sheet that
 beats the alternative.
+
+**Playbook** (`strategy/playbook.py`): the baseline plus the rules of
+[`docs/knowledge/get-best-price-guide.md`](docs/knowledge/get-best-price-guide.md) that held up on the sandbox - a deeper
+anchor, a cash sheet that pays sooner than the supplier's own term, one open question in the first e-mail, and one
+closing offer after a final offer (`playbook-noprobe` leaves the closing offer out: a pushed supplier may walk away).
 
 **Experiments** (`strategy/experiments.py`): the baseline with exactly one tactic changed each - `lowball` (a deeper
 anchor), `questions` (three questions per e-mail), `polite` / `shelby` (tone), `budget` (a ceiling "set by

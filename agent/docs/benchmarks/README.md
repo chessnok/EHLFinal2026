@@ -7,7 +7,9 @@ repository's `AGENTS.md`. This page is the overview; the records hold the runs, 
 
 | Strategy | D01 | D02 | Mean | vs. baseline | Record |
 |---|---|---|---|---|---|
-| lowball | 0.863 | 0.650 | **0.756** | +0.020 | [record](2026-10-10-lowball-none.md) |
+| playbook | 0.943 | 0.660 | **0.801** | +0.065 | [record](2026-10-10-playbook-none.md) |
+| lowball | 0.863 | 0.650 | 0.756 | +0.020 | [record](2026-10-10-lowball-none.md) |
+| playbook-noprobe | 0.869 | 0.639 | 0.754 | +0.018 | [record](2026-10-10-playbook-none.md) |
 | questions | 0.828 | 0.650 | 0.739 | +0.003 | [record](2026-10-10-questions-none.md) |
 | tactical | 0.823 | 0.650 | 0.736 | 0.000 | [record](2026-10-10-tactical-none.md) |
 | baseline (control) | 0.843 | 0.629 | 0.736 | – | [record](2026-10-10-baseline-none.md) |
@@ -18,6 +20,8 @@ repository's `AGENTS.md`. This page is the overview; the records hold the runs, 
 
 Scores are means over one to four plays of each case. Cost of all runs: 0 practice sessions, 0 LLM tokens.
 
+- **One tactic clearly helps:** a closing offer after the supplier's final offer (`playbook`). Its risk, a supplier
+  walking away, did not show on the sandbox and is not measured; see the record.
 - **Two tactics clearly hurt:** naming a budget ceiling (the supplier aims at it) and the hard tone (the family
   foundry closes a round earlier, at a dearer price).
 - **One helps a little:** the deeper anchor. Neither bot punished it.

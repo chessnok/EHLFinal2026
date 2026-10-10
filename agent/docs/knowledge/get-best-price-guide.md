@@ -8,12 +8,15 @@ itself: the cost floor, the approval ladder, the ID check and "nothing without a
 them the supplier "decides as that person would" and "reacts to tone and relationship as people do". So human
 negotiation advice should carry over to everything except those four rules.
 
+**Tested since:** section 7 lists what the sandbox confirmed and what it contradicted. Read it before acting on
+the rules below; several did not survive.
+
 **Caveat on sources:** the books and papers below are cited from memory, not looked up for this document. Titles,
 authors and the main findings are well known; check a page or a figure before quoting one in the pitch.
 
 ## 1. The short version
 
-Ten rules, ordered by how much we expect them to move the score.
+Ten rules from the literature. Section 7 says which of them the sandbox confirmed.
 
 1. **Negotiate the package, not the price.** The score is total cost `C`, and the supplier values terms differently
    from us. Give what is cheap for us and dear to them; take the reverse.
@@ -186,16 +189,37 @@ Ways to improve beyond tuning price tactics.
 
 ## 6. What to test
 
-Hypotheses for benchmark runs, most promising first. Each needs at least three repetitions per case, recorded under
-`agent/docs/benchmarks/`.
+Hypotheses for benchmark runs, each recorded under `agent/docs/benchmarks/`. Section 7 has the results of those
+the sandbox could test.
 
-| # | Change | Expected effect | Basis |
-|---|---|---|---|
-| 1 | Answer the volume question: commit the forecast volume where it is a field, cite the forecast where it is not | A price step in most cases | Row 1; logrolling |
-| 2 | Anchor from the floor estimate instead of a fixed percentage | Higher scores on `leverage` and RFQ cases | D02 floor; Galinsky, Mussweiler |
-| 3 | Offer a two-way index clause when the supplier cites its own index | Lifts P08 and P18, our lowest scores | Row 2; contingent contracts |
-| 4 | Lead with payment days for suppliers flagged cash-short | Price moves where price arguments fail | Rows 5 and 12 |
-| 5 | Cap arguments at two per e-mail, chosen by supplier trait | Fewer "does not change our calculation" replies | Row 6; Rackham |
-| 6 | Shrinking, labelled concessions with a precise last step | A better final offer from the supplier | Ackerman; Kwon, Weingart |
-| 7 | One line of appreciation and a label of their problem in each e-mail | More movement per round | Brief; Vaccaro et al. |
-| 8 | A calibrated question added to every message that also contains a move | Suppliers name their lever sooner | Voss; row 8 |
+| # | Change | Basis |
+|---|---|---|
+| 1 | Answer the volume question: commit the forecast volume where it is a field, cite the forecast where it is not | Row 1; logrolling |
+| 2 | Anchor from the floor estimate instead of a fixed percentage | D02 floor; Galinsky, Mussweiler |
+| 3 | Offer a two-way index clause when the supplier cites its own index | Row 2; contingent contracts |
+| 4 | Lead with payment days for suppliers flagged cash-short | Rows 5 and 12 |
+| 5 | Cap arguments at two per e-mail, chosen by supplier trait | Row 6; Rackham |
+| 6 | Shrinking, labelled concessions with a precise last step | Ackerman; Kwon, Weingart |
+| 7 | One line of appreciation and a label of their problem in each e-mail | Brief; Vaccaro et al. |
+| 8 | A calibrated question added to every message that also contains a move | Voss; row 8 |
+
+## 7. What the sandbox said
+
+Tested on 10 October 2026 as the `playbook` strategy, on D01 and D02 only, without an LLM. Runs, parameters and
+figures: [`../benchmarks/2026-10-10-playbook-none.md`](../benchmarks/2026-10-10-playbook-none.md). Two demo cases and
+three suppliers; one run per variant, and a change below about 0.05 on one case is noise.
+
+| Rule | Result |
+|---|---|
+| 9, 4.6: do not take the final offer as final; make one closing offer | **Confirmed, the largest effect.** Accepting the supplier's terms and offering to sign today one step lower moved the leading supplier five times out of five (D01 0.869 → 0.943). No supplier walked away; that risk is not measured. |
+| 2, 4.1: a deeper anchor | Confirmed as harmless and slightly positive (the earlier `lowball` runs). An opening 10 % deeper again changed nothing: the foundry ended at the same final offer. |
+| 5: a menu of equal-cost sheets | Confirmed. One sheet instead of the menu lowered D01 from 0.803 to 0.777. |
+| 4.3: lead with payment days for a supplier that wants cash | Not confirmed. The job shop took 14 days and kept the price it gave for 30. |
+| 1, 4.3: pick the terms that are cheapest at the supplier's price | Contradicted on D01. The foundry prices each term at about what it is worth to us, so a later effective date bought nothing. |
+| 8, 4.5: an open question next to every move | Contradicted on D01 (0.863 → 0.803): the foundry explains its costs instead of moving. One question in the first e-mail did no harm. |
+| 6, hypothesis 1: answer the volume question | Contradicted as written. Stating the need without a data ID is an unbacked claim: "please provide the corresponding data", for three rounds. An ID without a figure is not counted either. It needs the forecast ID with its figure; the sandbox cases have none in the data package, so this is untested where it can work. |
+| 4.2: shrinking concessions | No effect seen. The suppliers call a final offer in reply 3 or 4 whatever our steps are. |
+| 3: index clause, hypotheses 3 to 5 | Not testable on the sandbox: no index clause, no supplier dossier, no data arguments. |
+
+The pattern behind these results: the suppliers concede on their own schedule and stop after three or four replies.
+What we send changes the outcome in two places only - a verified rival quote early, and a closing offer at the end.

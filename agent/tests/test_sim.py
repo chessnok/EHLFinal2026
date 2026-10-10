@@ -48,13 +48,15 @@ def test_every_experiment_closes_a_sim_case(sim: Settings, world: WorldData, nam
 
 
 @pytest.mark.parametrize("name", list(VARIANTS))
-def test_every_playbook_variant_closes_a_sim_case(sim: Settings, world: WorldData, name: str) -> None:
+def test_every_playbook_variant_plays_a_sim_case(sim: Settings, world: WorldData, name: str) -> None:
     recorder = Recorder(sim.runs_dir, f"pytest-{name}")
     client = ArenaClient(sim, recorder)
     case_id = client.cases("practice")[0]["case_id"]
     outcomes = play_many(client, recorder, [case_id], lambda: STRATEGIES[name](world, None), world, parallel=1)
     recorder.close()
-    assert outcomes[0]["deal"] and outcomes[0]["strategy"] == name
+    assert outcomes[0]["strategy"] == name
+    # the scripted supplier walks away from any offer below its final one: the closing offer costs the deal there
+    assert outcomes[0]["deal"] == (VARIANTS[name].probe == "off")
 
 
 def test_invalid_message_is_a_422(sim: Settings) -> None:

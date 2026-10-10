@@ -1,29 +1,24 @@
-"""Playbook: the baseline with the rules of docs/knowledge/get-best-price-guide.md that the replays back.
+"""Playbook: the baseline plus the rules of docs/knowledge/get-best-price-guide.md that held up on the sandbox.
 
-What the sandbox replays showed the baseline doing wrong, and the rule that fixes it:
-
-  landing    The baseline picks the non-price terms that are cheapest at OUR price. The deal closes on the
-             supplier's sheet, at its price, where another structure can be cheaper (a price above today's: the
-             later the new price applies, the better). Terms are optimised at the supplier's standing price.
-  free asks  Among terms that cost us the same, the baseline took an arbitrary one, e.g. a 21-day lead time when 35
-             is needed: a cost for the supplier, worth nothing to us. Ties go to the supplier's own terms.
-  big steps  The suppliers answer the size of our step: a "slight adjustment" earns a slight one. The deal closes
-             on the supplier's sheet, so a step of ours costs nothing while we stay below its floor. We open below
-             the target and walk up to it in halving steps (Ackerman): large moves early, a visible limit late.
-  cash       The shorter-payment sheet goes out only to a supplier that said it wants cash, then at the shortest
-             payment; otherwise the supplier takes the shorter payment and keeps its price.
+  closing    A final offer is answered once with a closing offer on exactly the supplier's terms: its last step
+             once more, and we sign today. The suppliers read it as a large step from us and give a last one.
+  cash       The shorter-payment sheet pays sooner than the supplier's own term where an option allows. Given the
+             choice, a supplier takes the payment it wants and prices it.
+  anchor     Deeper, as in the `lowball` experiment - neither demo bot punished it.
+  free asks  Among terms that cost us the same, ties go to the supplier's own terms: a 21-day lead time when 35 is
+             needed costs the supplier and is worth nothing to us.
+  question   One open question in the first e-mail, next to our offer: which term would bring the price down.
   no insult  A sheet priced far below the supplier's offer (the equal-cost price of a structure that is bad for us)
              reads as a lowball: it is dropped.
-  anchor     Deeper, as in the `lowball` experiment - neither demo bot punished it.
-  wording    Appreciation, and one open question next to every move.
-  probe      A final offer is answered once with its own price on our terms - a term trade, not a price push -
-             when walking away would cost little (`probe="safe"`) or always (`probe="always"`, to measure it).
+
+Tried on the sandbox and left out because they lowered the score (docs/benchmarks/2026-10-10-playbook-none.md):
+an open question in every later e-mail, a warmer opener, terms optimised at the supplier's price instead of ours, a
+single sheet instead of a menu, a deeper opening with halving steps, and citing case IDs without a figure.
 
 Everything else - arguments, concession schedule, reciprocity, holding and closing - is the baseline's.
 """
 
 import math
-import re
 from dataclasses import dataclass
 
 from arena_kit.cost import complete_offer
@@ -31,17 +26,20 @@ from arena_kit.cost import complete_offer
 from negotiator.data import Evidence
 from negotiator.session import Negotiation
 from negotiator.strategy.base import Decision
-from negotiator.strategy.baseline import GOAL_ANCHOR, MIN_STEP, SIGNATURE, BaselineStrategy, SupplierPlan, describe
+from negotiator.strategy.baseline import (
+    GOAL_ANCHOR,
+    SIGNATURE,
+    BaselineStrategy,
+    SupplierPlan,
+    describe,
+    structure_key,
+)
 from negotiator.telemetry import log
 
-CASH_SIGNAL = re.compile(
-    r"need the \d+ days payment|faster payment|earlier payment|payment sooner|liquidity|cash", re.IGNORECASE
+QUESTION = (
+    "What would you need from us to come closer on price - a different payment term, delivery term or commitment?"
 )
-QUESTIONS = [
-    "What would you need from us to come closer on price - a different payment term, delivery term or commitment?",
-    "Which of the terms above costs you most, and what would the price be without it?",
-    "What would have to change on our side for you to reach option A?",
-]
+PROBE_MIN_STEP = 0.005  # the closing offer asks for at least 0.5 % below the final offer
 PROBE_FALLBACK = 0.02  # "safe": the next best outcome costs at most 2 % more than the final offer
 
 
@@ -49,26 +47,14 @@ PROBE_FALLBACK = 0.02  # "safe": the next best outcome costs at most 2 % more th
 class Playbook:
     name: str = "playbook"
     anchor_scale: float = 1.5  # multiplies the baseline's anchor per category goal
-    landing: bool = True  # optimise the non-price terms at the supplier's price
     first_claims: int = 2  # arguments in the first e-mail; one a round after that
-    depth: float = 0.10  # we open this far below the target and close half of the rest every round
-    cash_on_signal: bool = True  # the shorter-payment sheet only for a supplier that asked for cash
+    cash_below: bool = True  # the cash sheet pays sooner than the supplier's own term, where an option allows
     min_sheet_share: float = 0.75  # drop sheets priced below this share of the supplier's price
-    wording: bool = True
-    probe: str = "safe"  # off | safe | always
+    question: bool = True  # one open question in the first e-mail
+    probe: str = "always"  # a closing offer after a final offer: off | safe (only with a fallback) | always
 
 
-VARIANTS = {
-    p.name: p
-    for p in (
-        Playbook(),
-        Playbook("playbook-probe", probe="always"),
-        Playbook("pb-a", landing=False, cash_on_signal=False, depth=0.0),
-        Playbook("pb-b", landing=True, cash_on_signal=False, depth=0.0),
-        Playbook("pb-c", landing=False, cash_on_signal=True, depth=0.0),
-        Playbook("pb-d", landing=False, cash_on_signal=False, depth=0.0, wording=False),
-    )
-}
+VARIANTS = {p.name: p for p in (Playbook(), Playbook("playbook-noprobe", probe="off"))}
 
 
 class PlaybookStrategy(BaselineStrategy):
@@ -115,26 +101,12 @@ class PlaybookStrategy(BaselineStrategy):
                 return probe
         return super().decide(neg, supplier_id)
 
-    def _next_price(self, plan: SupplierPlan, theirs, ours, round_index, their_path=None) -> float:
-        if not self.pb.depth:
-            return super()._next_price(plan, theirs, ours, round_index, their_path)
-        start = plan.target_price * (1 - self.pb.depth)
-        price = start + (plan.target_price - start) * (1 - 0.5**round_index)
-        if ours:  # never back, and never the same numbers again: that counts as no move
-            price = max(price, ours[-1] * (1 + MIN_STEP))
-        return round(min(price, theirs), 2)
-
     def _optimise(self, neg: Negotiation, sid: str, terms: dict) -> dict:
-        """The baseline's coordinate descent, at the landing price, with ties going to the supplier's own terms."""
+        """The baseline's coordinate descent, with ties going to the supplier's own terms."""
         t = neg.threads[sid]
-        standing = t.standing[1]
-        theirs, price = standing.get("unit_price"), terms.get("unit_price")
-        at = price
-        if self.pb.landing and theirs and price is not None and price < theirs:
-            at = theirs
-        prefer = {**t.standard_terms, **{k: v for k, v in standing.items() if v is not None}}
+        prefer = {**t.standard_terms, **{k: v for k, v in t.standing[1].items() if v is not None}}
         options = neg.case.get("term_options", {})
-        best = {**terms, "unit_price": at}
+        best = dict(terms)
         for _ in range(2):
             for f in neg.case["negotiable"]:
                 if f == "unit_price" or not options.get(f):
@@ -146,7 +118,7 @@ class PlaybookStrategy(BaselineStrategy):
                     return (round(cost, 2), _distance(value, prefer.get(f)), repr(value))
 
                 best[f] = min(options[f], key=key)
-        return {**best, "unit_price": price}
+        return best
 
     def _term_sheets(self, neg: Negotiation, sid: str, theirs: dict, price: float) -> list[dict]:
         sheets = super()._term_sheets(neg, sid, theirs, price)
@@ -154,12 +126,15 @@ class PlaybookStrategy(BaselineStrategy):
         return [s for s in sheets if s["terms"]["unit_price"] >= floor] or sheets[:1]
 
     def _cash_days(self, neg: Negotiation, sid: str, shorter: list[int]) -> int | None:
-        if not self.pb.cash_on_signal:
-            return super()._cash_days(neg, sid, shorter)
-        return shorter[0] if shorter and self._said(neg, sid, CASH_SIGNAL) else None
+        t = neg.threads[sid]
+        own = t.standing[1].get("payment_days") or t.standard_terms.get("payment_days")
+        below = [o for o in shorter if own and o < own]
+        if self.pb.cash_below and below:
+            return below[-1]
+        return super()._cash_days(neg, sid, shorter)
 
-    def _said(self, neg: Negotiation, sid: str, pattern: re.Pattern) -> bool:
-        return any(pattern.search(m.get("body") or m.get("text") or "") for m in neg.threads[sid].supplier_messages)
+    def _extra_lines(self, neg: Negotiation, plan: SupplierPlan, first: bool) -> list[str]:
+        return [QUESTION] if self.pb.question and first else []
 
     # ------------------------------------------------------------------ final offer
     def _may_probe(self, neg: Negotiation, sid: str) -> bool:
@@ -170,7 +145,7 @@ class PlaybookStrategy(BaselineStrategy):
             return False
         if self.pb.probe == "always":
             return True
-        fallback = neg.c_alt if neg.c_alt is not None else math.inf
+        fallback = neg.c_alt
         for other, o in neg.threads.items():
             offer_id, terms = o.standing
             if other != sid and offer_id and o.live and neg.keeps_must_haves(other, terms):
@@ -178,60 +153,39 @@ class PlaybookStrategy(BaselineStrategy):
         return fallback <= neg.cost(sid, t.standing[1]) * (1 + PROBE_FALLBACK)
 
     def _probe(self, neg: Negotiation, sid: str) -> Decision | None:
-        """The supplier's final price on our terms: it keeps its number, we ask for the terms around it."""
-        case, plan = neg.case, self.plans[sid]
-        theirs = neg.threads[sid].standing[1]
-        if theirs.get("unit_price") is None:
+        """One closing offer on exactly the supplier's terms: its last step once more, and we sign today."""
+        case, plan, t = neg.case, self.plans[sid], neg.threads[sid]
+        theirs = t.standing[1]
+        path = t.price_path()
+        if theirs.get("unit_price") is None or len(path) < 2:
             return None
         self.probed.add(sid)
-        terms = self._optimise(neg, sid, dict(theirs))
-        if "payment_days" in theirs and self._said(neg, sid, CASH_SIGNAL):
-            terms["payment_days"] = theirs["payment_days"]
-        terms = complete_offer(case, terms)
-        c_theirs, c_ours = neg.cost(sid, theirs), neg.cost(sid, terms)
-        if c_ours >= c_theirs - 1 or not neg.keeps_must_haves(sid, terms):
+        step = max(path[-2] - path[-1], path[-1] * PROBE_MIN_STEP)
+        terms = complete_offer(case, {**theirs, "unit_price": round(path[-1] - step, 2)})
+        key = structure_key(terms)
+        if terms["unit_price"] <= plan.offered.get(key, 0.0) or not neg.keeps_must_haves(sid, terms):
             return None
-        asks = [k for k in case["negotiable"] if k != "unit_price" and theirs.get(k) != terms.get(k)]
-        changed = {k: terms[k] for k in asks}
+        plan.offered[key] = terms["unit_price"]
         body = [
             f"Dear {plan.name} team," if plan.name != plan.supplier_id else "Dear Sir or Madam,",
             "",
-            "thank you for your final offer - we appreciate the steps you have taken, and we do not ask you to go "
-            f"below your price of EUR {theirs['unit_price']:,.2f} per unit.",
-            f"To sign at that price we need one thing around it: {describe(case, changed)}.",
-            "If you can confirm this, we close today.",
+            "thank you for your final offer - we appreciate the steps you have taken, and we accept your terms as "
+            "they stand.",
+            f"We are ready to sign today at EUR {terms['unit_price']:,.2f} per unit: one more step of the size of "
+            "your last one, and a large one from our side.",
             "",
             f"Our proposal: {describe(case, terms)}",
             "",
             SIGNATURE,
         ]
-        return Decision(
-            "message",
-            sid,
-            message={
-                "subject": f"{case.get('title', 'Your quote')}",
-                "body": "\n".join(body),
-                "term_sheets": [{"terms": terms}],
-                "refs": [],
-            },
-            rationale={"probe": True, "c_theirs": c_theirs, "c_sheets": [c_ours], "changed": sorted(changed)},
-        )
-
-    # ------------------------------------------------------------------ wording
-    def _opener(self, first: bool) -> str:
-        if not self.pb.wording:
-            return super()._opener(first)
-        if first:
-            return (
-                "thank you for your quote and for the work behind it. We would like to place this with you; on the "
-                "quoted terms we cannot yet."
-            )
-        return "thank you for your reply. We have taken a further step on every option below."
-
-    def _extra_lines(self, neg: Negotiation, plan: SupplierPlan, first: bool) -> list[str]:
-        if not self.pb.wording:
-            return []
-        return [QUESTIONS[neg.threads[plan.supplier_id].rounds_used % len(QUESTIONS)]]
+        message = {
+            "subject": f"{case.get('title', 'Your quote')}",
+            "body": "\n".join(body),
+            "term_sheets": [{"terms": terms}],
+            "refs": [],
+        }
+        rationale = {"probe": True, "c_theirs": neg.cost(sid, theirs), "c_sheets": [neg.cost(sid, terms)]}
+        return Decision("message", sid, message=message, rationale=rationale)
 
 
 def _distance(value, preferred) -> float:
