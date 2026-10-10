@@ -43,6 +43,18 @@ uv run negotiator --url http://127.0.0.1:8100 register "Team" sim               
 uv run negotiator --url http://127.0.0.1:8100 --key <sim key> run --set practice
 ```
 
+## Supplier simulator
+
+`negotiator sim` is a local arena with suppliers fitted from our own replays: no practice session, no token, 12
+cases in seconds. It ranks changes to the numbers (anchor, concessions, menus, arguments), not to the wording, and
+its error is measured - see [`docs/simulator.md`](docs/simulator.md) before trusting a result.
+
+```sh
+uv run negotiator sim calibrate                          # fit from runs/ (again after every arena run)
+uv run negotiator sim check                              # error on sessions the fit has not seen
+uv run negotiator sim bench baseline tactical --reps 5   # strategies side by side, next to their arena scores
+```
+
 ## LLM strategy and providers
 
 `--strategy llm` adds a model on top of the baseline: before the session opens it profiles each supplier from
@@ -95,6 +107,7 @@ guards.py      hard rules before every send and accept: must-haves, alternative,
 lessons.py     lessons.md: what each case taught
 session.py     Negotiation: threads, documents, costs (kit's C), send/accept/walk away, transcript
 llm.py         one client for OpenAI-compatible and Anthropic APIs, switched by `provider:model`; telemetry
+sim/           the supplier simulator: pricing fit, supplier model, calibration from runs/, local arena, bench
 strategy/      Strategy protocol (prepare, decide, conclude, keepalive), baseline, llm_strategy
 runner.py      play_case (one worker per thread, keepalive, deadline), play_many, play_final
 report.py      summary.json, report.md, statistics across runs

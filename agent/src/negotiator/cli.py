@@ -7,6 +7,7 @@
   negotiator final                                       the Live Final (NEGOTIATOR_FINAL=1)
   negotiator report [run_id|latest] | stats              reports and statistics across runs
   negotiator lessons [run_id|latest]                     what each case taught: scores, costs, supplier reasons
+  negotiator sim calibrate | check | bench <strategies> | serve     the local supplier simulator (no quota)
 Global: --url (e.g. http://127.0.0.1:8000 for arena-sim), --key, --json.
 """
 
@@ -28,6 +29,7 @@ from negotiator.lessons import write_lessons
 from negotiator.llm import LLM
 from negotiator.report import history, write_report
 from negotiator.runner import play_case, play_final, play_many
+from negotiator.sim.cli import add_parser as add_sim_parser
 from negotiator.strategy import NEEDS_LLM, STRATEGIES
 from negotiator.telemetry import Recorder
 
@@ -374,6 +376,7 @@ def build_parser() -> argparse.ArgumentParser:
         "lessons", cmd_lessons, "per case: score, cost blocks, the supplier's reasons", needs_client=False
     ).add_argument("run", nargs="?", default="latest")
     add("stats", cmd_stats, "scores across all runs", needs_client=False)
+    add_sim_parser(add)
     return ap
 
 

@@ -25,6 +25,9 @@ Arena: the key is `ARENA_API_KEY` in the root `.env`. Practice is limited to 200
 During the Live Final the agent must not read the live feed, leaderboard or results (`NEGOTIATOR_FINAL=1`
 blocks them in the client).
 
+Before a practice run, try a change to the numbers on `negotiator sim bench` (suppliers fitted from our replays,
+no quota); it cannot judge wording, and a difference under 0.08 is noise - see `agent/docs/simulator.md`.
+
 ## Benchmarks
 
 Every benchmark run (any `negotiator run` / `play` on sandbox or practice that is used to judge a strategy) gets a
