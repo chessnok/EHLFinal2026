@@ -3,8 +3,16 @@
   "checkpoint_id": "cb4602b12a12",
   "strategy": "manual-commit",
   "branch": "feat/sim-llm-supplier",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/docs/simulator.md",
+    "agent/src/negotiator/sim/arena.py",
+    "agent/src/negotiator/sim/calibrate.py",
+    "agent/src/negotiator/sim/cli.py",
+    "agent/src/negotiator/sim/llm_supplier.py",
+    "agent/src/negotiator/sim/supplier.py",
+    "agent/tests/test_simulator.py"
+  ],
   "sessions": [
     {
       "metadata": "/cb/4602b12a12/0/metadata.json",
@@ -12,13 +20,20 @@
       "compact_transcript": "/cb/4602b12a12/0/transcript.jsonl",
       "content_hash": "/cb/4602b12a12/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/cb/4602b12a12/1/metadata.json",
+      "transcript": "/cb/4602b12a12/1/full.jsonl",
+      "compact_transcript": "/cb/4602b12a12/1/transcript.jsonl",
+      "content_hash": "/cb/4602b12a12/1/content_hash.txt",
+      "prompt": "/cb/4602b12a12/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 326,
-    "cache_creation_tokens": 408118,
-    "cache_read_tokens": 41414781,
-    "output_tokens": 170398,
-    "api_call_count": 156
+    "input_tokens": 330,
+    "cache_creation_tokens": 409235,
+    "cache_read_tokens": 41624305,
+    "output_tokens": 171963,
+    "api_call_count": 157
   }
 }
