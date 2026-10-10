@@ -19,20 +19,21 @@ the `thread_hold` events; the rule in `tactical.py` behind each stop has not bee
 | Renewal | P04 | 0.860 | 324 | 3 | held: "last word: take it" on a `final_offer` |
 | RFQ | P05 | 0.742 | 21,153 | 3 | supplier `agreed`: we went 30.46 → 28.00 against its 28.79 |
 | Bundling | P07 | 0.721 | 25,607 | 4 | held: "last word: take it" on a `final_offer` |
-| Capacity | P10 | 0.647 | 212,881 | 2 | supplier `agreed`: we went 27.37 → 31.90, its price |
+| Capacity | P10 | 0.647 | 212,881 | 2 | `final_offer` in its first reply (33.80, alternative 31.90); we took the alternative |
 | Quality | P11 | 0.545 | 43,244 | 4 | held: "last word: take it", supplier still `open` |
 
 ## 2. The problems, largest first
 
 ### 2.1 We stop after two to four of ten rounds
 
-No thread used more than four rounds. In four cases the deal came from our own offer rising to the supplier's
-price in one or two steps (P10, P18, P02, P05); in two the thread was held while the supplier's status was still
-`open` (P01, P11). These six cases hold 0.58 + 0.35 + 0.31 + 0.26 + 0.14 + 0.45 of unclaimed score.
+No thread used more than four rounds. In P18 and P05 the supplier agreed to our own rising offer (P18: 5.00 → 5.25
+→ 5.50 against its 5.60); in P01 and P11 the thread was held while the supplier's status was still `open`.
 
-- P10: the deal costs 1,541,808; our own upper bound for the case was 1,374,881 and C_best is 1,328,927. We accepted
-  167,000 above what our own estimate said was reachable, in round 2.
 - P18: deal 264,784, our upper bound 259,433, C_best 222,651.
+- P10 is a different case: the supplier called its first reply final (33.80, with an alternative at 31.90) and we
+  took the alternative. The deal costs 1,541,808 against our upper bound of 1,374,881 and C_best 1,328,927; what
+  would have moved it is not in the trace.
+- P02 closed in round 2 below our own ask (358.45 against 361.34), after we offered an index clause.
 
 ### 2.2 Our estimate of what is reachable is too high in leverage cases
 
@@ -83,7 +84,7 @@ before a final offer, not about pushing past one.
 
 | # | Item | Cases it concerns | Evidence |
 |---|---|---|---|
-| 1 | Do not raise our offer to the supplier's price while it is `open` and rounds are left; keep the reciprocal step | P10, P18, P02, P05 | 2.1 |
+| 1 | Concede more slowly while the supplier is `open` and rounds are left (`tactical-slow25`: sandbox D02 0.587 → 0.671, not played on practice) | P18, P05 | 2.1 |
 | 2 | Do not hold a thread on "last word" or "meets our ask" while the status is `open` and the supplier names a lever | P11, P01 | 2.1, 2.3 |
 | 3 | Lower the upper bound for leverage cases, or stop using it as a reason to close | P05, P18, P08, P07 | 2.2 |
 | 4 | When a supplier names a lever twice, send a sheet that gives it (shortest payment, no chargeback) at its price | P11, P07 | 2.3 |

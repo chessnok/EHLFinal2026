@@ -9,6 +9,7 @@ from negotiator.strategy.baseline import BaselineStrategy
 from negotiator.strategy.decided import DecidedStrategy
 from negotiator.strategy.experiments import TACTICS, ExperimentStrategy
 from negotiator.strategy.llm_strategy import LLMStrategy
+from negotiator.strategy.patient import SCALES, PatientStrategy
 from negotiator.strategy.playbook import VARIANTS, PlaybookStrategy
 from negotiator.strategy.tactical import TacticalStrategy
 
@@ -18,6 +19,7 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     "llm": LLMStrategy,
     **{name: partial(ExperimentStrategy, tactic) for name, tactic in TACTICS.items()},
     **{name: partial(PlaybookStrategy, playbook) for name, playbook in VARIANTS.items()},
+    **{name: partial(PatientStrategy, scale, name) for name, scale in SCALES.items()},
     "decided": DecidedStrategy,
 }
 NEEDS_LLM = {"llm"}

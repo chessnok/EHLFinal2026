@@ -30,6 +30,15 @@ Scores are means over one to four plays of each case. Cost of all runs: 0 practi
   one run per strategy is enough there. The differences above are real for these two cases - and only for them:
   two demo cases and three suppliers say little about the ten practice cases.
 
+## 2026-10-10 · sandbox, `tactical` as on `556a31d` · no LLM
+
+| Strategy | D01 | D02 | Mean | Record |
+|---|---|---|---|---|
+| tactical-slow25 | 0.957 | 0.671 | **0.814** | [record](2026-10-10-tactical-slow25-none.md) |
+| tactical | 0.969 | 0.587 | 0.778 | [record](2026-10-10-tactical-slow25-none.md) |
+
+`tactical` changed during the day, so these two rows do not compare with the table at the top.
+
 ## 2026-10-10 · practice (10 hosted cases) · no LLM
 
 | Strategy | Mean | Deals | Record |
