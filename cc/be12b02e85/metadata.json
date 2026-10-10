@@ -3,7 +3,7 @@
   "checkpoint_id": "ccbe12b02e85",
   "strategy": "manual-commit",
   "branch": "feat/tactic-experiments",
-  "checkpoints_count": 8,
+  "checkpoints_count": 9,
   "files_touched": [
     "AGENTS.md",
     "agent/.gitignore",
@@ -39,6 +39,13 @@
       "compact_transcript": "/cc/be12b02e85/2/transcript.jsonl",
       "content_hash": "/cc/be12b02e85/2/content_hash.txt",
       "prompt": "/cc/be12b02e85/2/prompt.txt"
+    },
+    {
+      "metadata": "/cc/be12b02e85/3/metadata.json",
+      "transcript": "/cc/be12b02e85/3/full.jsonl",
+      "compact_transcript": "/cc/be12b02e85/3/transcript.jsonl",
+      "content_hash": "/cc/be12b02e85/3/content_hash.txt",
+      "prompt": "/cc/be12b02e85/3/prompt.txt"
     }
   ],
   "token_usage": {
