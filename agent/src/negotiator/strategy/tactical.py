@@ -70,7 +70,8 @@ DEFAULT_POLICY = POLICIES["routine"]
 STALL_EPS = 0.0005  # a C move below 0.05 % is no move
 DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
 MAX_ANCHOR = 0.15  # the first ask never lies more than 15 % below the supplier's quote ...
-MAX_ANCHOR_LEVERAGE = 0.22  # ... except in leverage, where floors sat 19-24 % under the quote (D02, P05, P18)
+MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D02, P05, P18), but a deeper first
+# ask lost credibility (P05: Hrvelec walked after four rounds at 24-25 against its 34)
 # without a cost estimate, anchor this far under the reference price (baseline v2's sandbox-tested depths)
 GUESS_ANCHOR = {"leverage": 0.18, "routine": 0.12, "quality_first": 0.10, "stabilise": 0.06, "secure_supply": 0.05}
 UNDER_FLOOR = 0.02  # the first ask sits this far under the supplier's estimated floor
@@ -89,6 +90,7 @@ FIRM_SIGNALS = re.compile(
 )
 REANCHOR = 0.10  # an ungrounded floor the supplier undercuts at once: ask again this far under its price
 BIG_STEP = 0.04  # a supplier move of 4 %+ in one round says it had room
+UPPER_ROOM = 0.06  # the upper bound sits at least this far above our first ask
 MIN_STEP = 0.004  # every message moves at least 0.4 % of C: these bots punish a repeated offer
 MAX_SPREAD = 0.08  # options of one message stay within 8 % of each other's price
 
@@ -297,7 +299,9 @@ class TacticalStrategy(BaselineStrategy):
             lower_c = neg.cost(sid, self._ideal(neg, sid, terms, gt.lower))
         if gt.upper:
             upper_c = min(upper_c, neg.cost(sid, self._ideal(neg, sid, terms, gt.upper)))
-        return lower_c, max(upper_c, target_c)
+        # room to concede above our first ask, whatever the calibration says (P05: an 18 % anchor over a 22 %
+        # floor left upper == anchor and only 0.4 % steps) - never above its quote or our alternative
+        return lower_c, min(max(upper_c, target_c * (1 + UPPER_ROOM)), open_c, neg.c_alt)
 
     def _ideal(self, neg, sid, terms: dict, price: float) -> dict:
         return complete_offer(neg.case, self._optimise(neg, sid, {**terms, "unit_price": round(price, 2)}))
@@ -311,12 +315,12 @@ class TacticalStrategy(BaselineStrategy):
         sheet_id, theirs = neg.best_offer(supplier_id)  # judge it by its best sheet for us, not its first
         if theirs.get("unit_price") is None or not math.isfinite(plan.target_c):
             return Decision.hold(supplier_id, "no price to negotiate on")
+        if text := self._text_price_offer(neg, supplier_id, plan):
+            return text  # it wrote a lower price than it sheeted: ask for that first, even next to an agreement
         if t.status == "agreed":
             if take := self._take_agreed(neg, supplier_id):
                 return take
             return Decision.hold(supplier_id, "agreed")
-        if text := self._text_price_offer(neg, supplier_id, plan):
-            return text
         rounds_left = neg.case.get("round_limit", 10) - t.rounds_used
         if rounds_left <= 1:
             return Decision.hold(supplier_id, "last round: keep it for the close")
@@ -446,7 +450,8 @@ class TacticalStrategy(BaselineStrategy):
         elif plan.stalls == 2:
             step = max(by_time * 0.5, 2 * min_step)  # break the deadlock, gently
         else:
-            step = min(plan.policy.reciprocity * max(their_move, 0.0), max(by_time, 0.3 * max(their_move, 0.0)))
+            # a real counter-step: at least half of its last move (cent steps read as no movement)
+            step = min(plan.policy.reciprocity * max(their_move, 0.0), max(by_time, 0.5 * max(their_move, 0.0)))
             step = max(step, min_step)
         return min(last + step, their_c, plan.upper_c)  # the upper bound is never asked for beyond
 
