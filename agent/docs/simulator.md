@@ -114,6 +114,20 @@ With sonnet a named budget ceiling costs on D02 (0.65 → 0.51; arena 0.629 → 
 arena, so their recorded exchanges are among the examples the model is shown; a wording nobody has played is not
 covered by this test.
 
+**Blind, the effect is gone.** The same bench with `--without budget shelby` (suppliers fitted from 183 sessions,
+none played by these two strategies, so their e-mails and the replies to them are not among the examples), sonnet,
+two repeats:
+
+| | D01 baseline | D01 budget | D01 shelby | D02 baseline | D02 budget | D02 shelby |
+|---|---|---|---|---|---|---|
+| Arena | 0.843 | 0.863 | 0.663 | 0.629 | 0.314 | 0.566 |
+| llm, sonnet, shown the two strategies' sessions | 0.84 | 0.86 | 0.76 | 0.65 | 0.51 | 0.51 |
+| llm, sonnet, blind | 0.84 | 0.84 | 0.84 | 0.66 | 0.65 | 0.64 |
+
+So the model repeats a reaction it has been shown and does not predict one it has not: a wording nobody has played
+on the arena still needs the sandbox. Run as three processes at once (one per strategy) that shared one supplier
+log: 66 calls in it, USD 1.3663 at the last count.
+
 **Walking away is fitted since 10 October, 22:00:** per supplier, how often a term sheet sent after its final offer
 made it walk away, with the pool of all suppliers as prior. The record then: 3 walk-aways in 26 such sheets (P04, P07
 and P18, one each, all from `playbook`'s closing offer; the three demo suppliers never walked in 20). One observation

@@ -11,7 +11,7 @@ from rich.table import Table
 
 from negotiator.config import PACKAGE_ROOT, Settings
 from negotiator.sim.arena import CalibratedSim, arena_scores, bench, check, serve
-from negotiator.sim.calibrate import calibrate, load_model, load_sessions
+from negotiator.sim.calibrate import as_objects, calibrate, load_model, load_sessions
 from negotiator.sim.supplier import PERSONAS
 
 console = Console()
@@ -167,6 +167,10 @@ def cmd_bench(args, settings: Settings) -> None:
     opponents = free if "all" in args.opponents else tuple(args.opponents)
     reads = any(PERSONAS[o].llm for o in opponents)
     model = _with_examples(settings, args.refit) if reads else _model(settings, refit=args.refit)
+    if args.without:  # a blind test: fitted without the sessions these strategies played, and not stored
+        kept = [t for t in load_sessions(settings.runs_dir) if t["outcome"].get("strategy") not in args.without]
+        model = as_objects(calibrate(kept))
+        console.print(f"fitted from {len(kept)} sessions, none of them played by {', '.join(args.without)}")
     data = WorldData(settings.data_dir, settings.release_dir)
     case_ids = args.cases or sorted(model["cases"])
     console.print(f"{len(args.strategies)} strategies x {len(case_ids)} cases x {args.reps} repeats on the simulator")
@@ -241,6 +245,8 @@ def add_parser(add) -> None:
                    help="opponent types to play against (all: the whole pool)")  # fmt: skip
     b.add_argument("--jitter", action="store_true", help="move each supplier's floor at random, per session")
     b.add_argument("--supplier-llm", help=SUPPLIER_LLM)
+    b.add_argument("--without", nargs="+", default=[], metavar="STRATEGY",
+                   help="fit the suppliers without the sessions these strategies played (a blind test)")  # fmt: skip
     b.add_argument("--json", action="store_true")
     b.set_defaults(sim_func=cmd_bench)
     s = sub.add_parser("serve", help="the simulator as a local arena")
