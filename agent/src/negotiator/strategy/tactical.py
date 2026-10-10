@@ -926,6 +926,10 @@ class TacticalStrategy(BaselineStrategy):
             if not under:
                 return self._iso_cost_price(neg, sid, terms, ask_c - slack)
             least = neg.cost(sid, {**terms, "unit_price": self._cheapest_price(neg, sid, terms)})
+            if least > plan.target_c * (1 + STALL_EPS):
+                # only the structures that are as cheap for us as the best one: P03's deep ask went out on a
+                # volume below our need, P02's on an index clause, and the supplier agreed to both (P-18)
+                return 0.0
             return self._iso_cost_price(neg, sid, terms, least + slack - spent, under=True)
 
         menu = priced_menu(case, theirs, price_for)
