@@ -3,8 +3,11 @@
   "checkpoint_id": "e53b9923a71a",
   "strategy": "manual-commit",
   "branch": "fix/relationship-charge",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/docs/backlog.md",
+    "agent/docs/benchmarks/2026-10-11-tactical-none.md"
+  ],
   "sessions": [
     {
       "metadata": "/e5/3b9923a71a/0/metadata.json",
@@ -12,6 +15,13 @@
       "compact_transcript": "/e5/3b9923a71a/0/transcript.jsonl",
       "content_hash": "/e5/3b9923a71a/0/content_hash.txt",
       "prompt": "/e5/3b9923a71a/0/prompt.txt"
+    },
+    {
+      "metadata": "/e5/3b9923a71a/1/metadata.json",
+      "transcript": "/e5/3b9923a71a/1/full.jsonl",
+      "compact_transcript": "/e5/3b9923a71a/1/transcript.jsonl",
+      "content_hash": "/e5/3b9923a71a/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
