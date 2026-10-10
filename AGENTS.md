@@ -53,6 +53,10 @@ Read the file for the area you touch before changing it:
 - [`agent/README.md`](agent/README.md) — package architecture, telemetry layout, how to add a strategy
 - [`agent/docs/benchmarks/`](agent/docs/benchmarks/) — one record per benchmark run (see Benchmarks above)
 
+Files hold measured data only: a number in a doc, a benchmark record or a comment is something a run on the arena
+(or a named tool run, e.g. `negotiator sim check`) actually returned, with its source. No predictions, forecasts or
+expected scores in files - say them in the conversation, and write the result down once the run has verified it.
+
 General: keep changes scoped to the request, match the surrounding code's style, run the checks above for every
 area you changed, and do not commit or push unless asked.
 
