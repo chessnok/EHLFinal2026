@@ -42,6 +42,7 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | Own-plant should-cost cited from 3 % under the quote (12 % before) | practice P-26 (P01, P03) | mixed: P03 0.903 → 0.923, P01 0.969 → 0.952 | P03: "below this price we would need facts" - with it the first reply came at 432.15 instead of 432.94. P01: ranked ahead of the forecast it took round 4 and the final offer was 131.80 instead of 131.30; now ranked last |
 | Complaints (`qn:` rows) cited one by one as further quality arguments | practice P-23 (P11) | failed: 0.672, unchanged | the first one came back `duplicate` after the scorecard's ppm figure, and the supplier called its offer final in that round |
 | Answer a supplier's hedge with our term's dates (`hedge_turn`: "21 of our 24 months come after your cover") | practice P-32 (P08) | failed: P08 0.550, the same price path as P-29 | the supplier agreed and turned it into a reason for the index clause ("you correctly note that the index clause will reflect market movements"); only P08's supplier writes about a hedge |
+| Cite an accepted cost driver again over a window with new IDs (`more_drops`, P08: PPI-C2431 05 → 07) | practice P-33 (P08) | failed: P08 0.550 → 0.528 | `duplicate`: "this kind of fact was already taken into account" - the arena counts one argument per index series per case, not per ID; it also took the slot of the forecast |
 
 ## LLM
 

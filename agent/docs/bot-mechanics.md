@@ -47,6 +47,28 @@ The most common sentences (numbers masked):
 
 Claim results: 905 verified, 35 duplicate, 4 contradicted.
 
+### A duplicate is a series, not an ID
+
+`api.md` says each ID counts once per case. On P08 (`../runs.md` P-33) a second fall of PPI-C2431 over a window
+with IDs we had not cited (05 → 07, after 06 → 08 in round 1) came back `duplicate`: "it holds, but this kind of
+fact was already taken into account in our previous calculation". One argument per index series per case.
+
+### P08: what sets the price (31 sessions)
+
+The supplier makes one big step in its first reply, then small ones, and calls its offer final in round 3. Its final
+offer sat 0.04-0.18 under its first reply. The first reply depends on our first message:
+
+| Our first message | Its first reply |
+|---|---|
+| PPI-C2431's fall + AS-14404's fall + order history | 5.41 (13 sessions) |
+| order history + forecast, no PPI | 5.46 |
+| AS-14404 alone, or with LCI-C | 5.57 |
+| a delivery-record complaint (+ forecast) | 5.71 and 6.10 |
+
+AS-14404 is answered "not our reality: covered at fixed prices until March 2027"; PPI-C2431 (36 % of its cost by our
+cost drivers) is "taken into account"; a complaint raises the price. From round 3 we had nothing left to cite in
+every session.
+
 ## 3. Our step against the supplier's next reply
 
 Rounds 2 and later; "our step" is the change of our lowest ask against our previous ask to the same supplier.
