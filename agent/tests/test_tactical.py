@@ -258,3 +258,18 @@ def test_timeout_answers_become_the_standing_offer() -> None:
     out = timeout_messages(thread, "sup:x")
     assert [m["term_sheets"][0]["term_sheet_id"] for m in out] == ["offer:x-4"]
     assert out[0]["status"] == "agreed"
+
+
+def test_ledger_turns_a_cited_driver_and_reads_a_hedge(world) -> None:
+    from negotiator.ledger import reply_facts
+
+    body = (
+        "AS-14404 rose 5.9 % in twelve months and is 45 % of our cost. "
+        "Our fixed-price material coverage only extends to March 2027."
+    )
+    facts = reply_facts(world, body)
+    kinds = {f.kind for f in facts}
+    assert "their_hedge" in kinds
+    drops = [f for f in facts if f.kind == "recent_drop"]
+    assert drops and drops[0].sentence.startswith("You cite AS-14404") and " fell -" not in drops[0].sentence
+    assert all(world.fact(r) for f in drops for r in f.refs)  # every figure checkable by ID

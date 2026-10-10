@@ -37,6 +37,7 @@ from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
 from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
+from negotiator.ledger import data_facts, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
 from negotiator.profile import SupplierProfile, build_profile
 from negotiator.session import Negotiation
@@ -70,7 +71,9 @@ POLICIES = {
 DEFAULT_POLICY = POLICIES["routine"]
 STALL_EPS = 0.0005  # a C move below 0.05 % is no move
 DONE_EPS = 0.001  # our ask within 0.1 % of their C: nothing left worth a round
-MAX_ANCHOR = 0.15  # the first ask never lies more than 15 % below the supplier's quote ...
+ANCHOR_WITH_LEVERS = 0.25  # first ask 25 % under the quote where competition, material or capacity give a lever
+ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
+MAX_ANCHOR = 0.15  # (kept for the experiments that import it)
 MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D02, P05, P18), but a deeper first
 # ask lost credibility (P05: Hrvelec walked after four rounds at 24-25 against its 34)
 # without a cost estimate, anchor this far under the reference price (baseline v2's sandbox-tested depths)
@@ -87,6 +90,11 @@ FIRM_SIGNALS = re.compile(
     r"|no further (?:room|concession)|our (?:absolute )?limit|not able to move|this is our last"
     r"|must (?:\w+ )?(?:hold|maintain) our (?:current )?offer|does not allow us to reduce|unable to (?:reduce|improve)"
     r"|we maintain our (?:current )?offer",
+    re.I,
+)
+APPROVAL_PENDING = re.compile(
+    r"clarify (?:this |it )?internally|come back to you on (?:the )?price|my band|approv(?:e|al) (?:a|for) further|"
+    r"check (?:the rest|internally)|discuss (?:this )?internally",
     re.I,
 )
 REANCHOR = 0.10  # an ungrounded floor the supplier undercuts at once: ask again this far under its price
@@ -139,6 +147,8 @@ class Plan:
     text_price: float | None = None  # a lower price it wrote in the text but not on a sheet
     text_price_used: bool = False
     alternatives_taken: set = field(default_factory=set)
+    counters: list = field(default_factory=list)  # facts from its own e-mails that answer it - spent first
+    used_sentences: set = field(default_factory=set)
     request_counts: dict = field(default_factory=dict)  # lever -> replies that asked for it
     reanchored: bool = False
     asked_breakdown: bool = False
@@ -243,6 +253,7 @@ class TacticalStrategy(BaselineStrategy):
         out = super()._evidence(neg, sid, open_price, current)
         if self.data:
             out += self.data.evidence_orders(neg.case.get("parts", []), sid, open_price)
+            out += data_facts(self.data, neg.case.get("parts", []))
         return sorted(out, key=lambda e: -e.strength)
 
     def _full_cost(self, parts: list[str], supplier_id: str) -> float | None:
@@ -325,17 +336,17 @@ class TacticalStrategy(BaselineStrategy):
         open_price = terms.get("unit_price")
         if open_price is None:
             return math.inf
-        ref = min(open_price, current) if current else open_price
-        goal = neg.buyer.get("category_goal", "routine")
+        price_only = bool(gt and gt.lower and gt.lower >= open_price * 0.95)  # the prior says: only the price moves
+        depth = ANCHOR_PRICE_ONLY if price_only else ANCHOR_WITH_LEVERS
+        # round 1 carries 67 % of all supplier movement and no supplier ever walked over a deep first offer
+        # (0 of 917 replies); within a case deeper first offers went with better scores - so we open deep
+        candidates = [open_price * (1 - depth)]
         if gt and gt.lower and gt.grounded:
-            candidates = [gt.lower * (1 - UNDER_FLOOR)]
-        else:  # a guessed floor is no anchor: go as deep as these bots tolerate
-            candidates = [ref * (1 - max(policy.anchor, GUESS_ANCHOR.get(goal, 0.1)))]
+            candidates.append(gt.lower * (1 - UNDER_FLOOR))
         alt_price = ((neg.buyer.get("alternative") or {}).get("terms") or {}).get("unit_price")
         if alt_price and alt_price < open_price:
             candidates.append(alt_price * 0.98)
-        cap = MAX_ANCHOR_LEVERAGE if goal == "leverage" else MAX_ANCHOR
-        price = max(min(candidates), open_price * (1 - cap))  # deeper reads as an insult, not an ask
+        price = max(min(candidates), open_price * (1 - depth))
         # no hard floor for strategic suppliers: the relationship term already prices a squeeze in C, and
         # our cost estimate can sit above its real one (P02: should-cost 380 over a 371 quote, C_best ~364)
         price = min(price, open_price)
@@ -434,6 +445,9 @@ class TacticalStrategy(BaselineStrategy):
             for r in asked:
                 plan.request_counts[r] = plan.request_counts.get(r, 0) + 1
             plan.requests |= asked
+            for fact in reply_facts(self.data, reply.get("body", "")):
+                if fact.sentence not in plan.used_sentences and all(fact.sentence != c.sentence for c in plan.counters):
+                    plan.counters.append(fact)
             for f, values in proposed_values(neg.case, reply.get("term_sheets") or []).items():
                 plan.proposed.setdefault(f, [])
                 plan.proposed[f] += [v for v in values if v not in plan.proposed[f]]
@@ -504,6 +518,10 @@ class TacticalStrategy(BaselineStrategy):
         their_move = theirs_path[-2] - theirs_path[-1] if len(theirs_path) >= 2 else 0.0
         min_step = MIN_STEP * last
         gap = max(0.0, their_c - last)
+        if APPROVAL_PENDING.search(t.latest.get("body", "")):
+            # "we need to clarify this internally" / "more than my band allows": its boss approves the next
+            # step anyway (8 of 8 in the back office) - hold, with the smallest visible move
+            return min(last + min_step, their_c, plan.upper_c)
         if plan.stalls == 1:
             step = max(min_step, 0.15 * gap)  # no move from it: a visible step, not a "small bump"
         elif plan.stalls >= 2:
@@ -876,26 +894,29 @@ class TacticalStrategy(BaselineStrategy):
         banned = plan.banned_kinds | self.banned_case_kinds
         if neg.buyer.get("category_goal") != "quality_first":
             banned = banned | {"scorecard"}
-        pool = [e for e in plan.evidence if e.kind not in banned]
+        fresh = [e for e in plan.counters if e.kind not in banned and e.sentence not in plan.used_sentences]
+        fresh.sort(key=lambda e: -e.strength)
+        pool = fresh + [e for e in plan.evidence if e.kind not in banned and e.sentence not in plan.used_sentences]
         rival = self._rival_evidence(neg, sid)
         if rival and "rival_offer" not in banned:
             pool.insert(0, rival)
         prefer: list[str] = []
         for key in [*sorted(plan.profile.traits), neg.buyer.get("category_goal", "")]:
             prefer += EVIDENCE_FIRST.get(key, [])
-        pool.sort(key=lambda e: (e.kind not in prefer, -e.strength))
+        pool.sort(key=lambda e: (e not in fresh, e.kind not in prefer, -e.strength))
         picked, kinds = [], set()
-        limit = plan.policy.claims_first if first else 1
+        limit = plan.policy.claims_first if first else (2 if fresh else 1)
         for e in pool:
             if len(picked) >= limit:
                 break
             if e.kind == "rival_offer":
                 if any((sid, r) in self.used_rival_refs for r in e.refs):
                     continue
-            elif any(r in self.used_refs for r in e.refs) or e.kind in kinds:
+            elif any(r in self.used_refs for r in e.refs) or (e.kind in kinds and e.kind != "recent_drop"):
                 continue
             picked.append(e)
             kinds.add(e.kind)
+            plan.used_sentences.add(e.sentence)
         for e in picked:
             if e.kind == "rival_offer":
                 self.used_rival_refs.update((sid, r) for r in e.refs)
