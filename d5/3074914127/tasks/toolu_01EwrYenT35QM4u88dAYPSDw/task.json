@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01EwrYenT35QM4u88dAYPSDw",
+  "agent_id": "a67eb351efc2cdd3c",
+  "subagent_type": "general-purpose",
+  "task_description": "P05 timeouts and early-final stats",
+  "token_usage": {
+    "input_tokens": 142,
+    "cache_creation_tokens": 265642,
+    "cache_read_tokens": 11759581,
+    "output_tokens": 26780,
+    "api_call_count": 70
+  },
+  "started_at": "2026-10-11T00:22:28.251512834+03:00",
+  "completed_at": "2026-10-11T01:01:25.264501839+03:00"
+}

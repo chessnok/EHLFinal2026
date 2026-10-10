@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "d53074914127",
+  "strategy": "manual-commit",
+  "branch": "fix/relationship-charge",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/d5/3074914127/0/metadata.json",
+      "transcript": "/d5/3074914127/0/full.jsonl",
+      "compact_transcript": "/d5/3074914127/0/transcript.jsonl",
+      "content_hash": "/d5/3074914127/0/content_hash.txt",
+      "prompt": "/d5/3074914127/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 18763,
+    "cache_read_tokens": 2469088,
+    "output_tokens": 3720,
+    "api_call_count": 6
+  }
+}
