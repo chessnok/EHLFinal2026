@@ -144,7 +144,7 @@ class PlaybookStrategy(BaselineStrategy):
         t = neg.threads[sid]
         if self.pb.probe == "off" or sid in self.probed:
             return False
-        if neg.case.get("round_limit", 10) - t.rounds_used <= 1 or neg.seconds_to_deadline() < 120:
+        if (neg.case.get("round_limit") or 10) - t.rounds_used <= 1 or neg.seconds_to_deadline() < 120:
             return False
         if self.pb.probe == "always":
             return True

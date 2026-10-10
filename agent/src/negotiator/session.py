@@ -241,12 +241,18 @@ class Negotiation:
     @property
     def c_open(self) -> float:
         """Our estimate of C_open: the cheapest opening quote that keeps the must-haves."""
-        best = math.inf
+        best = any_opening = math.inf
         for sid, t in self.threads.items():
             first = next((m for m in t.supplier_messages if m.get("term_sheets")), None)
-            if first and self.keeps_must_haves(sid, first["term_sheets"][0]["terms"]):
-                best = min(best, self.cost(sid, first["term_sheets"][0]["terms"]))
-        return best
+            if not first:
+                continue
+            c = self.cost(sid, first["term_sheets"][0]["terms"])
+            any_opening = min(any_opening, c)
+            if self.keeps_must_haves(sid, first["term_sheets"][0]["terms"]):
+                best = min(best, c)
+        # where no opening keeps the must-haves the arena takes the cheapest of all (P10, P11: its recorded
+        # C_open is that of the only opening, which breaks one)
+        return best if math.isfinite(best) else any_opening
 
     def best_offer(self, supplier_id: str) -> tuple[str | None, dict]:
         """The supplier's sheet that costs us least and keeps the must-haves (else its primary one)."""

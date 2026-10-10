@@ -201,7 +201,7 @@ class TacticalStrategy(BaselineStrategy):
     def prepare(self, neg: Negotiation) -> None:
         buyer = neg.buyer
         goal = buyer.get("category_goal", "routine")
-        parts = neg.case.get("parts", [])
+        parts = neg.case.get("parts") or []
         current = buyer.get("current_unit_price")
         for sid, thread in neg.threads.items():
             _, terms = thread.standing
@@ -296,8 +296,8 @@ class TacticalStrategy(BaselineStrategy):
     def _evidence(self, neg, sid, open_price, current):
         out = super()._evidence(neg, sid, open_price, current)
         if self.data:
-            out += self.data.evidence_orders(neg.case.get("parts", []), sid, open_price)
-            out += data_facts(self.data, neg.case.get("parts", []))
+            out += self.data.evidence_orders((neg.case.get("parts") or []), sid, open_price)
+            out += data_facts(self.data, (neg.case.get("parts") or []))
         return sorted(out, key=lambda e: -e.strength)
 
     def _full_cost(self, parts: list[str], supplier_id: str) -> float | None:
@@ -472,7 +472,7 @@ class TacticalStrategy(BaselineStrategy):
             if take := self._take_agreed(neg, supplier_id):
                 return take
             return Decision.hold(supplier_id, "agreed")
-        rounds_left = neg.case.get("round_limit", 10) - t.rounds_used
+        rounds_left = (neg.case.get("round_limit") or 10) - t.rounds_used
         if rounds_left <= 1:
             return Decision.hold(supplier_id, "last round: keep it for the close")
         if neg.seconds_to_deadline() < 120:
@@ -643,7 +643,7 @@ class TacticalStrategy(BaselineStrategy):
     def _round_budget(self, neg: Negotiation, sid: str) -> int:
         """Messages we can still expect to play in this thread: the round limit, or the clock."""
         t = neg.threads[sid]
-        limit = neg.case.get("round_limit", 10)
+        limit = neg.case.get("round_limit") or 10
         left = neg.seconds_to_deadline() - 120  # the runner closes before the cap
         if math.isfinite(left):
             per_round = max(15.0, neg.recorder.metrics.mean("supplier.reply_seconds") or 30.0) + 3.0
@@ -663,7 +663,7 @@ class TacticalStrategy(BaselineStrategy):
     def _may_probe(self, neg: Negotiation, sid: str, their_c: float) -> bool:
         """Push a final offer once - only when its walking away would cost us little."""
         t = neg.threads[sid]
-        if neg.case.get("round_limit", 10) - t.rounds_used < 2 or neg.seconds_to_deadline() < 180:
+        if (neg.case.get("round_limit") or 10) - t.rounds_used < 2 or neg.seconds_to_deadline() < 180:
             return False
         for other, ot in neg.threads.items():
             if other != sid and self.tplans[other].probed_final and ot.live:
@@ -798,7 +798,7 @@ class TacticalStrategy(BaselineStrategy):
 
     def _may_push(self, neg: Negotiation, sid: str) -> bool:
         t = neg.threads[sid]
-        return neg.case.get("round_limit", 10) - t.rounds_used >= 2 and neg.seconds_to_deadline() > 150
+        return (neg.case.get("round_limit") or 10) - t.rounds_used >= 2 and neg.seconds_to_deadline() > 150
 
     def _reanchor(self, neg, sid, plan: Plan, theirs: dict, their_c: float) -> Decision | None:
         """It came under a floor we only guessed: our guess was timid. Ask again under its new price, once."""
@@ -1227,7 +1227,7 @@ class TacticalStrategy(BaselineStrategy):
     def keepalive(self, neg: Negotiation, supplier_id: str) -> dict | None:
         """A held thread's clock runs while others negotiate: a harmless question keeps it alive."""
         t = neg.threads[supplier_id]
-        if neg.case.get("round_limit", 10) - t.rounds_used <= 2:
+        if (neg.case.get("round_limit") or 10) - t.rounds_used <= 2:
             return None
         plan = self.tplans[supplier_id]
         asks = [

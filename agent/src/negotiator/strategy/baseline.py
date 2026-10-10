@@ -77,7 +77,7 @@ class BaselineStrategy:
     def prepare(self, neg: Negotiation) -> None:
         case, buyer = neg.case, neg.buyer
         goal = buyer.get("category_goal", "leverage")
-        parts = case.get("parts", [])
+        parts = case.get("parts") or []
         current = buyer.get("current_unit_price")
         for sid, thread in neg.threads.items():
             _, terms = thread.standing
@@ -149,7 +149,7 @@ class BaselineStrategy:
         if not self.data:
             return []
         case, d = neg.case, self.data
-        parts = case.get("parts", [])
+        parts = case.get("parts") or []
         asked = (open_price / current - 1) * 100 if open_price and current else None
         trigger = case.get("trigger_doc")
         fact = d.fact(trigger) if trigger else None
@@ -180,7 +180,7 @@ class BaselineStrategy:
             return Decision.hold(supplier_id, t.status)
         if theirs.get("unit_price") is None or plan.target_price is None:
             return Decision.hold(supplier_id, "no price to negotiate on")
-        rounds_left = neg.case.get("round_limit", 10) - t.rounds_used
+        rounds_left = (neg.case.get("round_limit") or 10) - t.rounds_used
         if rounds_left <= 1:
             return Decision.hold(supplier_id, "last round: keep it for the close")
         if neg.seconds_to_deadline() < 120:
@@ -452,7 +452,7 @@ class BaselineStrategy:
 
     def keepalive(self, neg: Negotiation, supplier_id: str) -> dict | None:
         t = neg.threads[supplier_id]
-        if neg.case.get("round_limit", 10) - t.rounds_used <= 2:
+        if (neg.case.get("round_limit") or 10) - t.rounds_used <= 2:
             return None
         return {
             "subject": f"{neg.case.get('title', 'Your quote')}",

@@ -176,7 +176,7 @@ class LLMStrategy(TacticalStrategy):
         ]
         if not d:
             return "\n".join(out)
-        dossier = d.dossier(sid, case.get("parts", []))
+        dossier = d.dossier(sid, (case.get("parts") or []))
         out.append(f"SUPPLIER: {json.dumps(dossier['supplier'], ensure_ascii=False, default=str)}")
         out.append(f"SCORECARDS: {json.dumps(dossier['scorecards'][:3], default=str)}")
         out.append(f"CONTRACTS: {json.dumps(dossier['contracts'], default=str)}")
@@ -210,7 +210,7 @@ class LLMStrategy(TacticalStrategy):
             if take := self._take_agreed(neg, supplier_id):
                 return take
             return Decision.hold(supplier_id, "agreed")
-        if neg.case.get("round_limit", 10) - t.rounds_used <= 1 or neg.seconds_to_deadline() < 120:
+        if (neg.case.get("round_limit") or 10) - t.rounds_used <= 1 or neg.seconds_to_deadline() < 120:
             return Decision.hold(supplier_id, "out of rounds or time")
 
         their_c = neg.cost(supplier_id, theirs)
@@ -251,7 +251,7 @@ class LLMStrategy(TacticalStrategy):
         or an alternative about as cheap. Its words alone are no reason - every practice walk-away followed a
         push on a final offer."""
         t = neg.threads[sid]
-        if neg.case.get("round_limit", 10) - t.rounds_used < 2 or neg.seconds_to_deadline() < 180:
+        if (neg.case.get("round_limit") or 10) - t.rounds_used < 2 or neg.seconds_to_deadline() < 180:
             return False
         for other, ot in neg.threads.items():
             if other != sid and self.tplans[other].probed_final and ot.live:

@@ -63,7 +63,7 @@ def accept_problems(neg, supplier_id: str, term_sheet_id: str | None) -> list[st
     return problems
 
 
-def sheet_problems(case: dict, terms: dict) -> list[str]:
+def sheet_problems(case: dict, terms: dict, standard: dict | None = None) -> list[str]:
     problems = []
     negotiable = case["negotiable"]
     if set(terms) != set(negotiable):
@@ -75,7 +75,9 @@ def sheet_problems(case: dict, terms: dict) -> list[str]:
                 problems.append(f"unit_price {v!r}")
         elif options.get(f) and v not in options[f]:
             problems.append(f"{f}={v!r} not in options")
-    if not must_haves_ok(case, terms):
+    # on the terms it would close on: a must-have on a field that is neither negotiable nor fixed is kept
+    # (or broken) by the supplier's standard terms, not by our sheet
+    if not must_haves_ok(case, terms, standard):
         problems.append("breaks a must-have")
     return problems
 
@@ -98,7 +100,8 @@ def clean_message(neg, supplier_id: str, message: dict) -> tuple[dict, list[str]
     removed: list[str] = []
     sheets = []
     for sheet in (message.get("term_sheets") or [])[:MAX_SHEETS]:
-        problems = sheet_problems(neg.case, sheet.get("terms", {}))
+        thread = neg.threads.get(supplier_id)
+        problems = sheet_problems(neg.case, sheet.get("terms", {}), thread.standard_terms if thread else None)
         if problems:
             removed.append(f"sheet {sheet.get('terms')}: {'; '.join(problems)}")
         elif sheet not in sheets:
