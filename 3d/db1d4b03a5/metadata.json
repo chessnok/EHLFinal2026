@@ -3,7 +3,7 @@
   "checkpoint_id": "3ddb1d4b03a5",
   "strategy": "manual-commit",
   "branch": "feat/tactic-experiments",
-  "checkpoints_count": 4,
+  "checkpoints_count": 8,
   "files_touched": [
     "AGENTS.md",
     "agent/README.md",
@@ -16,8 +16,11 @@
     "agent/docs/benchmarks/2026-10-10-tactical-none.md",
     "agent/docs/benchmarks/2026-10-10-trade-none.md",
     "agent/docs/benchmarks/README.md",
+    "agent/docs/knowledge/get-best-price-guide.md",
     "agent/src/negotiator/strategy/__init__.py",
     "agent/src/negotiator/strategy/baseline.py",
+    "agent/src/negotiator/strategy/experiments.py",
+    "agent/src/negotiator/strategy/playbook.py",
     "agent/tests/test_sim.py"
   ],
   "sessions": [
@@ -34,13 +37,20 @@
       "compact_transcript": "/3d/db1d4b03a5/1/transcript.jsonl",
       "content_hash": "/3d/db1d4b03a5/1/content_hash.txt",
       "prompt": "/3d/db1d4b03a5/1/prompt.txt"
+    },
+    {
+      "metadata": "/3d/db1d4b03a5/2/metadata.json",
+      "transcript": "/3d/db1d4b03a5/2/full.jsonl",
+      "compact_transcript": "/3d/db1d4b03a5/2/transcript.jsonl",
+      "content_hash": "/3d/db1d4b03a5/2/content_hash.txt",
+      "prompt": "/3d/db1d4b03a5/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 40,
-    "cache_creation_tokens": 25609,
-    "cache_read_tokens": 2735453,
-    "output_tokens": 14833,
-    "api_call_count": 17
+    "input_tokens": 143,
+    "cache_creation_tokens": 276669,
+    "cache_read_tokens": 11812786,
+    "output_tokens": 98450,
+    "api_call_count": 65
   }
 }
