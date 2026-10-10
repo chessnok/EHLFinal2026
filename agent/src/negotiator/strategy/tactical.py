@@ -224,6 +224,12 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief.capped = self.flags["belief_cap"]
                 plan.belief.ppm = profile.ppm  # scorecard ppm: what a chargeback really costs it
             plan.evidence = self._evidence(neg, sid, terms.get("unit_price"), current) if terms else []
+            body = thread.latest.get("body") or ""
+            clauses = [o for o in neg.case.get("term_options", {}).get("index_clause") or [] if o]
+            if "index_clause" in neg.case["negotiable"] and any(o.get("series") in body for o in clauses):
+                # it argues its price with the very index a clause would follow: the clause answers it. P02's
+                # supplier dropped its price by 15-22 for one and never went under 372.96 without (P-13, P-15, P-19)
+                plan.requests.add("index_clause")
             if profile.has("hedged"):
                 plan.banned_kinds.add("index")  # "not our reality" until its hedge runs out
             if gt.market_supports_ask:
@@ -822,7 +828,14 @@ class TacticalStrategy(BaselineStrategy):
             t.status == "final_offer"
             or plan.stalls >= 2
             or self._round_budget(neg, sid) - t.rounds_used <= 2
-            or (gt.grounded and gt.lower is not None and price <= gt.lower * (1 + UNDER_FLOOR))  # at its floor
+            # at its floor - where we have one: with a margin charge the floor is only the prior of 1 % under
+            # its quote, and P01 came down 4.4 % (132.50); matching 133.50 in round 3 ended that run at 0.728
+            or (
+                not neg.supplier_estimates.get(sid)
+                and gt.grounded
+                and gt.lower is not None
+                and price <= gt.lower * (1 + UNDER_FLOOR)
+            )
         )
         if not at_risk:
             return None  # the upper bound is our emergency line, not an early yes
@@ -922,15 +935,29 @@ class TacticalStrategy(BaselineStrategy):
         spent = max(0.0, ask_c - plan.target_c)
         under = spent < slack
 
+        def least(terms: dict) -> float:
+            return neg.cost(sid, {**terms, "unit_price": self._cheapest_price(neg, sid, terms)})
+
+        def asked(terms: dict) -> bool:
+            return any(satisfies(case, terms, theirs, r, plan.proposed) for r in plan.requests)
+
+        # a dearer structure the supplier asked for (an index clause) is offered at the price that costs us
+        # least - the cheapest such structure only (P02: deadband 5, not 3 or 0)
+        asked_least = min(
+            (least(t) for t in priced_menu(case, theirs, lambda _t: theirs["unit_price"]) if asked(t)), default=math.inf
+        )
+
         def price_for(terms: dict) -> float:
             if not under:
                 return self._iso_cost_price(neg, sid, terms, ask_c - slack)
-            least = neg.cost(sid, {**terms, "unit_price": self._cheapest_price(neg, sid, terms)})
-            if least > plan.target_c * (1 + STALL_EPS):
-                # only the structures that are as cheap for us as the best one: P03's deep ask went out on a
-                # volume below our need, P02's on an index clause, and the supplier agreed to both (P-18)
+            floor_c = least(terms)
+            if floor_c > plan.target_c + 0.25 * slack:
+                # only the structures about as cheap for us as the best one go deep: P03's deep ask went out on
+                # a volume below our need, P02's on an index clause, and the supplier agreed to both (P-18)
+                if asked(terms) and floor_c <= asked_least * (1 + STALL_EPS):
+                    return self._cheapest_price(neg, sid, terms)
                 return 0.0
-            return self._iso_cost_price(neg, sid, terms, least + slack - spent, under=True)
+            return self._iso_cost_price(neg, sid, terms, floor_c + slack - spent, under=True)
 
         menu = priced_menu(case, theirs, price_for)
         valid, under_floor = [], []
