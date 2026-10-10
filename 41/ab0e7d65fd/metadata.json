@@ -3,14 +3,23 @@
   "checkpoint_id": "41ab0e7d65fd",
   "strategy": "manual-commit",
   "branch": "fix/timeout-moves",
-  "checkpoints_count": 1,
-  "files_touched": null,
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/docs/final-offer-stats-2026-10-11.md"
+  ],
   "sessions": [
     {
       "metadata": "/41/ab0e7d65fd/0/metadata.json",
       "transcript": "/41/ab0e7d65fd/0/full.jsonl",
       "compact_transcript": "/41/ab0e7d65fd/0/transcript.jsonl",
       "content_hash": "/41/ab0e7d65fd/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/41/ab0e7d65fd/1/metadata.json",
+      "transcript": "/41/ab0e7d65fd/1/full.jsonl",
+      "compact_transcript": "/41/ab0e7d65fd/1/transcript.jsonl",
+      "content_hash": "/41/ab0e7d65fd/1/content_hash.txt",
       "prompt": ""
     }
   ],
