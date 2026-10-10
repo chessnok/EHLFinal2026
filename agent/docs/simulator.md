@@ -120,7 +120,16 @@ of anything on the arena.
 With walk-aways fitted (fit of 22:00, 10 repeats) the simulator gives `playbook` 0.405 over the practice cases; that
 is the same data it was fitted on, not a check.
 
-**Open check.** Simulator figures for `tactical-slow25` on the practice cases, written down before any arena run of
-it (fit of 22:00, 10 repeats; `tactical` in brackets): P01 0.87 (0.85), P02 0.51 (0.34), P03 0.96 (0.86), P04 1.00
+**Check of 10 October, 22:14 - failed.** Simulator figures for `tactical-slow25` on the practice cases, written down
+before the arena run of it (fit of 22:00, 10 repeats; `tactical` in brackets): P01 0.87 (0.85), P02 0.51 (0.34), P03 0.96 (0.86), P04 1.00
 (1.00), P05 0.60 (0.50), P07 0.79 (0.74), P08 0.40 (0.47), P10 0.65 (0.61), P11 0.52 (0.42), P18 0.26 (0.24); mean
 0.656 (0.603).
+
+The arena run (`20261010-221425-practice-tactical-slow25`): P01 0.914, P02 0.000, P03 0.903, P04 0.860, P05 0.689, P07
+0.585, P08 0.515, P10 0.647, P11 0.626, P18 0.467; mean 0.621 against 0.695 for `tactical`. The simulator had the
+change at +0.053 on the mean; the arena has it at −0.074 (−0.006 without P02). It had the direction right on P01, P08,
+P11 and P18 and wrong on P02, P03, P05 and P07. On P02 it missed a relationship charge of 179,204 that turned the deal
+into a score of 0.
+
+**What that means for its use:** on the sandbox it ranked this change correctly, on practice it did not. Do not use
+it to decide a change on practice cases; a practice pass costs 10 sessions.

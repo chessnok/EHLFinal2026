@@ -101,15 +101,24 @@ P08, P02, P07 and P11.
 [`benchmarks/2026-10-10-playbook-none.md`](benchmarks/2026-10-10-playbook-none.md). Problem 2.1 is about the rounds
 before a final offer, not about pushing past one.
 
+### 2.7 Our cost of a deal misses the relationship charge
+
+P02 (`stabilise`), run `20261010-221425-practice-tactical-slow25`: we accepted EUR 345.39 and computed C as 2,135,441.
+The arena's C is 2,314,646, of which 179,204 is the relationship charge for leaving the supplier below its
+sustainable margin; the deal is above C_open and scored 0. At 358.45 (run `20261010-211824-practice-tactical`) the
+charge was 56,127. Our estimate of the charge was 0 in both, so the guard that refuses a deal worse than the opening
+did not fire.
+
 ## 3. Work items
 
 | # | Item | Cases it concerns | Evidence |
 |---|---|---|---|
-| 1 | Concede more slowly while the supplier is `open` and rounds are left (`tactical-slow25`: sandbox D02 0.587 → 0.671, not played on practice) | P18, P05 | 2.1 |
+| 1 | ~~Concede more slowly while the supplier is `open`~~ - tried as `tactical-slow25`: sandbox D02 0.587 → 0.671, practice mean 0.695 → 0.621 (0.696 → 0.690 without P02). No gain. | P18, P05 | 2.1 |
 | 2 | Do not hold a thread on "last word" or "meets our ask" while the status is `open` and the supplier names a lever | P11, P01 | 2.1, 2.3 |
 | 3 | Lower the upper bound for leverage cases, or stop using it as a reason to close | P05, P18, P08, P07 | 2.2 |
 | 4 | When a supplier names a lever twice, send a sheet that gives it (shortest payment, no chargeback) at its price | P11, P07 | 2.3 |
 | 5 | Drop the price-history argument from the first e-mail; never cite one ID twice | all | 2.4 |
+| 6 | In `stabilise` and `secure_supply` cases, estimate the supplier's cost before pushing the price down, and stop where the relationship charge outweighs the price | P02, P01, P03, P10 | 2.7 |
 
 ## 4. How to test changes
 

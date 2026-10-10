@@ -44,7 +44,9 @@ Scores are means over one to four plays of each case. Cost of all runs: 0 practi
 | Strategy | Mean | Deals | Record |
 |---|---|---|---|
 | tactical (`96f7545`) | **0.695** | 10 of 10 | [record](2026-10-10-tactical-none.md) |
+| tactical-slow25 (`fe7a9ea`) | 0.621 | 10 of 10 | [record](2026-10-10-tactical-slow25-none.md) |
 | playbook | 0.376 | 7 of 10 | [record](2026-10-10-playbook-none.md) |
 
-One run each, 20 practice sessions in total. Playbook's closing offer made three suppliers walk away (P04, P07, P18);
+One run each, 30 practice sessions in total. `tactical-slow25` gained on the sandbox and lost on practice: P02 closed
+at a price that cost a relationship charge of 179,204 and scored 0. Playbook's closing offer made three suppliers walk away (P04, P07, P18);
 scored at the suppliers' final offers the same run gives 0.539, still behind tactical.
