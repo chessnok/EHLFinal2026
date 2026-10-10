@@ -39,7 +39,7 @@ from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
 from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
-from negotiator.ledger import CITED_DRIVER, data_facts, reply_facts
+from negotiator.ledger import CITED_DRIVER, data_facts, next_drop, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
 from negotiator.profile import SupplierProfile, build_profile
 from negotiator.session import Negotiation
@@ -216,6 +216,8 @@ FLAGS: dict[str, str] = {
     "60 % of the usual but never under 0.6 % of C",
     "answers": "plain answers: the volume we need, an opener that matches its move, a fixed field said once, a "
     "clause it must have kept, no 'pays early' that is not",
+    "more_drops": "a cost driver whose fall the supplier accepted is cited again over a window with new IDs in a "
+    "later round (P08: PPI-C2431 was taken into account once, and from round 3 on we had nothing left to cite)",
 }
 
 
@@ -577,6 +579,8 @@ class TacticalStrategy(BaselineStrategy):
                 if not isinstance(i, int) or not 0 <= i < len(plan.last_claims):
                     continue
                 kind = plan.last_claims[i].kind
+                if self.flags["more_drops"] and result == "verified" and kind == "recent_drop":
+                    self._another_drop(plan, plan.last_claims[i], reply.get("body", ""))
                 if result == "contradicted":
                     self.banned_case_kinds.add(kind)
                 elif result == "irrelevant":
@@ -629,6 +633,21 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief.observe(reply)
             self._update_upper(neg, sid, plan)
         plan.seen_replies = len(replies)
+
+    def _another_drop(self, plan: Plan, claim: Evidence, body: str) -> None:
+        """more_drops: the supplier accepted a driver's fall - unless it said that driver does not reach its costs
+        ("not our reality: our AS-14404 is covered"), the same driver's next window goes into the fresh pool."""
+        series = (claim.meta or {}).get("series")
+        if not series or not self.data:
+            return
+        for clause in re.split(
+            r"[.;:!?]", body or ""
+        ):  # "factored the drop in PPI-C2431; however, our AS-14404 is covered"
+            if series in clause and re.search(r"not our reality|does not reach|covered", clause, re.I):
+                return
+        if e := next_drop(self.data, series, self.used_refs | set(claim.refs)):
+            if all(e.sentence != c.sentence for c in plan.counters):
+                plan.counters.append(e)
 
     def _read_breakdown(self, neg: Negotiation, sid: str, plan: Plan, reply: dict) -> None:
         """A cost breakdown XLSX: the supplier's own cost per unit is the floor it will not go below."""

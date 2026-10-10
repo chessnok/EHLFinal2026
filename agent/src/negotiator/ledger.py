@@ -65,6 +65,38 @@ def _drop_evidence(data: WorldData, series: str, weight: float, cited: bool) -> 
     )
 
 
+def next_drop(data: WorldData, series: str, used: set[str], weight: float = 0.0) -> Evidence | None:
+    """The steepest fall of a series over a window none of whose IDs we have cited (each ID counts once per case):
+    the same driver, a second verified fact. The window ends within the series' last 12 months, spans at most 12."""
+    rows = data.query(
+        "SELECT id, month, value FROM index_values WHERE series_id = ? ORDER BY month DESC", (series,), limit=13
+    )
+    rows = [r for r in rows if r["value"]]
+    best = None
+    for i, later in enumerate(rows):
+        for earlier in rows[i + 1 :]:
+            if later["id"] in used or earlier["id"] in used:
+                continue
+            pct = (later["value"] / earlier["value"] - 1) * 100
+            if best is None or pct < best[2]:
+                best = (earlier, later, pct)
+    if not best or best[2] > -MIN_DROP:
+        return None
+    earlier, later, pct = best
+    name = series
+    named = data.query("SELECT name FROM index_series WHERE id = ?", (series,))
+    if named and named[0]["name"]:
+        name = named[0]["name"].split(",")[0].split("(")[0].strip()
+    return Evidence(
+        kind="recent_drop",
+        refs=[earlier["id"], later["id"]],
+        sentence=f"{name} also fell {abs(pct):.1f}% from {earlier['month']} to {later['month']} "
+        f"({earlier['id']}, {later['id']}).",
+        strength=4.0 + weight * abs(pct),
+        meta={"series": series, "pct": round(pct, 2), "cited": False, "again": True},
+    )
+
+
 def data_facts(data: WorldData | None, part_ids: list[str]) -> list[Evidence]:
     """Before the first move: the part's cost drivers that have fallen recently."""
     if not data or not part_ids:
