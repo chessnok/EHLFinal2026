@@ -34,3 +34,8 @@ Read the file for the area you touch before changing it:
 
 General: keep changes scoped to the request, match the surrounding code's style, run the checks above for every
 area you changed, and do not commit or push unless asked.
+
+Costs: report an LLM cost only when the provider measured it (`cost_usd` on the `llm_call` event, e.g.
+`claude-code`). When it did not (OpenAI-compatible endpoints return tokens, not money), write
+`APPROX-NOT-MEASURED` in place of the amount and give the token counts; never a figure computed from a
+remembered price list.
