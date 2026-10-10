@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "82ef35f82cfe",
+  "strategy": "manual-commit",
+  "branch": "feat/tactic-experiments",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/README.md",
+    "agent/docs/benchmarks/README.md",
+    "agent/docs/knowledge/get-best-price-guide.md",
+    "agent/src/negotiator/strategy/playbook.py",
+    "agent/tests/test_sim.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/82/ef35f82cfe/0/metadata.json",
+      "transcript": "/82/ef35f82cfe/0/full.jsonl",
+      "compact_transcript": "/82/ef35f82cfe/0/transcript.jsonl",
+      "content_hash": "/82/ef35f82cfe/0/content_hash.txt",
+      "prompt": "/82/ef35f82cfe/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 144,
+    "cache_creation_tokens": 141981,
+    "cache_read_tokens": 7906727,
+    "output_tokens": 47332,
+    "api_call_count": 61
+  }
+}
