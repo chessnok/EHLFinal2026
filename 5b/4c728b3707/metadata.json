@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "5b4c728b3707",
+  "strategy": "manual-commit",
+  "branch": "fix/timeout-moves",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/5b/4c728b3707/0/metadata.json",
+      "transcript": "/5b/4c728b3707/0/full.jsonl",
+      "compact_transcript": "/5b/4c728b3707/0/transcript.jsonl",
+      "content_hash": "/5b/4c728b3707/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
