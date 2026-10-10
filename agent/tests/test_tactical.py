@@ -111,6 +111,19 @@ def test_send_guard_drops_bad_sheets_and_unknown_ids(tmp_path, world) -> None:
     assert len(removed) == 4
 
 
+def test_send_guard_drops_claims_without_source_and_empty_threats(tmp_path, world) -> None:
+    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 16.0, "payment_days": 60})
+    body = (
+        "Dear team,\n\nThe index fell 4 % (idx:NOPE@2026-08). Steel eased (idx:PPI-D351@2025-08). "
+        "A competitor offers EUR 15.70. Otherwise we will walk away.\n\nOur proposal: below."
+    )
+    out, removed = clean_message(neg, sid, {"subject": "x", "body": body, "refs": []})
+    assert out["body"] == "Dear team,\n\nSteel eased (idx:PPI-D351@2025-08).\n\nOur proposal: below."
+    assert sum(r.startswith("unsupported sentence") for r in removed) == 3
+    clean = "Dear team,\n\nThank you. Our proposal: below."
+    assert clean_message(neg, sid, {"subject": "x", "body": clean})[0]["body"] == clean  # nothing to drop: unchanged
+
+
 def test_sheet_needs_exactly_the_negotiable_fields() -> None:
     assert sheet_problems(case(), {"unit_price": 15.0})
     assert not sheet_problems(case(), {"unit_price": 15.0, "payment_days": 60})

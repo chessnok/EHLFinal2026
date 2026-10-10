@@ -11,6 +11,7 @@ from negotiator.strategy.experiments import TACTICS, ExperimentStrategy
 from negotiator.strategy.llm_strategy import LLMStrategy
 from negotiator.strategy.patient import SCALES, PatientStrategy
 from negotiator.strategy.playbook import VARIANTS, PlaybookStrategy
+from negotiator.strategy.tactical import FLAGS as TACTICAL_FLAGS
 from negotiator.strategy.tactical import TacticalStrategy
 
 STRATEGIES: dict[str, Callable[..., Strategy]] = {
@@ -21,6 +22,9 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     **{name: partial(PlaybookStrategy, playbook) for name, playbook in VARIANTS.items()},
     **{name: partial(PatientStrategy, scale, name) for name, scale in SCALES.items()},
     "decided": DecidedStrategy,
+    # tactical with one review change switched on, for measuring each on its own; and with all of them
+    **{f"tactical+{flag}": partial(TacticalStrategy, **{flag: True}) for flag in TACTICAL_FLAGS},
+    "tactical+all": partial(TacticalStrategy, **{flag: True for flag in TACTICAL_FLAGS}),
 }
 NEEDS_LLM = {"llm"}
 NEEDS_DECISIONS = {"decided"}  # constructed as Strategy(data, DecisionsClient)

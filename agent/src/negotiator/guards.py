@@ -8,14 +8,17 @@ Accept:  the sheet is the supplier's current standing offer; it keeps every must
          scores at least as much).
 Send:    every term sheet carries exactly the negotiable fields with allowed values and keeps the
          must-haves (a supplier may agree to any sheet we send, and we must be able to accept it);
-         every cited ID exists in the data, the case's facts or this session's offers; at most 3
-         sheets and 20 refs.
+         every cited ID exists in the data, the case's facts or this session's offers - a sentence
+         whose IDs are all unknown goes, and so does a threat or an "other offer" without a rival's
+         offer cited (conduct.py); at most 3 sheets and 20 refs.
 """
 
 import math
 import re
 
 from arena_kit.cost import must_haves_ok
+
+from negotiator.conduct import unsupported_sentences
 
 ID_RE = re.compile(r"\b(?:idx|quote|offer|sc|qn|po|cost|fc|news|doc|ctr):[\w.:@#/-]*\w")
 MAX_SHEETS = 3
@@ -114,7 +117,20 @@ def clean_message(neg, supplier_id: str, message: dict) -> tuple[dict, list[str]
         removed.append(f"body id {m.group(0)}")
         return ""
 
-    body = ID_RE.sub(keep, message.get("body") or "")
+    # conduct.py: no claim without its source, no threat or "other offer" we cannot show
+    rival_ids = {
+        s.get("term_sheet_id")
+        for other, t in neg.threads.items()
+        if other != supplier_id
+        for m in t.supplier_messages
+        for s in m.get("term_sheets") or []
+    }
+    rival_cited = any(r in rival_ids or r.startswith("quote:") for r in refs)
+    body, unsupported = unsupported_sentences(
+        message.get("body") or "", ID_RE, lambda i: known_id(neg, i), rival_cited
+    )
+    removed += [f"unsupported sentence: {s}" for s in unsupported]
+    body = ID_RE.sub(keep, body)
     body = re.sub(r"\s*\(\s*[,;\s]*\)", "", body)
     out = {**message, "body": body[:8000], "subject": (message.get("subject") or "")[:300], "refs": refs[:MAX_REFS]}
     if "term_sheets" in message:
