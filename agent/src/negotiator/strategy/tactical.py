@@ -298,7 +298,6 @@ class TacticalStrategy(BaselineStrategy):
         if self.data:
             out += self.data.evidence_orders((neg.case.get("parts") or []), sid, open_price)
             out += data_facts(self.data, (neg.case.get("parts") or []))
-            out += self.data.evidence_passthrough(sid, neg.threads[sid].latest.get("body") or "")
         return sorted(out, key=lambda e: -e.strength)
 
     def _full_cost(self, parts: list[str], supplier_id: str) -> float | None:

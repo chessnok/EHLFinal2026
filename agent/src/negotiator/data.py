@@ -21,7 +21,7 @@ MAX_ROWS = 500
 class Evidence:
     """One checkable argument: a sentence with its figure next to the IDs it rests on."""
 
-    kind: str  # index | passthrough | scorecard | quality | rival_offer | quote | should_cost | notice | forecast
+    kind: str  # index | scorecard | quality | rival_offer | quote | should_cost | notice | forecast
     refs: list[str]
     sentence: str
     strength: float = 0.0  # how much it should help us, for ranking
@@ -201,30 +201,6 @@ class WorldData:
                     f"({sc['id']}).",
                     strength=sc["ppm"] / 1000,
                     meta={"ppm": sc["ppm"]},
-                )
-            )
-        return out
-
-    def evidence_passthrough(self, supplier_id: str, their_text: str) -> list[Evidence]:
-        """The supplier argues its price with an index that a clause of our running contract already passes
-        through to the price: the rise it cites is in the current price - it would be paid twice."""
-        out = []
-        for row in self.query(
-            "SELECT cl.id, cl.clause, cl.series, cl.material_share FROM contract_clauses cl "
-            "JOIN contracts c ON c.id = cl.contract_id WHERE c.supplier_id = ? AND cl.type = 'index'",
-            (supplier_id,),
-        ):
-            if not row["series"] or not row["material_share"] or row["series"] not in (their_text or ""):
-                continue
-            out.append(
-                Evidence(
-                    kind="passthrough",
-                    refs=[row["id"]],
-                    sentence=f"Clause {row['clause']} of our framework agreement already passes {row['series']} "
-                    f"through to the price at a material share of {row['material_share'] * 100:.0f}% ({row['id']}), "
-                    f"so the rise in {row['series']} you cite is already in the price we pay today.",
-                    strength=6.0,  # it answers the supplier's own main argument: first e-mail
-                    meta={"series": row["series"], "material_share": row["material_share"]},
                 )
             )
         return out
