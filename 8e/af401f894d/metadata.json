@@ -3,14 +3,22 @@
   "checkpoint_id": "8eaf401f894d",
   "strategy": "manual-commit",
   "branch": "feat/bot-mechanics-flags",
-  "checkpoints_count": 2,
-  "files_touched": null,
+  "checkpoints_count": 3,
+  "files_touched": [
+    "agent/src/negotiator/strategy/tactical.py"
+  ],
   "sessions": [
     {
       "metadata": "/8e/af401f894d/0/metadata.json",
       "transcript": "/8e/af401f894d/0/full.jsonl",
       "content_hash": "/8e/af401f894d/0/content_hash.txt",
       "prompt": "/8e/af401f894d/0/prompt.txt"
+    },
+    {
+      "metadata": "/8e/af401f894d/1/metadata.json",
+      "transcript": "/8e/af401f894d/1/full.jsonl",
+      "content_hash": "/8e/af401f894d/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
