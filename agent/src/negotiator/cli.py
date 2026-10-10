@@ -7,6 +7,7 @@
   negotiator final                                       the Live Final (NEGOTIATOR_FINAL=1)
   negotiator report [run_id|latest] | stats              reports and statistics across runs
   negotiator lessons [run_id|latest]                     what each case taught: scores, costs, supplier reasons
+  negotiator chats [run_id|latest]                       every negotiation as a readable e-mail thread
   negotiator sim calibrate | check | bench <strategies> | serve     the local supplier simulator (no quota)
 Global: --url (e.g. http://127.0.0.1:8000 for arena-sim), --key, --json.
 """
@@ -22,6 +23,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
+from negotiator.chats import write_chats
 from negotiator.client import ArenaClient, ArenaError
 from negotiator.config import Settings
 from negotiator.data import WorldData
@@ -94,6 +96,7 @@ def _finish(recorder: Recorder, outcomes: list[dict]) -> None:
     recorder.close()
     summary = write_report(recorder.dir, outcomes)
     write_lessons(recorder.dir)
+    write_chats(recorder.dir)
     table = Table(title=f"run {recorder.run_id}")
     for col in ("case", "deal", "score", "C_open", "C_deal", "C_best", "rounds", "end", "replay"):
         table.add_column(col)
@@ -284,6 +287,14 @@ def cmd_lessons(args, settings: Settings) -> None:
     console.print(write_lessons(run).read_text(encoding="utf-8"))
 
 
+def cmd_chats(args, settings: Settings) -> None:
+    runs = sorted(p for p in settings.runs_dir.iterdir() if p.is_dir()) if settings.runs_dir.is_dir() else []
+    if not runs:
+        raise SystemExit("no runs yet")
+    run = runs[-1] if args.run in (None, "latest") else settings.runs_dir / args.run
+    console.print(f"{write_chats(run)} (and sessions/<sid>.md per case)")
+
+
 def cmd_stats(args, settings: Settings) -> None:
     stats = history(settings.runs_dir)
     table = Table(title="all runs")
@@ -380,6 +391,9 @@ def build_parser() -> argparse.ArgumentParser:
     add(
         "lessons", cmd_lessons, "per case: score, cost blocks, the supplier's reasons", needs_client=False
     ).add_argument("run", nargs="?", default="latest")
+    add("chats", cmd_chats, "every negotiation as a readable e-mail thread", needs_client=False).add_argument(
+        "run", nargs="?", default="latest"
+    )
     add("stats", cmd_stats, "scores across all runs", needs_client=False)
     add_sim_parser(add)
     return ap

@@ -21,6 +21,26 @@ COUNTRY_FACTOR = {"DE": 1.0, "AT": 1.05, "CH": 1.05, "CZ": 0.82, "PL": 0.82, "HU
 BELOW_COST_FLOOR = 0.95  # a supplier that sold below full cost may do so again, not by much
 NO_COST_FLOOR = 0.90  # without a should-cost: 10 % under its quote
 NO_COST_FLOOR_RELATIONSHIP = 0.95  # ... 5 % where squeezing a strategic supplier costs us
+# The floor as a share of the opening quote, backed out of the practice cases' C_best (the price that
+# reaches C_best on the best structure; 12 suppliers, 10 cases, 2026-10-10). Should-cost missed it by 16 %
+# on average, "quote x 0.90" by 11 %, this table by about 4 %. Where a case's kind is unseen, the goal.
+FLOOR_FACTOR = {
+    "rfq": 0.78,  # P05: 0.69-0.85 - bidders compete, the floor sits far under the quotes
+    "raw_material": 0.80,  # P08 0.84, P18 0.77 - base price and an index clause
+    "capacity": 0.87,  # P10
+    "bundling": 0.875,  # P07
+    "quality": 0.93,  # P11
+    "price_increase": 0.99,  # P01 1.00, P02 0.99 - the price barely moves; the terms carry the deal
+    "renewal": 0.985,  # P03 0.98, P04 0.99
+}
+FLOOR_FACTOR_BY_GOAL = {
+    "leverage": 0.80,
+    "routine": 0.90,
+    "quality_first": 0.93,
+    "stabilise": 0.985,
+    "secure_supply": 0.87,
+}
+UPPER_MARGIN = 0.05  # we accept at most 5 % above the calibrated floor when the deal is at risk
 DEFAULT_GIVE_PCT = 2.5  # renewals settled 2.5 points under the ask on average (negotiation_history)
 
 
@@ -161,27 +181,23 @@ def estimate(data: WorldData | None, case: dict, supplier_id: str, open_price: f
     elif current and open_price > current:
         gt.asked_pct = round((open_price / current - 1) * 100, 2)
 
-    # lower bound: the supplier's floor
+    # lower bound: where the supplier really ends, calibrated on the practice cases' C_best (see FLOOR_FACTOR)
     if gt.full_cost:
-        floor = gt.full_cost * (
-            BELOW_COST_FLOOR if "below_cost" in traits or (current and current < gt.full_cost) else 1.0
-        )
         gt.notes.append(f"full cost {gt.full_cost} ({gt.full_cost_source})")
-        gt.grounded = True
-    else:
-        # no cost estimate: a guess around its quote, gentler where the relationship counts - a deep
-        # anchor on a guess reads as an insult (case:D01: 17 % under the quote, the owner withdrew)
-        relationship = case.get("buyer", {}).get("category_goal") in ("stabilise", "secure_supply")
-        floor = open_price * (NO_COST_FLOOR_RELATIONSHIP if relationship else NO_COST_FLOOR)
-        gt.notes.append("no should-cost: floor from prices")
-    gt.lower = round(min(floor, open_price), 2)
+        gt.grounded = True  # a cost estimate exists: an argument and the margin term, not the floor
+    factor = floor_factor(case)
+    gt.lower = round(open_price * factor, 2)
+    gt.notes.append(f"floor = quote x {factor} ({case.get('type')}, {case.get('buyer', {}).get('category_goal')})")
 
-    # upper bound: the most we accept when the deal is at risk
-    candidates = [open_price * (1 - gt.give_pct / 100)]  # where it usually ends
-    if current and gt.asked_pct is not None:
-        candidates.append(current * (1 + (gt.asked_pct - gt.give_pct) / 100))
-        if gt.justified_pct is not None:
-            candidates.append(current * (1 + max(gt.justified_pct, 0.0) / 100))  # what the market supports
-    upper = min(candidates)
-    gt.upper = round(min(max(upper, gt.lower), open_price), 2)
+    # upper bound: the most we accept when the deal is at risk - a little above where suppliers of this kind end
+    gt.upper = round(min(open_price, gt.lower * (1 + UPPER_MARGIN)), 2)
     return gt
+
+
+def floor_factor(case: dict) -> float:
+    """The supplier's floor as a share of its quote for this kind of case (practice calibration)."""
+    goal = case.get("buyer", {}).get("category_goal")
+    kind = case.get("type")
+    if len(case.get("suppliers") or []) > 1:
+        kind = "rfq"
+    return FLOOR_FACTOR.get(kind, FLOOR_FACTOR_BY_GOAL.get(goal, NO_COST_FLOOR))
