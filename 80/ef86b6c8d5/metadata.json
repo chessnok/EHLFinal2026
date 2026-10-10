@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "80ef86b6c8d5",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitmodules",
+    "AGENTS.md",
+    "Makefile",
+    "README.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/80/ef86b6c8d5/0/metadata.json",
+      "transcript": "/80/ef86b6c8d5/0/full.jsonl",
+      "content_hash": "/80/ef86b6c8d5/0/content_hash.txt",
+      "prompt": "/80/ef86b6c8d5/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 356,
+    "cache_creation_tokens": 500737,
+    "cache_read_tokens": 54267127,
+    "output_tokens": 166603,
+    "api_call_count": 180
+  }
+}
