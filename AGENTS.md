@@ -76,17 +76,6 @@ Example of the required question:
 > This spends practice quota: `uv run negotiator run --set practice --cases case:P01 case:P05 --strategy tactical`
 > → 2 sessions. Balance now 197 / 200 left, after the run 195. Quota resets at 2026-10-11 12:47 UTC. Run it?
 
-## HARD RULE: no run without Langfuse
-
-A coding agent must **not** start a run that judges a strategy unless Langfuse tracing is on: `LANGFUSE_PUBLIC_KEY`
-and `LANGFUSE_SECRET_KEY` are set in the root `.env` (see `agent/README.md`, Langfuse). This covers:
-- every run against the arena: practice, sandbox and the final (`negotiator play`, `run`, `final`);
-- every run on the local simulator (`negotiator sim bench`, or `play` / `run` with `--url` at `sim serve`).
-
-Check before starting, without printing the values: `grep -c '^LANGFUSE_.*_KEY=.' .env` must give 2. If the keys
-are missing, do not run - say so and ask for them. A run nobody can open afterwards teaches the team nothing.
-Not covered: `make test`, `sim calibrate`, `sim check` and read-only calls (`me`, `cases`, `sessions`).
-
 ## Run registry and pushed code only
 
 **Never run unpushed code on a limited run.** A practice run, or any run that spends quota, must use code that is

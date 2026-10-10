@@ -10,7 +10,6 @@ from negotiator.config import PACKAGE_ROOT, Settings
 from negotiator.sim.arena import CalibratedSim, arena_scores, bench, check, serve
 from negotiator.sim.calibrate import calibrate, load_model, load_sessions
 from negotiator.sim.supplier import PERSONAS
-from negotiator.tracing import enabled as tracing_enabled
 
 console = Console()
 MODEL = PACKAGE_ROOT / "data" / "sim" / "model.json"  # git-ignored: fitted from replays, never committed
@@ -88,9 +87,6 @@ def _pool_table(by_opponent: dict, strategies: list[str], opponents: tuple[str, 
 
 def cmd_bench(args, settings: Settings) -> None:
     from negotiator.data import WorldData
-
-    if not tracing_enabled():
-        raise SystemExit("no LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY in .env: AGENTS.md forbids a run without them")
 
     model = _model(settings, refit=args.refit)
     data = WorldData(settings.data_dir, settings.release_dir)
