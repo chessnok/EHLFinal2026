@@ -58,6 +58,7 @@ class SupplierPlan:
     evidence: list[Evidence] = field(default_factory=list)
     asked_cost_breakdown: bool = False
     offered: dict[str, float] = field(default_factory=dict)  # non-price terms -> highest price we offered
+    longer_offers: int = 0  # times we offered a contract covering the horizon while theirs was shorter
 
 
 class BaselineStrategy:
@@ -159,6 +160,7 @@ class BaselineStrategy:
             out += d.evidence_notice(trigger, sid)
         out += d.evidence_indices(parts, asked)
         out += d.evidence_scorecard(sid)
+        out += d.evidence_forecast(parts)  # low strength: picked when the supplier asks about volume
         if open_price:
             out += d.evidence_should_cost(parts, open_price)
         alt = neg.buyer.get("alternative") or {}
@@ -277,9 +279,13 @@ class BaselineStrategy:
         return neg.cost(sid, theirs) <= neg.cost(sid, best_at_theirs) * (1 + CLOSE_ENOUGH)
 
     def _optimise(self, neg: Negotiation, sid: str, terms: dict) -> dict:
-        """Coordinate descent over the non-price options: each field set to what minimises C."""
+        """Coordinate descent over the non-price options: each field set to what minimises C.
+
+        On a tie in C the supplier's own value wins: a term that costs us nothing is given away for free (e.g. a
+        looser ppm when the chargeback already covers our defect cost)."""
         options = neg.case.get("term_options", {})
         best = dict(terms)
+        given = dict(terms)
         for _ in range(2):
             for f in neg.case["negotiable"]:
                 if f == "unit_price" or not options.get(f):
@@ -288,7 +294,8 @@ class BaselineStrategy:
                 def key(value, f=f):
                     trial = {**best, f: value}
                     ok = neg.keeps_must_haves(sid, trial)
-                    return (neg.cost(sid, trial) if ok else math.inf, repr(value))
+                    cost = round(neg.cost(sid, trial), 2) if ok else math.inf
+                    return (cost, value != given.get(f), repr(value))
 
                 best[f] = min(options[f], key=key)
         return best
