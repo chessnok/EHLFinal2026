@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "1516bb844737",
+  "strategy": "manual-commit",
+  "branch": "feat/scout-hedge",
+  "checkpoints_count": 3,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/15/16bb844737/0/metadata.json",
+      "transcript": "/15/16bb844737/0/full.jsonl",
+      "content_hash": "/15/16bb844737/0/content_hash.txt",
+      "prompt": "/15/16bb844737/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1390,
+    "cache_creation_tokens": 1454027,
+    "cache_read_tokens": 291773408,
+    "output_tokens": 601509,
+    "api_call_count": 694
+  }
+}
