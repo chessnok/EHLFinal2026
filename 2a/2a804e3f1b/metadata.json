@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "2a2a804e3f1b",
+  "strategy": "manual-commit",
+  "branch": "refactor/strategy-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/src/negotiator/strategy/tactical.py",
+    "agent/src/negotiator/strategy/tactical/__init__.py",
+    "agent/src/negotiator/strategy/tactical/concession.py",
+    "agent/src/negotiator/strategy/tactical/plan.py",
+    "agent/src/negotiator/strategy/tactical/planning.py",
+    "agent/src/negotiator/strategy/tactical/reading.py",
+    "agent/src/negotiator/strategy/tactical/sheets.py",
+    "agent/src/negotiator/strategy/tactical/writing.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/2a/2a804e3f1b/0/metadata.json",
+      "transcript": "/2a/2a804e3f1b/0/full.jsonl",
+      "compact_transcript": "/2a/2a804e3f1b/0/transcript.jsonl",
+      "content_hash": "/2a/2a804e3f1b/0/content_hash.txt",
+      "prompt": "/2a/2a804e3f1b/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 87,
+    "cache_creation_tokens": 254338,
+    "cache_read_tokens": 8535640,
+    "output_tokens": 49423,
+    "api_call_count": 44
+  }
+}
