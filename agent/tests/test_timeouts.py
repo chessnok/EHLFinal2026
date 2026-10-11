@@ -298,7 +298,9 @@ def test_a_held_thread_without_keepalive_is_closed_on_before_its_clock_runs_out(
 
     arena = FakeArena(rfq("sup:A", "sup:B"), {"sup:A": 0.1, "sup:B": 0.25}, limit_s=LIMIT_S, final_after={"sup:A": 1})
     outcome, recorder, _ = play(tmp_path, arena, NoKeepalive(rounds=8), deadline=time.time() + 1000)
-    assert arena.counted()["sup:A"] == 0 and outcome["deal"]
+    # its offer here costs no less than the cheapest opening: a deal would score 0 like none, and since 11 Oct the
+    # accept guard refuses it while another bidder is live (P06: C >= C_open in 12 of 24 simulator runs)
+    assert arena.counted()["sup:A"] == 0 and (outcome["deal"] or outcome.get("c_deal") is None)
     assert [e["supplier_id"] for e in events(recorder, "close_unkept_thread")] == ["sup:A"]
 
 

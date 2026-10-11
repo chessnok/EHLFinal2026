@@ -245,6 +245,8 @@ FLAGS: dict[str, str] = {
     "error was up to +3.5 %; D01 fell 0.969 -> 0.669 with it)",
     "rel_anchor4": "strategic suppliers keep the 4 % first ask even when their margin charge is estimated (the 10 % "
     "ask of 11c: D01 0.969 -> 0.669, P01 0.946 -> 0.901, P10 0.663 -> 0.647); the charge stays in C",
+    "fast_pay": "it asked for faster payment and no option pays at 14 days: a 14-day option joins at option A's C "
+    "(P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
@@ -1557,6 +1559,8 @@ class TacticalStrategy(BaselineStrategy):
                 keys.add(structure_key(t))
                 out.append({"terms": t})
                 plan.offered[structure_key(t)] = max(plan.offered.get(structure_key(t), 0.0), t["unit_price"])
+        if self.flags["fast_pay"]:
+            out = self._fast_pay(neg, sid, plan, out, their_c)
         return out[:3]
 
     @staticmethod
@@ -1591,6 +1595,23 @@ class TacticalStrategy(BaselineStrategy):
                     picked[1] = chosen
                 keys.add(structure_key(chosen))
         return picked
+
+    def _fast_pay(self, neg: Negotiation, sid: str, plan: Plan, out: list[dict], their_c: float) -> list[dict]:
+        """It asked for faster payment and no option pays at 14 days: one that does joins, at the same C as option A.
+        It costs us ~0.10 EUR a unit for 16 days; P05's 70210 gave 0.50 for it ("I can drop the price to 27.50 for
+        14 days payment": 0.824 -> 0.865)."""
+        options = neg.case.get("term_options", {}).get("payment_days") or []
+        if not out or "payment_days" not in neg.case["negotiable"] or "payment_days" not in plan.requests:
+            return out
+        if 14 not in options or any((sh["terms"].get("payment_days") or 999) <= 14 for sh in out):
+            return out
+        a = out[0]["terms"]
+        base = complete_offer(neg.case, {**a, "payment_days": 14})
+        base["unit_price"] = self._iso_cost_price(neg, sid, base, neg.cost(sid, a))
+        if not neg.keeps_must_haves(sid, base) or neg.cost(sid, base) >= their_c:
+            return out
+        plan.offered[structure_key(base)] = max(plan.offered.get(structure_key(base), 0.0), base["unit_price"])
+        return out[:2] + [{"terms": base}]
 
     def _trade_terms(self, neg, sid, plan, ideal: dict) -> dict | None:
         """Our terms with the levers the supplier values given to it (the price pays for them)."""
