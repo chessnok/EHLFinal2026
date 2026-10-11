@@ -1297,11 +1297,15 @@ class TacticalStrategy(BaselineStrategy):
         """It came under a floor we only guessed: our guess was timid. Ask again under its new price, once."""
         if plan.reanchored or not self._may_push(neg, sid):
             return None
-        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS and not plan.guess:
-            # never 10 % under a strategic supplier's price: without an estimate of its cost nothing stops the
-            # squeeze (P02: 345.39, score 0); with one C is not monotone in the price - a price under the floor
-            # costs more charge than it saves, and the "re-anchor" asked a C above its offer, so no sheet went out.
-            # A guessed cost allows it: the guess floor (_sheets) keeps every sheet above the cost minimum
+        if (
+            neg.buyer.get("category_goal") in RELATIONSHIP_GOALS
+            and not plan.guess
+            and not neg.supplier_estimates.get(sid)
+        ):
+            # never 10 % under a strategic supplier's price without an estimate of its cost: nothing stops the
+            # squeeze (P02: 345.39, score 0). With an own-plant estimate the charge is in C and the re-anchor stays
+            # as measured (P01 0.969, P-29; off, it held at 133.6 in round 3: 0.901, run 20261011-082032); a guessed
+            # cost allows it too: the guess floor (_sheets) keeps every sheet above the cost minimum
             return None
         plan.reanchored = True
         price = theirs["unit_price"] * (1 - REANCHOR)
@@ -1440,6 +1444,13 @@ class TacticalStrategy(BaselineStrategy):
         B  the structure the supplier takes most readily (its requests answered, closest to its own);
         C  the next most acceptable structure of a different kind (another clause, term or payment)."""
         case = neg.case
+        # never above what it asks: under a guessed cost its offer at hand; with its own plant's cost its standing
+        # price - not a cheaper alternative it named (P01: 132.55 at 90 days against its 132.40 at 30, as measured)
+        _, standing = neg.threads[sid].standing
+        ceiling = theirs["unit_price"]
+        if not plan.guess and (standing or {}).get("unit_price"):
+            ceiling = max(ceiling, standing["unit_price"])
+        capping = bool(plan.guess or neg.supplier_estimates.get(sid))
         # Under a margin charge every C above the minimum has two prices. While our ask is within ANCHOR_SLACK
         # of the minimum we send the lower one: a deep first ask whose every step up is a move the supplier sees
         # and a gain for us, and if it agrees we pay at most the slack. After that, the usual side.
@@ -1480,7 +1491,7 @@ class TacticalStrategy(BaselineStrategy):
             # never above its own price: where the margin charge falls faster than the price rises (a sustainable
             # margin above what its quote leaves it) the cost-optimal price sat over its quote (brief variants)
             price = price_for(terms)
-            return min(price, theirs["unit_price"]) if neg.supplier_estimates.get(sid) else price
+            return min(price, ceiling) if capping else price
 
         menu = priced_menu(case, theirs, capped)
         valid, under_floor = [], []
@@ -1510,7 +1521,9 @@ class TacticalStrategy(BaselineStrategy):
             # against a should-cost of 380 and paid EUR 179k of margin charge (score 0); its C_best sat near 362
             floor = round(plan.full_cost * RELATIONSHIP_COST_FLOOR, 2)
             for t in pool:
-                t["unit_price"] = min(max(t["unit_price"], floor), theirs["unit_price"])
+                t["unit_price"] = max(t["unit_price"], floor)
+                if capping:
+                    t["unit_price"] = min(t["unit_price"], ceiling)
             pool = [t for t in pool if neg.cost(sid, t) < their_c] or pool
         if plan.guess:
             # a guessed cost is a floor: no sheet under the price that costs us least with the guessed charge
