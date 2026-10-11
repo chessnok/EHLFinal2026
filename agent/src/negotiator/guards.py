@@ -57,8 +57,12 @@ def accept_problems(neg, supplier_id: str, term_sheet_id: str | None) -> list[st
         problems.append("C is not finite")
     elif c >= neg.c_alt:
         problems.append(f"C {c:,.0f} does not beat the alternative {neg.c_alt:,.0f}")
-    elif math.isfinite(neg.c_alt) and c >= neg.c_open:
-        # a deal no better than the cheapest opening scores 0; the alternative scores at least that
+    elif c >= neg.c_open and (
+        math.isfinite(neg.c_alt) or any(o != supplier_id and ot.live for o, ot in neg.threads.items())
+    ):
+        # a deal no better than the cheapest opening scores 0; the alternative scores at least that - and in an
+        # RFQ without one another live bidder still can (P06 type: the dearer bidder agreed in round 1, C >= C_open,
+        # score 0 in 12 of 24 simulator runs)
         problems.append(f"C {c:,.0f} is not better than the opening {neg.c_open:,.0f}")
     return problems
 

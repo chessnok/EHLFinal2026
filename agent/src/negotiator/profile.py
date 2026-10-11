@@ -65,7 +65,10 @@ PATTERNS: dict[str, list[str]] = {
     "price_frozen": [
         r"no room on price",
         r"frozen all price reductions",
-        r"price list applies to all customers",
+        r"price list(?: \d{4})? applies to all customers",
+        r"ruled out individual price reductions",
+        r"no longer grant individual price reductions",
+        r"prices (?:are|will be) set centrally",
         r"standard items are not discounted",
         r"list conditions",
     ],
