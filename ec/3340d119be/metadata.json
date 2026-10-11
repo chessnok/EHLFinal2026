@@ -3,7 +3,7 @@
   "checkpoint_id": "ec3340d119be",
   "strategy": "manual-commit",
   "branch": "docs/final-analysis",
-  "checkpoints_count": 2,
+  "checkpoints_count": 13,
   "files_touched": [
     "agent/docs/final-analysis-2026-10-11.md"
   ],
@@ -19,13 +19,19 @@
       "transcript": "/ec/3340d119be/1/full.jsonl",
       "content_hash": "/ec/3340d119be/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/ec/3340d119be/2/metadata.json",
+      "transcript": "/ec/3340d119be/2/full.jsonl",
+      "content_hash": "/ec/3340d119be/2/content_hash.txt",
+      "prompt": "/ec/3340d119be/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 836,
+    "cache_creation_tokens": 536982,
+    "cache_read_tokens": 137343380,
+    "output_tokens": 222464,
+    "api_call_count": 403
   }
 }
