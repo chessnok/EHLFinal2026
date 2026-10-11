@@ -110,3 +110,57 @@ def test_a_duplicate_spends_the_kind(tmp_path, world) -> None:
     strategy._learn_claims(t, plan, reply)
     # orders of another part would be counted again; an index series is counted by series, not by kind
     assert plan.spent_kinds == {"orders"}
+
+
+# ---------------------------------------------------------------- index falls over any valid window (`all_windows`)
+def _drivers(world: WorldData) -> list[str]:
+    return [r["series_id"] for r in world.query("SELECT DISTINCT series_id FROM cost_drivers")]
+
+
+def test_steepest_drop_keeps_the_arenas_window_rule(world) -> None:
+    from negotiator.ledger import MAX_AGE, MAX_SPAN, MIN_DROP, _month_no, recent_drop, steepest_drop
+
+    last = _month_no(world.query("SELECT max(month) AS m FROM index_values")[0]["m"])
+    found = 0
+    for series in _drivers(world):
+        drop = steepest_drop(world, series)
+        if not drop:
+            continue
+        found += 1
+        earlier, later, pct, months = drop
+        m0, m1 = _month_no(earlier.split("@")[1]), _month_no(later.split("@")[1])
+        assert 1 <= m1 - m0 <= MAX_SPAN and m1 >= last - MAX_AGE and pct <= -MIN_DROP and months == m1 - m0
+        assert world.fact(earlier) and world.fact(later)
+        recent = recent_drop(world, series)
+        assert not recent or pct <= recent[2] + 1e-9  # never shallower than the window ending at the latest month
+    assert found
+
+
+def test_all_windows_finds_falls_that_have_risen_since(world) -> None:
+    from negotiator.ledger import _drop_evidence, recent_drop, steepest_drop
+
+    series = next(s for s in _drivers(world) if not recent_drop(world, s) and steepest_drop(world, s))
+    assert _drop_evidence(world, series, 0.3, cited=False) is None
+    e = _drop_evidence(world, series, 0.3, cited=False, all_windows=True)
+    assert e and " from " in e.sentence and "over the last" not in e.sentence
+
+
+def test_all_windows_gives_one_fall_per_series(world) -> None:
+    from negotiator.ledger import data_facts
+
+    shared = world.query(
+        "SELECT series_id, group_concat(part_id) AS parts FROM cost_drivers GROUP BY series_id HAVING count(*) >= 2"
+    )
+    parts = sorted({p for r in shared for p in r["parts"].split(",")})[:20]
+    facts = data_facts(world, parts, all_windows=True)
+    series = [e.meta["series"] for e in facts]
+    assert len(series) == len(set(series))
+
+
+def test_all_windows_cites_a_series_once_per_supplier(tmp_path, world) -> None:
+    neg, sid, strategy, plan = _setup(tmp_path, world, all_windows=True)
+    t = neg.threads[sid]
+    t.messages.append({"from": "buyer", "body": "TA fell 3% (idx:TA@2025-01, idx:TA@2025-07).", "refs": []})
+    t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": t.messages[0]["term_sheets"]})
+    picked = strategy._choose_claims(neg, sid, plan, first=False)
+    assert all("idx:TA" not in r for e in picked for r in e.refs)  # another window of TA is a duplicate

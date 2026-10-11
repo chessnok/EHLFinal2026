@@ -219,6 +219,8 @@ FLAGS: dict[str, str] = {
     "clause it must have kept, no 'pays early' that is not",
     "fresh_args": "never an argument the arena already counted (one per kind, index series, part); one held back from "
     "the first e-mail for a later round; a bundle's orders per part",
+    "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
+    "12), not only one ending at the latest month; one per series",
 }
 
 
@@ -338,7 +340,7 @@ class TacticalStrategy(BaselineStrategy):
             out += self.data.evidence_orders(parts, sid, open_price)
             if self.flags["fresh_args"]:
                 out += self.data.evidence_orders_per_part(parts, sid)
-            out += data_facts(self.data, parts)
+            out += data_facts(self.data, parts, all_windows=self.flags["all_windows"])
             if self.flags["fresh_claims"]:
                 later = self.data.evidence_complaints(parts, sid, since="2025-10-01")
                 if open_price and not any(e.kind == "should_cost" for e in out):
@@ -609,7 +611,7 @@ class TacticalStrategy(BaselineStrategy):
             for series in CITED_DRIVER.findall(reply.get("body", "")):
                 if series[0] not in plan.pressures:
                     plan.pressures.append(series[0])
-            for fact in reply_facts(self.data, reply.get("body", "")):
+            for fact in reply_facts(self.data, reply.get("body", ""), all_windows=self.flags["all_windows"]):
                 if fact.sentence not in plan.used_sentences and all(fact.sentence != c.sentence for c in plan.counters):
                     plan.counters.append(fact)
             for f, values in proposed_values(neg.case, reply.get("term_sheets") or []).items():
@@ -1286,7 +1288,7 @@ class TacticalStrategy(BaselineStrategy):
             if plan.figures_asked:
                 order = ["should_cost", "recent_drop", "index", "notice", "quality", "complaint", "orders"]
                 pool.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
-        spent = self._spent_keys(neg, sid) if self.flags["fresh_args"] else set()
+        spent = self._spent_keys(neg, sid) if self.flags["fresh_args"] or self.flags["all_windows"] else set()
 
         def select(limit: float) -> list[Evidence]:
             picked, kinds, keys, companions = [], set(), set(), 0
@@ -1305,7 +1307,12 @@ class TacticalStrategy(BaselineStrategy):
                     continue
                 if self.flags["fresh_claims"] and not first and set(e.refs) & {r for x in picked for r in x.refs}:
                     continue  # the same index point twice in one e-mail reads as a duplicate
-                key = self._arg_key(e) if self.flags["fresh_args"] else None
+                key = (
+                    self._arg_key(e)
+                    if self.flags["fresh_args"]
+                    or (self.flags["all_windows"] and e.kind in ("index", "recent_drop"))  # one window per series
+                    else None
+                )
                 if key and key in keys and key == ("record",):
                     # the same scorecard row for delivery and quality is read as one argument (the quality one,
                     # P11): it goes along with the first and takes no slot

@@ -88,8 +88,51 @@ def recent_drop(data: WorldData, series: str) -> tuple[str, str, float, int] | N
     return best if best and best[2] <= -MIN_DROP else None
 
 
-def _drop_evidence(data: WorldData, series: str, weight: float, cited: bool) -> Evidence | None:
-    drop = recent_drop(data, series)
+# api.md, "What counts": an index argument is "2 × `idx`, one series, ≤ 12 months apart, ending within the last 12
+# months of the data". The window may end before the series' latest month; we keep its end one month inside that
+# bound (the data's latest month over all series, not this series'), since a window "too old" is `irrelevant` and an
+# irrelevant result bans the kind for the supplier.
+MAX_SPAN = 12  # months between the two IDs
+MAX_AGE = 10  # months the window's end may lie before the data's latest month
+
+
+def _month_no(month: str) -> int:
+    year, mon = month.split("-")[:2]
+    return int(year) * 12 + int(mon) - 1
+
+
+def steepest_drop(data: WorldData, series: str) -> tuple[str, str, float, int] | None:
+    """The steepest fall of a series over any window the arena accepts (`MAX_SPAN`, `MAX_AGE`), not only one that
+    ends at its latest month: P02's copper notation fell 2.2 % from 2026-01 to 2026-03 and has risen since."""
+    end = data.query("SELECT max(month) AS m FROM index_values")
+    if not end or not end[0]["m"]:
+        return None
+    last = _month_no(end[0]["m"])
+    rows = [
+        (r["id"], _month_no(r["month"]), r["value"])
+        for r in data.query(
+            "SELECT id, month, value FROM index_values WHERE series_id = ? ORDER BY month DESC",
+            (series,),
+            limit=MAX_SPAN + MAX_AGE + 2,
+        )
+        if r["value"]
+    ]
+    best = None
+    for later_id, later_no, later_value in rows:
+        if later_no < last - MAX_AGE:
+            continue
+        for earlier_id, earlier_no, earlier_value in rows:
+            if 1 <= later_no - earlier_no <= MAX_SPAN:
+                pct = (later_value / earlier_value - 1) * 100
+                if best is None or pct < best[2]:
+                    best = (earlier_id, later_id, pct, later_no - earlier_no)
+    return best if best and best[2] <= -MIN_DROP else None
+
+
+def _drop_evidence(
+    data: WorldData, series: str, weight: float, cited: bool, all_windows: bool = False
+) -> Evidence | None:
+    drop = steepest_drop(data, series) if all_windows else recent_drop(data, series)
     if not drop:
         return None
     earlier, later, pct, months = drop
@@ -99,34 +142,43 @@ def _drop_evidence(data: WorldData, series: str, weight: float, cited: bool) -> 
         name = rows[0]["name"].split(",")[0].split("(")[0].strip()
     lead = f"You cite {series}: " if cited else ""
     span = "month" if months == 1 else f"{months} months"
+    latest = data.query("SELECT max(month) AS m FROM index_values WHERE series_id = ?", (series,))
+    if all_windows and latest and later.split("@")[-1] != latest[0]["m"]:
+        window = f"from {earlier.split('@')[-1]} to {later.split('@')[-1]}"  # not "the last" months: it rose since
+    else:
+        window = f"over the last {span}"
     return Evidence(
         kind="recent_drop",
         refs=[earlier, later],
-        sentence=f"{lead}{name} fell {abs(pct):.1f}% over the last {span} ({earlier}, {later}).",
+        sentence=f"{lead}{name} fell {abs(pct):.1f}% {window} ({earlier}, {later}).",
         strength=(4.0 if cited else 1.5) + weight * abs(pct),
         meta={"series": series, "pct": round(pct, 2), "months": months, "cited": cited},
     )
 
 
-def data_facts(data: WorldData | None, part_ids: list[str]) -> list[Evidence]:
-    """Before the first move: the part's cost drivers that have fallen recently."""
+def data_facts(data: WorldData | None, part_ids: list[str], all_windows: bool = False) -> list[Evidence]:
+    """Before the first move: the part's cost drivers that have fallen recently (`all_windows`: over any window the
+    arena accepts, one per series)."""
     if not data or not part_ids:
         return []
     marks = ",".join("?" for _ in part_ids)
-    out = []
+    out, seen = [], set()
     for d in data.query(f"SELECT series_id, weight FROM cost_drivers WHERE part_id IN ({marks})", tuple(part_ids)):
-        if e := _drop_evidence(data, d["series_id"], float(d["weight"] or 0), cited=False):
+        if all_windows and d["series_id"] in seen:
+            continue  # the arena counts one argument per series
+        seen.add(d["series_id"])
+        if e := _drop_evidence(data, d["series_id"], float(d["weight"] or 0), cited=False, all_windows=all_windows):
             out.append(e)
     return out
 
 
-def reply_facts(data: WorldData | None, body: str) -> list[Evidence]:
+def reply_facts(data: WorldData | None, body: str, all_windows: bool = False) -> list[Evidence]:
     """From its e-mail: the drivers it cites that have fallen recently, its hedge, its free capacity."""
     out = []
     if data:
         for series, share in CITED_DRIVER.findall(body or ""):
             if data.query("SELECT 1 FROM index_series WHERE id = ?", (series,)):
-                if e := _drop_evidence(data, series, float(share) / 100, cited=True):
+                if e := _drop_evidence(data, series, float(share) / 100, cited=True, all_windows=all_windows):
                     out.append(e)
     if m := HEDGE.search(body or ""):
         out.append(
