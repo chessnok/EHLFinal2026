@@ -7,6 +7,7 @@
 - In final mode the live feed, leaderboard and results raise: the agent must not read them.
 """
 
+import socket
 import threading
 import time
 import uuid
@@ -27,6 +28,25 @@ TRANSPORT_RETRY_S = 45.0
 TRANSPORT_PAUSE_MAX_S = 5.0
 REMAINING_HEADER = "X-Practice-Remaining"
 USER_AGENT = "negotiator/0.1 (Undeterministic Tornado)"
+
+
+KEEPALIVE_IDLE_S, KEEPALIVE_INTERVAL_S, KEEPALIVE_PROBES = 5, 2, 3
+
+
+def keepalive_options() -> list[tuple[int, int, int]]:
+    """TCP keepalive on every connection: a socket left on an address the machine no longer has (a network restart
+    in the Live Final, 11 Oct: four requests hung until the 180 s read timeout and two cases timed out) fails in about
+    11 s instead, and the request is retried on a fresh connection with the same X-Move-Id. A live arena answers the
+    probes, so a supplier reply that takes a minute is not cut."""
+    opts = [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
+    idle = getattr(socket, "TCP_KEEPIDLE", None) or getattr(socket, "TCP_KEEPALIVE", None)  # Linux / macOS
+    if idle is not None:
+        opts.append((socket.IPPROTO_TCP, idle, KEEPALIVE_IDLE_S))
+    if hasattr(socket, "TCP_KEEPINTVL"):
+        opts.append((socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, KEEPALIVE_INTERVAL_S))
+    if hasattr(socket, "TCP_KEEPCNT"):
+        opts.append((socket.IPPROTO_TCP, socket.TCP_KEEPCNT, KEEPALIVE_PROBES))
+    return opts
 
 
 class ArenaError(Exception):
@@ -75,6 +95,7 @@ class ArenaClient:
         headers = {"User-Agent": USER_AGENT}
         if settings.api_key:
             headers["X-API-Key"] = settings.api_key
+        transport = transport or httpx.HTTPTransport(socket_options=keepalive_options())
         self.http = httpx.Client(base_url=settings.arena_url, headers=headers, timeout=timeout, transport=transport)
         self.pacer = _Pacer(CALLS_PER_SECOND)
         self.practice_remaining: int | None = None
