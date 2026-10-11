@@ -2,6 +2,7 @@
 
 import math
 import re
+from dataclasses import dataclass, field
 
 from arena_kit.cost import RELATIONSHIP_GOALS
 
@@ -42,6 +43,61 @@ def reply_signals(body: str) -> dict:
     return {"firm": bool(FIRM_SIGNALS.search(body or ""))}
 
 
+@dataclass
+class Signals:
+    """What one reply says beyond its term sheets - read once, in `_learn`, and kept on the plan (`plan.signals`),
+    so every rule asks the same reading instead of matching the e-mail again.
+
+    The regular expressions read first (they know the arena's fixed sentences); a model, where one is configured
+    (reader.py), adds what they miss in other words. The model only ever adds: a signal it reports counts when the
+    words it quotes stand in the e-mail, and a price only when that figure does."""
+
+    firm: bool = False  # a last word in its own words, without the `final_offer` status
+    pending: bool = False  # it checks internally: the rest of its step comes whatever we send
+    requests: set = field(default_factory=set)  # negotiable levers it asks us to move
+    stated_price: float | None = None  # a price below its sheets that it names in the text
+    by_model: list = field(default_factory=list)  # which of these only the model found
+
+    def summary(self) -> dict:
+        return {"firm": self.firm, "pending": self.pending, "requests": sorted(self.requests),
+                "stated_price": self.stated_price, "by_model": self.by_model}  # fmt: skip
+
+
+def read_signals(reply: dict, negotiable: list[str]) -> Signals:
+    """The regular expressions' reading of one reply."""
+    body = reply.get("body") or ""
+    prices = [s["terms"].get("unit_price") for s in reply.get("term_sheets") or [] if s.get("terms")]
+    prices = [p for p in prices if p]
+    said = [p for p in prices_in_text(body) if prices and 0.6 * min(prices) < p < min(prices) - 0.004]
+    return Signals(
+        firm=bool(FIRM_SIGNALS.search(body)),
+        pending=bool(APPROVAL_PENDING.search(body)),
+        requests={r for r in requests_in(body) if r in negotiable},
+        stated_price=min(said) if said else None,  # "I am dropping the price to EUR 28.00" on a 29.09 sheet (P05)
+    )
+
+
+def merge_hints(signals: Signals, hints: dict, reply: dict, negotiable: list[str]) -> Signals:
+    """The model's checked hints (reader.checked_hints) added to the regular expressions' reading."""
+    for lever in hints.get("levers") or []:
+        if lever in negotiable and lever not in signals.requests:
+            signals.requests.add(lever)
+            signals.by_model.append(f"request:{lever}")
+    if hints.get("last_word") and not signals.firm:
+        signals.firm = True
+        signals.by_model.append("firm")
+    if hints.get("approval_pending") and not signals.pending:
+        signals.pending = True
+        signals.by_model.append("pending")
+    price = hints.get("stated_price")
+    prices = [s["terms"].get("unit_price") for s in reply.get("term_sheets") or [] if s.get("terms")]
+    prices = [p for p in prices if p]
+    if price and signals.stated_price is None and prices and 0.6 * min(prices) < price < min(prices) - 0.004:
+        signals.stated_price = price
+        signals.by_model.append("stated_price")
+    return signals
+
+
 class ReadingMixin:
     def _learn(self, neg: Negotiation, sid: str, plan: Plan) -> None:
         """Read what came back since we last looked: argument checks, stalls, a cost breakdown."""
@@ -52,7 +108,12 @@ class ReadingMixin:
             if not plan.breakdown_read:
                 self._read_breakdown(neg, sid, plan, reply)
             self._read_reply(neg, sid, reply)
-            asked = {r for r in requests_in(reply.get("body", "")) if r in neg.case["negotiable"]}
+            signals = read_signals(reply, neg.case["negotiable"])
+            if reply is replies[-1]:
+                signals = self._model_reading(neg, sid, reply, signals)  # one call per reply, the latest only
+                plan.signals = signals
+                neg.recorder.event("signals", session_id=neg.session_id, supplier_id=sid, signals=signals.summary())
+            asked = signals.requests
             for r in asked:
                 plan.request_counts[r] = plan.request_counts.get(r, 0) + 1
             plan.requests |= asked
@@ -67,15 +128,8 @@ class ReadingMixin:
                 plan.proposed[f] += [v for v in values if v not in plan.proposed[f]]
                 if len(plan.proposed[f]) > 1:
                     plan.requests.add(f)  # it varies this field across its sheets: a lever it trades on
-            sheet_prices = [s["terms"].get("unit_price") for s in reply.get("term_sheets") or []]
-            sheet_prices = [p for p in sheet_prices if p]
-            said = [
-                p
-                for p in prices_in_text(reply.get("body", ""))
-                if sheet_prices and 0.6 * min(sheet_prices) < p < min(sheet_prices) - 0.004
-            ]
-            if said:
-                plan.text_price = min(said)  # "I am dropping the price to EUR 28.00" on a 29.09 sheet (P05)
+            if signals.stated_price is not None:
+                plan.text_price = signals.stated_price
             sheets = reply.get("term_sheets") or []
             if sheets and sheets[0]["terms"].get("index_clause"):
                 plan.requests.add("index_clause")  # it proposed one: it wants one
@@ -89,6 +143,25 @@ class ReadingMixin:
                 plan.belief.observe(reply)
             self._update_upper(neg, sid, plan)
         plan.seen_replies = len(replies)
+
+    def _model_reading(self, neg: Negotiation, sid: str, reply: dict, signals: Signals) -> Signals:
+        """With a model (`self.reader`): its checked hints added to the reading. Without one, or when the call
+        fails or is slow, the regular expressions' reading stands."""
+        reader = getattr(self, "reader", None)
+        if reader is None:
+            return signals
+        earlier = [m for m in neg.threads[sid].supplier_messages if m is not reply and m.get("term_sheets")]
+        previous = earlier[-1]["term_sheets"][0].get("terms") if earlier else None
+        deadline = getattr(self, "deadlines", {}).get(sid)
+        hints = reader.read(neg, sid, reply, previous, deadline)
+        if hasattr(self, "hints"):
+            self.hints[sid] = hints  # the writer's prompt takes the reasons and questions from here
+        signals = merge_hints(signals, hints, reply, neg.case["negotiable"])
+        if signals.by_model:
+            neg.recorder.metrics.incr("reader.signals_added", len(signals.by_model))
+        neg.recorder.event("reader", session_id=neg.session_id, case_id=neg.case_id, supplier_id=sid, hints=hints,
+                           added=signals.by_model)  # fmt: skip
+        return signals
 
     @staticmethod
     def _read_reply(neg: Negotiation, sid: str, reply: dict) -> ReplyFacts | None:

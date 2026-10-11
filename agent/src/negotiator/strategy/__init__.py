@@ -18,6 +18,8 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     "tactical": TacticalStrategy,
     # the round's choice by expected cost over a belief about where the supplier stops (tactical/choice.py)
     "tactical-ev": ExpectedValueStrategy,
+    # ... with a model's reading of each reply added to the regular expressions' (needs --llm; `readcheck` first)
+    "tactical-ev+reader": partial(ExpectedValueStrategy),
     "baseline": BaselineStrategy,
     "llm": LLMStrategy,
     **{name: partial(ExperimentStrategy, tactic) for name, tactic in TACTICS.items()},
@@ -28,7 +30,7 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     "tactical-llm": WrittenStrategy,
     "tactical-llm+reader": partial(WrittenStrategy, reader=True),
 }
-NEEDS_LLM = {"llm", "tactical-llm", "tactical-llm+reader"}
+NEEDS_LLM = {"llm", "tactical-llm", "tactical-llm+reader", "tactical-ev+reader"}
 NEEDS_DECISIONS = {"decided"}  # constructed as Strategy(data, DecisionsClient)
 
 __all__ = [

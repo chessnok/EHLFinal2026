@@ -30,6 +30,7 @@ from negotiator.data import WorldData
 from negotiator.decisions import DecisionsClient
 from negotiator.lessons import write_lessons
 from negotiator.llm import LLM
+from negotiator.readcheck import add_parser as add_readcheck_parser
 from negotiator.report import history, write_report
 from negotiator.runner import play_case, play_final, play_many
 from negotiator.sim.arena import SIM_KEY, SIM_URL
@@ -401,6 +402,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add("stats", cmd_stats, "scores across all runs", needs_client=False)
     add_sim_parser(add)
+    add_readcheck_parser(add)
     return ap
 
 

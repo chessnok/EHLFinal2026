@@ -17,10 +17,6 @@ from negotiator.strategy.tactical.plan import (
     RELATIONSHIP_STEP,
     Plan,
 )
-from negotiator.strategy.tactical.reading import (
-    APPROVAL_PENDING,
-    reply_signals,
-)
 from negotiator.telemetry import log
 
 
@@ -50,10 +46,9 @@ class ConcessionMixin:
             return counter
 
         their_c = neg.cost(supplier_id, theirs)
-        signals = reply_signals(t.latest.get("body", ""))
         # the lower bound is where we anchor, not where we stop: below it we keep asking - the supplier
         # ends it with a stall or a final offer, and only it knows its real floor
-        last_word = t.status == "final_offer" or (signals["firm"] and t.rounds_used > 0)
+        last_word = t.status == "final_offer" or (self._says(plan, "firm") and t.rounds_used > 0)
         rest_pending = self._rest_pending(neg, supplier_id, plan)
         if (
             not last_word
@@ -102,6 +97,11 @@ class ConcessionMixin:
             return Decision.hold(supplier_id, "their offer meets our ask", ask_c=ask_c, their_c=their_c)
         return self._offer(neg, supplier_id, plan, theirs, ask_c, their_c)
 
+    @staticmethod
+    def _says(plan: Plan, signal: str) -> bool:
+        """A signal of its latest reply, as `_learn` read it (reading.Signals)."""
+        return bool(plan.signals and getattr(plan.signals, signal))
+
     def _next_c(self, neg: Negotiation, sid: str, plan: Plan, their_c: float) -> float:
         """Boulware over the rounds we can still play, capped by what the supplier gave last."""
         if not plan.our_c:
@@ -118,7 +118,7 @@ class ConcessionMixin:
         gap = max(0.0, their_c - last)
         if self._rest_pending(neg, sid, plan):
             return min(last + min_step, their_c, plan.upper_c)
-        if APPROVAL_PENDING.search(t.latest.get("body", "")):
+        if self._says(plan, "pending"):
             # "we need to clarify this internally" / "more than my band allows": its boss approves the next
             # step anyway (8 of 8 in the back office) - hold, with the smallest visible move
             return min(last + min_step, their_c, plan.upper_c)
@@ -161,7 +161,7 @@ class ConcessionMixin:
         t = neg.threads[sid]
         return (
             t.status == "final_offer"
-            or reply_signals(t.latest.get("body", ""))["firm"]
+            or self._says(plan, "firm")
             or plan.stalls >= 1
             or self._round_budget(neg, sid) - t.rounds_used <= 3
         )

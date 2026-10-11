@@ -161,6 +161,7 @@ class Plan:
     asked_breakdown: bool = False
     breakdown_read: bool = False
     stop_c: float = math.inf  # where the belief expects it to stop with us (C)
+    signals: object = None  # reading.Signals of its latest reply (set in `_learn`)
     yes_line: str | None = None  # the conditions of its we took at our price, said once
 
 

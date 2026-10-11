@@ -91,7 +91,6 @@ class ChoiceMixin:
                 rest_pending: bool):  # fmt: skip
         from negotiator.strategy.base import Decision
         from negotiator.strategy.tactical.plan import DONE_EPS, PATIENT_GAP
-        from negotiator.strategy.tactical.reading import APPROVAL_PENDING
 
         t = neg.threads[supplier_id]
         if last_word:
@@ -123,7 +122,7 @@ class ChoiceMixin:
         if plan.stalls:  # every reply without a move says it stands nearer to its stop
             belief = [(their_c - (their_c - stop) * 0.5**plan.stalls, w) for stop, w in belief]
             plan.lever_turn = True  # a structure it has not seen carries our step
-        pending = rest_pending or bool(APPROVAL_PENDING.search(t.latest.get("body", "")))
+        pending = rest_pending or self._says(plan, "pending")
         step, expected = best_step(their_c, last, belief, t.rounds_used, rounds, pending)
         room = max(0.0, plan.open_c - plan.target_c)
         neg.recorder.event(

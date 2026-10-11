@@ -10,10 +10,14 @@ miss and nothing more:
                the e-mail, and the supplier's own term sheets do not say the opposite. Kept levers go into
                `plan.requests` - the same set the regular expressions fill - where they rank the equal-C options.
                A lever the regular expressions found already adds nothing.
-  reasons, constraints, questions, last_word
-               for the writer's prompt and the telemetry only. They change no number and no decision: a wrong
-               "last word" would end a thread early, and holding too early is already where score is lost
-               (docs/backlog.md 2.1).
+  last_word, approval_pending, stated_price
+               the signals the regular expressions read as `firm`, `pending` and a price in the text
+               (tactical/reading.py `Signals`). The model only adds to that reading, and only what it can show: the
+               words it quotes must stand in the e-mail, the price must be a figure of the e-mail (and, in
+               `merge_hints`, below its sheets). A wrong "last word" would end a thread early, so `negotiator
+               readcheck` measures the model against the logged replies before it is used on the arena.
+  reasons, constraints, questions
+               for the writer's prompt and the telemetry only.
 
 An error, a slow call or an answer of the wrong shape gives no hints (`reader.fallback`).
 Settings (environment): READER_TIMEOUT_S (default 4), within the e-mail's LLM_MESSAGE_BUDGET_S (writer.py).
@@ -48,7 +52,10 @@ Return JSON:
              "quote": "<the exact words of the e-mail that say so, copied letter for letter, 3 to 15 words>"}],
  "questions": ["<a question it asks us, at most 2>"],
  "last_word": <true only if it says this is its final position or that it cannot move further>,
- "last_word_quote": "<its exact words, or empty>"}
+ "last_word_quote": "<its exact words, or empty>",
+ "approval_pending": <true only if it says it must check or get approval internally before it can move further>,
+ "approval_quote": "<its exact words, or empty>",
+ "stated_price": <a unit price lower than its term sheets that it says it can go to, as a number, or null>}
 A lever belongs in the list only when the supplier asks for that change or says it would improve its price. \
 Empty lists are a good answer."""
 
@@ -111,12 +118,26 @@ def checked_hints(raw, case: dict, reply: dict, previous: dict | None = None) ->
     last_word = raw.get("last_word") is True and len(last_quote) >= 8 and last_quote in body
     if raw.get("last_word") is True and not last_word:
         dropped.append("last_word: the quoted words are not in the e-mail")
+    approval_quote = _squash(str(raw.get("approval_quote") or ""))
+    approval = raw.get("approval_pending") is True and len(approval_quote) >= 8 and approval_quote in body
+    if raw.get("approval_pending") is True and not approval:
+        dropped.append("approval_pending: the quoted words are not in the e-mail")
+    price = raw.get("stated_price")
+    stated = None
+    if isinstance(price, int | float) and not isinstance(price, bool) and price > 0:
+        figures = {float(x.replace(",", "")) for x in re.findall(r"\d[\d,]*\.?\d*", reply.get("body") or "") if x}
+        if any(abs(f - price) < 0.005 for f in figures):
+            stated = float(price)
+        else:
+            dropped.append("stated_price: the figure is not in the e-mail")
     hints = {
         "reasons": _strings(raw.get("reasons"), 3),
         "constraints": [c for c in _strings(raw.get("constraints"), 8) if c in CONSTRAINTS],
         "levers": levers,
         "questions": _strings(raw.get("questions"), 2),
         "last_word": last_word,
+        "approval_pending": approval,
+        "stated_price": stated,
     }
     return hints, dropped
 

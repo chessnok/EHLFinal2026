@@ -22,9 +22,6 @@ from negotiator.strategy.tactical.plan import (
     UNDER_FLOOR,
     Plan,
 )
-from negotiator.strategy.tactical.reading import (
-    reply_signals,
-)
 from negotiator.strategy.tactical.writing import FIELD_WORDS
 from negotiator.telemetry import log
 
@@ -276,7 +273,7 @@ class SheetsMixin:
         # only when we would close anyway - in round 1 its alternative is an opening, not a deal (P18 dry run)
         closing = (
             t.status == "final_offer"
-            or reply_signals(t.latest.get("body", ""))["firm"]
+            or self._says(plan, "firm")
             or plan.stalls >= 1
             or self._round_budget(neg, sid) - t.rounds_used <= 2
         )

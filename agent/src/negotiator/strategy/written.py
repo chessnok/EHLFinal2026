@@ -23,7 +23,7 @@ from negotiator.data import WorldData
 from negotiator.reader import Reader
 from negotiator.session import Negotiation
 from negotiator.strategy.base import Decision
-from negotiator.strategy.tactical import Plan, TacticalStrategy
+from negotiator.strategy.tactical import TacticalStrategy
 from negotiator.telemetry import log
 from negotiator.writer import Writer, WriterSettings
 
@@ -81,22 +81,3 @@ class WrittenStrategy(TacticalStrategy):
         "one last step and we can sign" is a promise, and none of the e-mails that accept something."""
         r = decision.rationale
         return "claims" in r and not r.get("probe") and "move" not in r
-
-    def _learn(self, neg: Negotiation, sid: str, plan: Plan) -> None:
-        """Tactical's reading first; then the reader may add the levers the regular expressions missed."""
-        seen = plan.seen_replies
-        super()._learn(neg, sid, plan)
-        replies = neg.threads[sid].supplier_messages
-        if self.reader is None or len(replies) <= seen or not replies:
-            return
-        reply = replies[-1]
-        sheets = [m["term_sheets"][0].get("terms") for m in replies[:-1] if m.get("term_sheets")]
-        hints = self.reader.read(neg, sid, reply, sheets[-1] if sheets else None, self.deadlines.get(sid))
-        self.hints[sid] = hints
-        added = sorted(set(hints.get("levers") or []) - plan.requests)
-        plan.requests |= set(added)
-        if added:
-            neg.recorder.metrics.incr("reader.levers_added", len(added))
-        neg.recorder.event(
-            "reader", session_id=neg.session_id, case_id=neg.case_id, supplier_id=sid, hints=hints, added=added
-        )

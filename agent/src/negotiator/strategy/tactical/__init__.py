@@ -34,6 +34,7 @@ says), `concession` (decide, conclude), `sheets` (the term sheets of a message),
 """
 
 from negotiator.data import WorldData
+from negotiator.reader import Reader
 from negotiator.strategy.baseline import BaselineStrategy
 from negotiator.strategy.tactical.choice import ChoiceMixin
 from negotiator.strategy.tactical.concession import ConcessionMixin
@@ -123,6 +124,8 @@ class TacticalStrategy(PlanningMixin, ReadingMixin, ConcessionMixin, SheetsMixin
         super().__init__(data, llm)
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
+        # with a model, its reading of each reply is added to the regular expressions' (reading.Signals)
+        self.reader = Reader(llm) if llm is not None else None
 
 
 class ExpectedValueStrategy(ChoiceMixin, TacticalStrategy):
