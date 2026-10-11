@@ -1,0 +1,163 @@
+i want to know i guess from TRYED.md how the idea with inflation behaved?
+
+---
+
+okay, make 7 submissions
+
+---
+
+okay run it
+
+---
+
+i allow everythibng
+
+---
+
+<pasted_content id="c8eb">
+
+! cd /home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent && uv run negotiator run --set practice --cases case:P11 --strategy tactical+ppm_ladder
+! cd /home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent && uv run negotiator run --set practice --cases case:P08 --strategy tactical+anchor18
+! cd /home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent && uv run negotiator run --set practice --cases case:P08 --strategy tactical+owner_offer
+</pasted_content id="c8eb">
+
+---
+
+<pasted_content id="c8eb">
+.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+    ~/Des/Pr/EHLFinal2026    main ⇣21 ?2  git push
+[entire] Pushing entire/checkpoints/v1 to origin.............. done
+Everything up-to-date
+    ~/Des/Pr/EHLFinal2026    feat/terms-from-text ?3   cd /home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent && uv run negotiator run --set practice --cases case:P11 --strategy tactical+ppm_ladder
+1 case(s): case:P11
+[10/11/26 11:25:31] INFO     opened case:P11: Kalwisz:
+                             bearing brackets in red, 1
+                             supplier(s),
+                             C_alt=894,383.19
+                    INFO     sup:70140 plan
+                             [quality_first
+                             cash_short]: price open
+                             47.0 lower 40.42 upper
+                             42.44 (asked 4.1%,
+                             justified 2.3%) | C target
+                             584,961 upper 699,282
+                    INFO     sup:70140 belief: stop
+                             ~669,470 (price 40.43),
+                             upper 699,282 -> 676,164
+
+
+[10/11/26 11:25:53] INFO     sup:70140 r1: open 46.5 C=765,982.50 claims=['verified',
+                             'verified'] (21s)
+                    INFO     sup:70140 belief: stop ~718,760 (price 43.53), upper 676,164 ->
+                             725,947
+[10/11/26 11:26:14] INFO     sup:70140 r2: open 46.0 C=758,032.50 claims=['verified'] (20s)
+                    INFO     sup:70140 belief: stop ~744,836 (price 45.17), upper 725,947 ->
+                             752,284
+[10/11/26 11:26:28] INFO     sup:70140 r3: open 45.5 C=750,082.50 claims=['verified'] (14s)
+                    INFO     sup:70140 belief: stop ~744,836 (price 45.17), upper 752,284 ->
+                             750,082
+[10/11/26 11:26:47] INFO     sup:70140 r4: final_offer 45.5 C=750,082.50 claims=- (19s)
+                    INFO     sup:70140 belief: stop ~742,292 (price 45.01), upper 750,082 ->
+                             749,714
+                    INFO     sup:70140: hold (last word: take it)
+                    INFO     case:P11: accept sup:70140 offer:70140-4
+[10/11/26 11:26:48] INFO     case:P11 ended (accepted): deal=True score=0.7098962346486538
+                             C_deal=750,082.50 C_open=817,578.00 C_best=722,500.02
+                             https://arena.tacto.ai/replay/1c0dce63100a3218
+practice sessions left: 329
+                       run 20261011-112529-practice-tactical+ppm_ladder
+┏━━━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┓
+┃ case     ┃ deal ┃ score ┃ C_open    ┃ C_deal    ┃ C_best   ┃ rounds ┃ end      ┃ replay    ┃
+┡━━━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━┩
+│ case:P11 │ yes  │ 0.710 │ 817,578.… │ 750,082.… │ 722,500… │ 4      │ accepted │ https://… │
+└──────────┴──────┴───────┴───────────┴───────────┴──────────┴────────┴──────────┴───────────┘
+mean score 0.710 · deals 1/1 · claims {'verified': 4} · report:
+/home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent/runs/2026101
+1-112529-practice-tactical+ppm_ladder/report.md
+    ~/Des/Pr/EHLFinal2026/.cl/w/p08-p11-p02/agent    feat/p08-p11-p02 
+    ~/Des/Pr/EHLFinal2026/.cl/w/p08-p11-p02/agent    feat/p08-p11-p02              ✔
+</pasted_content id="c8eb">
+
+
+<pasted_content id="c8eb">
+02/agent && uv run negotiator run --set practice --cases case:P08 --strategy tactical+owner_offer%   
+    ~/Des/Pr/EHLFinal2026/.cl/w/p08-p11-p02/agent    feat/p08-p11-p02   cd /home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent && uv run negotiator run
+ --set practice --cases case:P08 --strategy tactical+owner_offer
+1 case(s): case:P08
+[10/11/26 11:26:30] INFO     opened case:P08: Alloy surcharge and base price for 1.4404 bar, 1
+                             supplier(s), C_alt=1,157,019.84
+                    INFO     sup:70710 plan [leverage hedged,open_book]: price open 6.05 lower
+                             5.2 upper 5.46 (asked 11.01%, justified 7.04%) | C target 855,045
+                             upper 1,028,315
+                    INFO     sup:70710 belief: stop ~993,011 (price 5.22), upper 1,028,315 ->
+                             1,002,941
+[10/11/26 11:27:05] INFO     sup:70710 r1: open 5.52 C=1,072,582.37 claims=['verified', 'verified', 'verified'] (35s)
+                    INFO     sup:70710 belief: stop ~994,414 (price 5.28), upper 1,002,941 -> 1,004,358
+
+
+[10/11/26 11:27:29] INFO     sup:70710 r2: open 5.49 C=1,066,753.12 claims=- (25s)
+                    INFO     sup:70710 belief: stop ~1,037,632 (price 5.46), upper 1,004,358 -> 1,048,008
+[10/11/26 11:27:46] INFO     sup:70710 r3: final_offer 5.47 C=1,062,866.95 claims=- (16s)
+                    INFO     sup:70710 belief: stop ~1,039,532 (price 5.47), upper 1,048,008 -> 1,049,927
+                    INFO     sup:70710: hold (last word: take it)
+                    INFO     case:P08: accept sup:70710 offer:70710-3
+[10/11/26 11:27:47] INFO     case:P08 ended (accepted): deal=True score=0.4158855368797736 C_deal=1,062,866.95 C_open=1,135,887.28 C_best=960,309.33
+                             https://arena.tacto.ai/replay/a11e1915d433af7a
+practice sessions left: 327
+                                             run 20261011-112625-practice-tactical+owner_offer
+┏━━━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ case     ┃ deal ┃ score ┃ C_open       ┃ C_deal       ┃ C_best     ┃ rounds ┃ end      ┃ replay                                         ┃
+┡━━━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ case:P08 │ yes  │ 0.416 │ 1,135,887.28 │ 1,062,866.95 │ 960,309.33 │ 3      │ accepted │ https://arena.tacto.ai/replay/a11e1915d433af7a │
+└──────────┴──────┴───────┴──────────────┴──────────────┴────────────┴────────┴──────────┴────────────────────────────────────────────────┘
+mean score 0.416 · deals 1/1 · claims {'verified': 3} · report:
+/home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent/runs/20261011-112625-practice-tactical+owner_offer/report.md
+    ~/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent    feat/p08-p11-p02  
+</pasted_content id="c8eb">
+
+
+<pasted_content id="c8eb">
+  cd /home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent && uv run negotiator run --set practice --cases case:P08 --strategy tactical+anchor18
+1 case(s): case:P08
+[10/11/26 11:26:21] INFO     opened case:P08: Alloy surcharge and base price for 1.4404 bar, 1
+                             supplier(s), C_alt=1,157,019.84
+                    INFO     sup:70710 plan [leverage hedged,open_book]: price open 6.05 lower
+                             5.2 upper 5.46 (asked 11.01%, justified 7.04%) | C target 934,147
+                             upper 1,028,315
+                    INFO     sup:70710 belief: stop ~993,011 (price 5.22), upper 1,028,315 ->
+                             1,002,941
+[10/11/26 11:26:44] INFO     sup:70710 r1: open 5.41 C=1,051,208.44 claims=['verified',
+                             'verified', 'verified'] (22s)
+                    INFO     sup:70710 belief: stop ~975,890 (price 5.13), upper 1,002,941 ->
+                             990,195
+
+[10/11/26 11:27:17] INFO     sup:70710 r2: open 5.44 C=1,033,830.66 claims=- (33s)
+                    INFO     sup:70710 belief: stop ~1,021,112 (price 5.32), upper 990,195 -> 1,031,323
+[10/11/26 11:27:42] INFO     sup:70710 r3: open 5.29 C=1,027,891.44 claims=- (25s)
+                    INFO     sup:70710 belief: stop ~1,005,217 (price 5.22), upper 1,031,323 -> 1,015,270
+[10/11/26 11:28:02] INFO     sup:70710 r4: open 5.26 C=1,022,062.18 claims=- (20s)
+                    INFO     sup:70710 belief: stop ~998,080 (price 5.2), upper 1,015,270 -> 1,008,060
+
+
+[10/11/26 11:28:19] INFO     sup:70710 r5: final_offer 5.24 C=1,018,176.02 claims=- (17s)
+                    INFO     sup:70710 belief: stop ~996,160 (price 5.19), upper 1,008,060 -> 1,006,122
+                    INFO     sup:70710: hold (last word: take it)
+[10/11/26 11:28:20] INFO     case:P08: accept sup:70710 offer:70710-5
+[10/11/26 11:28:21] INFO     case:P08 ended (accepted): deal=True score=0.6704216560222964 C_deal=1,018,176.02 C_open=1,135,887.28 C_best=960,309.33
+                             https://arena.tacto.ai/replay/914be5fe7dfa7c7f
+practice sessions left: 328
+                                              run 20261011-112618-practice-tactical+anchor18
+┏━━━━━━━━━━┳━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ case     ┃ deal ┃ score ┃ C_open       ┃ C_deal       ┃ C_best     ┃ rounds ┃ end      ┃ replay                                         ┃
+┡━━━━━━━━━━╇━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ case:P08 │ yes  │ 0.670 │ 1,135,887.28 │ 1,018,176.02 │ 960,309.33 │ 5      │ accepted │ https://arena.tacto.ai/replay/914be5fe7dfa7c7f │
+└──────────┴──────┴───────┴──────────────┴──────────────┴────────────┴────────┴──────────┴────────────────────────────────────────────────┘
+mean score 0.670 · deals 1/1 · claims {'verified': 3} · report:
+/home/vector/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent/runs/20261011-112618-practice-tactical+anchor18/report.md
+    ~/Desktop/Programming/EHLFinal2026/.claude/worktrees/p08-p11-p02/agent    feat/p08-p11-p02                                                               ✔  2m 8s 
+    ~/Des/Pr/EHLFinal2026/.cl/w/p08-p11-p02/agent    feat/p08-p11-p02                                                                                                  ✔
+    ~/Des/Pr/EHLFinal2026/.cl/w/p08-p11-p02/agent    feat/p08-p11-p02                                                                                                  ✔
+    ~/Des/Pr/EHLFinal2026/.cl/w/p08-p11-p02/agent    feat/p08-p11-p02                                                                                                  ✔
+
+</pasted_content id="c8eb">
