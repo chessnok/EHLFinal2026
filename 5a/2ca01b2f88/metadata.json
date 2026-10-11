@@ -3,8 +3,23 @@
   "checkpoint_id": "5a2ca01b2f88",
   "strategy": "manual-commit",
   "branch": "docs/argument-audit",
-  "checkpoints_count": 2,
-  "files_touched": null,
+  "checkpoints_count": 3,
+  "files_touched": [
+    "agent/docs/TRYED.md",
+    "agent/docs/argument-audit.md",
+    "agent/docs/benchmarks/2026-10-11-tactical-news-none.md",
+    "agent/docs/gameplan-2026-10-11.md",
+    "agent/docs/runs.md",
+    "agent/src/negotiator/data.py",
+    "agent/src/negotiator/guards.py",
+    "agent/src/negotiator/profile.py",
+    "agent/src/negotiator/reply_parser.py",
+    "agent/src/negotiator/strategy/__init__.py",
+    "agent/src/negotiator/strategy/tactical.py",
+    "agent/tests/test_data.py",
+    "agent/tests/test_release_loading.py",
+    "agent/tests/test_timeouts.py"
+  ],
   "sessions": [
     {
       "metadata": "/5a/2ca01b2f88/0/metadata.json",
@@ -12,13 +27,20 @@
       "compact_transcript": "/5a/2ca01b2f88/0/transcript.jsonl",
       "content_hash": "/5a/2ca01b2f88/0/content_hash.txt",
       "prompt": "/5a/2ca01b2f88/0/prompt.txt"
+    },
+    {
+      "metadata": "/5a/2ca01b2f88/1/metadata.json",
+      "transcript": "/5a/2ca01b2f88/1/full.jsonl",
+      "compact_transcript": "/5a/2ca01b2f88/1/transcript.jsonl",
+      "content_hash": "/5a/2ca01b2f88/1/content_hash.txt",
+      "prompt": "/5a/2ca01b2f88/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 10,
+    "cache_creation_tokens": 8212,
+    "cache_read_tokens": 1408393,
+    "output_tokens": 2700,
+    "api_call_count": 5
   }
 }
