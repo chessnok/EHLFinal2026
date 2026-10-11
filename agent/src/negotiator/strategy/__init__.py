@@ -25,6 +25,9 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     "decided": DecidedStrategy,
     # tactical with one candidate change switched on, to measure it on its own (see FLAGS in tactical.py)
     **{f"tactical+{flag}": partial(TacticalStrategy, **{flag: True}) for flag in TACTICAL_FLAGS},
+    # David's winner strategy: a fixed frame, the head computes and the mouth argues with it, patience (default),
+    # yes only to conditions that cost us little and never to the price
+    "tactical+winner": partial(TacticalStrategy, clause_rel_only=True, justified_arg=True, cheap_yes=True),
     # tactical's numbers, a model for the words (and, with +reader, for the levers the regular expressions miss)
     "tactical-llm": WrittenStrategy,
     "tactical-llm+reader": partial(WrittenStrategy, reader=True),

@@ -90,6 +90,7 @@ CASH_SHORT_RATE = 1.2
 # of P02 (EUR 345.39 against a should-cost of 380: charge EUR 179k, score 0); prices and concessions otherwise
 # follow C without it, as an error of a few per cent in a charge inside C moved D01 from 0.749 to 0.627 (S-26).
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
+CHEAP_YES = 0.002  # `cheap_yes`: a condition of its we accept at our price when it costs us at most this share of C
 GUESS_SLACK = 0.04  # `guess_slack`: the guessed cost floor less its largest observed error (D01 +3.5 %)
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
 ANCHOR_ROUTINE = 0.13  # routine goal: a deeper first ask is answered with a final offer
@@ -215,6 +216,8 @@ class Plan:
     facts: ReplyFacts | None = None  # everything its last e-mail said (reply_parser)
     banned_series: set = field(default_factory=set)  # index series it said do not reach its costs
     price_terms: dict = field(default_factory=dict)  # terms its price is tied to ("calculated for 60 days")
+    yes_line: str | None = None  # `cheap_yes`: the conditions of its we took at our price, said once
+    justified_note: str | None = None  # its own drivers x shares against what its quote asks (said once)
     bigger_step: bool = False  # it called our last step too small
     spent_kinds: set = field(default_factory=set)  # argument kinds the arena called `duplicate` (fresh_args)
 
@@ -242,6 +245,10 @@ FLAGS: dict[str, str] = {
     "error was up to +3.5 %; D01 fell 0.969 -> 0.669 with it)",
     "rel_anchor4": "strategic suppliers keep the 4 % first ask even when their margin charge is estimated (the 10 % "
     "ask of 11c: D01 0.969 -> 0.669, P01 0.946 -> 0.901, P10 0.663 -> 0.647); the charge stays in C",
+    "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
+    "costs us at most 0.2 % of C - never a yes to its price",
+    "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
+    "it asks, where it asks at least 1 point more",
     "menu_fallback": "under a margin charge, where the price on the lower side of the C minimum is not below its "
     "offer, ask on the usual side instead of finding no sheet and closing (P03)",
     "clause_rel_only": "an index series named in its quote counts as a request for a clause only with a strategic "
@@ -307,6 +314,8 @@ class TacticalStrategy(BaselineStrategy):
             target_c = self._target_c(neg, sid, terms, policy, profile, floor, current, gt)
             plan = Plan(sid, self._name(sid), policy, profile, open_c, target_c, floor, full_cost, gt)
             plan.guess = guess
+            if self.flags["justified_arg"]:
+                plan.justified_note = self._justified_note(neg, thread, terms)
             plan.lower_c, plan.upper_c = self._bounds_c(neg, sid, terms, gt, target_c, open_c)
             if terms.get("unit_price") is not None:
                 rate = buyer.get("interest_rate", 0.08) * (2 if profile.has("cash_short") else 1)
@@ -755,6 +764,53 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief.observe(reply)
             self._update_upper(neg, sid, plan)
         plan.seen_replies = len(replies)
+
+    def _cheap_yes(self, neg: Negotiation, sid: str, plan: Plan, theirs: dict, terms: dict) -> dict:
+        """Yes to its conditions that cost us little - never to its price: each value of its own sheet on a lever it
+        asked for goes into our option A at OUR price when it costs us at most CHEAP_YES of C (P-42: a yes to its
+        start date at a lower price cost P01 0.14)."""
+        base = neg.cost(sid, terms)
+        out, granted = dict(terms), []
+        for f in sorted(plan.requests):
+            want = theirs.get(f)
+            if f == "unit_price" or f not in neg.case["negotiable"] or want is None or want == out.get(f):
+                continue
+            options = neg.case.get("term_options", {}).get(f)
+            if options and want not in options:
+                continue  # a value we may not sign (P10's 54 days) would void the whole option
+            trial = {**out, f: want}
+            if neg.keeps_must_haves(sid, trial) and neg.cost(sid, trial) - neg.cost(sid, out) <= CHEAP_YES * base:
+                out, granted = trial, granted + [(f, want)]
+        if granted:
+            words = " and ".join(f"{FIELD_WORDS.get(f, f.replace('_', ' '))} {v}" for f, v in granted)
+            plan.yes_line = f"Yes to {words}, as you asked - at the same price."
+        return out
+
+    @staticmethod
+    def _justified_note(neg: Negotiation, thread, terms: dict) -> str | None:
+        """Its quote names its cost drivers with their 12-month change and their share of its cost: what they add up
+        to is the rise its own figures justify. Said when its quote asks clearly more (P04: 13.0 % asked, 0.8 %
+        justified; P01 9.5 % against 2.4 %; P08 11.0 % against 7.5 %) - never where its figures carry the ask."""
+        current = neg.buyer.get("current_unit_price")
+        price = terms.get("unit_price")
+        if not current or not price or not thread.messages:
+            return None
+        moves = [
+            (s, pct, share)
+            for s, pct, _, share in parse_reply(thread.messages[0].get("body", "")).driver_moves
+            if share
+        ]
+        if not moves:
+            return None
+        justified = sum(pct * share / 100 for _, pct, share in moves)
+        asked = (price / current - 1) * 100
+        if asked - justified < 1.0:
+            return None
+        figures = ", ".join(f"{s} {pct:+.1f} % at {share:.0f} % of your cost" for s, pct, share in moves)
+        return (
+            f"By your own figures ({figures}) your costs rose by about {justified:.1f} %, while your quote asks "
+            f"{asked:.1f} % more than our current price of EUR {current:,.2f}."
+        )
 
     @staticmethod
     def _read_reply(neg: Negotiation, sid: str, reply: dict) -> ReplyFacts | None:
@@ -1483,6 +1539,8 @@ class TacticalStrategy(BaselineStrategy):
                     t["unit_price"] = bumped
         if self.flags["alt_structure"]:
             picked = self._with_alternative_structure(neg, sid, valid or under_floor, picked)  # before "refused twice"
+        if self.flags["cheap_yes"] and picked:
+            picked[0] = self._cheap_yes(neg, sid, plan, theirs, picked[0])
         # every option of a message costs us the same: floors and bumps can lift one above our ask, and the supplier
         # then picks the one dearest to us (P02 agreed at once to an index clause at the same price, EUR 39k more C;
         # without it practice P02 0.167 -> 0.731)
@@ -1696,6 +1754,12 @@ class TacticalStrategy(BaselineStrategy):
             said += self._fixed_field_answers(neg, plan)
         if self.flags["respond_all"] or self.flags["respond_lite"]:
             said += self._take_up_lines(neg, plan, sheets)
+        if plan.yes_line:
+            said.append(plan.yes_line)
+            plan.yes_line = None
+        if first and plan.justified_note:
+            said.append(plan.justified_note)  # the head's sum of its own figures, said by the mouth once
+            plan.justified_note = None
         lines += said
         if not plan.asked_breakdown and p.has("open_book") and not plan.breakdown_read:
             lines.append("Could you send us a cost breakdown for this part?")
