@@ -1606,9 +1606,15 @@ class TacticalStrategy(BaselineStrategy):
             return out
         if 14 not in options or any((sh["terms"].get("payment_days") or 999) <= 14 for sh in out):
             return out
+        if neg.supplier_estimates.get(sid) or neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+            return (
+                out  # under a margin charge the 14-day option prices high and pulls its price up (P01 0.943 -> 0.818)
+            )
         a = out[0]["terms"]
         base = complete_offer(neg.case, {**a, "payment_days": 14})
         base["unit_price"] = self._iso_cost_price(neg, sid, base, neg.cost(sid, a))
+        if base["unit_price"] > a["unit_price"]:
+            return out  # never an option dearer than A: it anchors its price up
         if not neg.keeps_must_haves(sid, base) or neg.cost(sid, base) >= their_c:
             return out
         plan.offered[structure_key(base)] = max(plan.offered.get(structure_key(base), 0.0), base["unit_price"])
