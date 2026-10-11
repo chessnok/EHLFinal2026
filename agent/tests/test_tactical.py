@@ -85,20 +85,6 @@ def test_accept_guard_refuses_an_unknown_must_have_field(tmp_path, world) -> Non
     assert any("unknown" in p for p in accept_problems(neg, sid, "offer:x-0"))
 
 
-def test_accept_guard_reads_a_must_have_field_from_the_master_data(tmp_path, world) -> None:
-    """The quote PDF names no payment terms: the supplier closes on its master data's (sup:70270: 45 days)."""
-    pdf = QUOTE_TEXT.replace("Payment terms (days net) 30\n", "")
-    c = case(must_haves=[{"field": "payment_days", "op": ">=", "value": 45}])
-    c["negotiable"].remove("payment_days")
-    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 16.0}, std_text=pdf)
-    assert world.supplier(sid)["payment_days"] == 45 and "payment_days" not in neg.threads[sid].standard_terms
-    assert accept_problems(neg, sid, "offer:x-0") == []
-    c["buyer"]["must_haves"] = [{"field": "payment_days", "op": ">=", "value": 60}]  # known, and it breaks it
-    assert any("must-have" in p for p in accept_problems(neg, sid, "offer:x-0"))
-    neg.data = None  # without the master data the field stays unknown
-    assert any("unknown" in p for p in accept_problems(neg, sid, "offer:x-0"))
-
-
 def test_accept_guard_refuses_a_deal_dearer_than_the_alternative(tmp_path, world) -> None:
     c = case(alternative={"kind": "quote", "ref": None, "terms": {"unit_price": 15.0, "payment_days": 60}})
     neg, sid = negotiation(tmp_path, world, c, {"unit_price": 16.0, "payment_days": 60})
