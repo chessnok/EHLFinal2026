@@ -26,6 +26,9 @@ first and `duplicate` when asked second; DEMO-J1's check was `verified` in both 
 Not measured on practice. Of the ten hosted practice cases only P05 has a qualifying item (`news:20260309-03`,
 sup:70250).
 
+On main's default of `632048c` and later (merged into the branch, `../runs.md` S-41): control D01 0.669, D02 0.660
+(C_deal 176,307); `tactical+news` D01 0.669, D02 0.681 (C_deal 175,094, deal 14.40), the same in two runs.
+
 ## Strategy
 
 `strategy/tactical.py`, the commit that adds this record (branch `docs/argument-audit`): `tactical` with the flag
@@ -36,7 +39,7 @@ bidder once. `guards.known_id` lets an ID named in the case's refs pass; `profil
 
 ## Runs
 
-Set sandbox (`../runs.md` S-35 to S-38): `20261011-101750-sandbox-tactical`, `20261011-102604-sandbox-tactical`,
+Set sandbox (`../runs.md` S-37 to S-40): `20261011-101750-sandbox-tactical`, `20261011-102604-sandbox-tactical`,
 `20261011-101914-sandbox-tactical+news` (the item cited once per case, to DEMO-C1 only: 0.587),
 `20261011-102124-sandbox-tactical+news`, `20261011-102435-sandbox-tactical+news`,
 `20261011-102636-sandbox-tactical+news`, `20261011-103025-sandbox-tactical+news` (D01 and D02, the code as

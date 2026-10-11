@@ -10,6 +10,7 @@ one sentence each - the strategy decides which to use.
 import copy
 import csv
 import json
+import logging
 import sqlite3
 import threading
 from dataclasses import dataclass, field
@@ -29,13 +30,29 @@ class Evidence:
     meta: dict = field(default_factory=dict)
 
 
+def _release_root(release: Path | None) -> Path | None:
+    """The folder of the Sunday release that holds its facts.json: the download unpacks the zip's own top folder
+    (`release-sunday/release-sunday/`), which left the release unread."""
+    if not release:
+        return None
+    release = Path(release)
+    if (release / "facts.json").is_file():
+        return release
+    inner = [d for d in release.glob("*/") if (d / "facts.json").is_file()] if release.is_dir() else []
+    if len(inner) == 1:
+        return inner[0]
+    if release.exists():
+        logging.getLogger(__name__).warning("release folder %s holds no facts.json: the release is NOT loaded", release)
+    return None
+
+
 class WorldData:
     def __init__(self, root: Path, release: Path | None = None) -> None:
         self.root = Path(root)
         if not (self.root / "facts.json").is_file():
             raise FileNotFoundError(f"no facts.json in {self.root}")
         self.facts: dict[str, dict] = json.loads((self.root / "facts.json").read_text(encoding="utf-8"))
-        self.release = release if release and (release / "facts.json").is_file() else None
+        self.release = _release_root(release)
         self._lock = threading.Lock()
         self.db = sqlite3.connect(":memory:", check_same_thread=False)
         self.db.row_factory = sqlite3.Row

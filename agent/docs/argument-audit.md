@@ -142,6 +142,6 @@ be cited to our advantage, and D02 is where it can be tried without quota.
 
 ## 6. Measured after the audit
 
-`tactical+news` on sandbox D02 (`runs.md` S-35 to S-38, [record](benchmarks/2026-10-11-tactical-news-none.md)): the
+`tactical+news` on sandbox D02 (`runs.md` S-37 to S-40, [record](benchmarks/2026-10-11-tactical-news-none.md)): the
 arena reads the type `news`; cited to the bidder it is about it is `verified` and "taken into account" (D02 0.587 →
 0.713, four of four runs), cited to the other bidder it is `irrelevant`. Not played on practice.
