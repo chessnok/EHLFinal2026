@@ -97,6 +97,7 @@ ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the de
 ANCHOR_ROUTINE = 0.13  # routine goal: a deeper first ask is answered with a final offer
 ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
 MAX_ANCHOR = 0.15  # (kept for the experiments that import it)
+SOFT_ANCHOR = 0.5  # `soft_anchor`: the first ask's depth as a share of the usual one
 MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D02, P05, P18), but a deeper first
 # ask lost credibility (P05: Hrvelec walked after four rounds at 24-25 against its 34)
 # without a cost estimate, anchor this far under the reference price (baseline v2's sandbox-tested depths)
@@ -250,6 +251,10 @@ FLAGS: dict[str, str] = {
     "(P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
+    "no_hedged_series": "a hedged supplier hears no argument on the series a clause option follows (P08 "
+    "answered 'not our reality' in every session; the slot goes to the next argument) and no fact twice",
+    "soft_anchor": "a higher first offer under routine and quality_first goals: the first ask half as deep "
+    "(their suppliers moved 0.4-6 % in all; leverage suppliers 15-24 %, P05 36 -> 27.50, need the deep one)",
     "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
     "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
@@ -285,8 +290,9 @@ def snap_option(options, value):
 
 # On by default since 11 Oct 09:20 (David's decision): clause_rel_only + cheap_yes (P-49: P01 0.924, P08 0.626,
 # P11 0.710, P18 0.685) and fast_pay (P-50: P05 0.824 -> 0.865). justified_arg is off: alone it lost P01 and P08
-# (P-47), and in the combination P08 fell from 0.626 to 0.571. Switch one off with flag=False.
-DEFAULT_ON = {"clause_rel_only", "cheap_yes", "fast_pay"}
+# (P-47), and in the combination P08 fell from 0.626 to 0.571. no_hedged_series on since 11 Oct 10:15 (P-57: P08
+# 0.626 -> 0.659, the other nine identical). Switch one off with flag=False.
+DEFAULT_ON = {"clause_rel_only", "cheap_yes", "fast_pay", "no_hedged_series"}
 
 
 class TacticalStrategy(BaselineStrategy):
@@ -605,6 +611,8 @@ class TacticalStrategy(BaselineStrategy):
             self.flags["guess_anchor"] and self._full_cost(neg.case.get("parts") or [], sid) is None
         ):
             depth, extra = min(depth, ANCHOR_RELATIONSHIP), 0.0  # squeezing a strategic supplier costs us C
+        if self.flags["soft_anchor"] and neg.buyer.get("category_goal") in ("routine", "quality_first"):
+            depth, extra = depth * SOFT_ANCHOR, 0.0
         # round 1 carries 67 % of all supplier movement and no supplier ever walked over a deep first offer
         # (0 of 917 replies); within a case deeper first offers went with better scores - so we open deep
         candidates = [open_price * (1 - depth)]
@@ -1311,11 +1319,15 @@ class TacticalStrategy(BaselineStrategy):
         """It came under a floor we only guessed: our guess was timid. Ask again under its new price, once."""
         if plan.reanchored or not self._may_push(neg, sid):
             return None
-        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS and not plan.guess:
-            # never 10 % under a strategic supplier's price: without an estimate of its cost nothing stops the
-            # squeeze (P02: 345.39, score 0); with one C is not monotone in the price - a price under the floor
-            # costs more charge than it saves, and the "re-anchor" asked a C above its offer, so no sheet went out.
-            # A guessed cost allows it: the guess floor (_sheets) keeps every sheet above the cost minimum
+        if (
+            neg.buyer.get("category_goal") in RELATIONSHIP_GOALS
+            and not plan.guess
+            and not neg.supplier_estimates.get(sid)
+        ):
+            # never 10 % under a strategic supplier's price without an estimate of its cost: nothing stops the
+            # squeeze (P02: 345.39, score 0). With an own-plant estimate the charge is in C and the re-anchor stays
+            # as measured (P01 0.969, P-29; off, it held at 133.6 in round 3: 0.901, run 20261011-082032); a guessed
+            # cost allows it too: the guess floor (_sheets) keeps every sheet above the cost minimum
             return None
         plan.reanchored = True
         price = theirs["unit_price"] * (1 - REANCHOR)
@@ -1454,6 +1466,13 @@ class TacticalStrategy(BaselineStrategy):
         B  the structure the supplier takes most readily (its requests answered, closest to its own);
         C  the next most acceptable structure of a different kind (another clause, term or payment)."""
         case = neg.case
+        # never above what it asks: under a guessed cost its offer at hand; with its own plant's cost its standing
+        # price - not a cheaper alternative it named (P01: 132.55 at 90 days against its 132.40 at 30, as measured)
+        _, standing = neg.threads[sid].standing
+        ceiling = theirs["unit_price"]
+        if not plan.guess and (standing or {}).get("unit_price"):
+            ceiling = max(ceiling, standing["unit_price"])
+        capping = bool(plan.guess or neg.supplier_estimates.get(sid))
         # Under a margin charge every C above the minimum has two prices. While our ask is within ANCHOR_SLACK
         # of the minimum we send the lower one: a deep first ask whose every step up is a move the supplier sees
         # and a gain for us, and if it agrees we pay at most the slack. After that, the usual side.
@@ -1494,7 +1513,7 @@ class TacticalStrategy(BaselineStrategy):
             # never above its own price: where the margin charge falls faster than the price rises (a sustainable
             # margin above what its quote leaves it) the cost-optimal price sat over its quote (brief variants)
             price = price_for(terms)
-            return min(price, theirs["unit_price"]) if neg.supplier_estimates.get(sid) else price
+            return min(price, ceiling) if capping else price
 
         menu = priced_menu(case, theirs, capped)
         valid, under_floor = [], []
@@ -1524,7 +1543,9 @@ class TacticalStrategy(BaselineStrategy):
             # against a should-cost of 380 and paid EUR 179k of margin charge (score 0); its C_best sat near 362
             floor = round(plan.full_cost * RELATIONSHIP_COST_FLOOR, 2)
             for t in pool:
-                t["unit_price"] = min(max(t["unit_price"], floor), theirs["unit_price"])
+                t["unit_price"] = max(t["unit_price"], floor)
+                if capping:
+                    t["unit_price"] = min(t["unit_price"], ceiling)
             pool = [t for t in pool if neg.cost(sid, t) < their_c] or pool
         if plan.guess:
             # a guessed cost is a floor: no sheet under the price that costs us least with the guessed charge
@@ -1721,6 +1742,8 @@ class TacticalStrategy(BaselineStrategy):
 
     # ------------------------------------------------------------------ arguments and words
     def _choose_claims(self, neg, sid, plan, first: bool) -> list[Evidence]:
+        if self.flags["no_hedged_series"]:
+            self._drop_hedged_series(neg, plan)
         banned = plan.banned_kinds | self.banned_case_kinds
         if neg.buyer.get("category_goal") != "quality_first":
             banned = banned | {"scorecard"}
@@ -1855,6 +1878,26 @@ class TacticalStrategy(BaselineStrategy):
                 meta = {"later": True, "any_supplier": True}
                 out.append(Evidence(kind="news", refs=[ref], sentence=sentence, meta=meta))
         return out
+
+    @staticmethod
+    def _drop_hedged_series(neg, plan: Plan) -> None:
+        """Its material is bought at fixed prices: a fall of the series its clause would follow is "not our reality"
+        (P08, every session) - the slot goes to the next argument. One fact is cited once (the counters may hold it)."""
+        clauses = neg.case.get("term_options", {}).get("index_clause") or []
+        series = {o.get("series") for o in clauses if o}
+        if not (plan.profile.has("hedged") and series):
+            return
+        prefixes = tuple(f"idx:{s}@" for s in series)
+
+        def keep(e: Evidence) -> bool:
+            return not any(r.startswith(prefixes) for r in e.refs or []) and not any(
+                s in (e.sentence or "") for s in series
+            )
+
+        plan.counters = [e for e in plan.counters if keep(e)]
+        plan.evidence = [e for e in plan.evidence if keep(e)]
+        cited = {r for e in plan.counters for r in e.refs or []}
+        plan.evidence = [e for e in plan.evidence if not set(e.refs or []) & cited]
 
     def _write(self, neg, plan: Plan, sheets: list[dict], claims: list[Evidence], probe: bool) -> dict:
         p, case = plan.profile, neg.case
