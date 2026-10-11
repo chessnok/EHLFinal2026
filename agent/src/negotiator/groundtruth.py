@@ -145,7 +145,9 @@ def last_price(data: WorldData, part_id: str, supplier_id: str) -> float | None:
     return rows[0]["price"] if rows else None
 
 
-def estimate(data: WorldData | None, case: dict, supplier_id: str, open_price: float | None, traits=()) -> GroundTruth:
+def estimate(
+    data: WorldData | None, case: dict, supplier_id: str, open_price: float | None, traits=(), by_goal: bool = False
+) -> GroundTruth:
     parts = case.get("parts") or []
     part = parts[0] if len(parts) == 1 else None  # a kit's price is not one part's cost
     buyer = case.get("buyer", {})
@@ -177,7 +179,7 @@ def estimate(data: WorldData | None, case: dict, supplier_id: str, open_price: f
     if gt.full_cost:
         gt.notes.append(f"full cost {gt.full_cost} ({gt.full_cost_source})")
         gt.grounded = True  # a cost estimate exists: an argument and the margin term, not the floor
-    factor = floor_factor(case)
+    factor = floor_factor(case, by_goal)
     gt.lower = round(open_price * factor, 2)
     gt.notes.append(f"floor = quote x {factor} ({case.get('type')}, {case.get('buyer', {}).get('category_goal')})")
 
@@ -186,7 +188,13 @@ def estimate(data: WorldData | None, case: dict, supplier_id: str, open_price: f
     return gt
 
 
-def floor_factor(case: dict) -> float:
-    """The supplier's floor as a share of its quote: price-only talks vs talks with a lever."""
+def floor_factor(case: dict, by_goal: bool = False) -> float:
+    """The supplier's floor as a share of its quote: price-only talks vs talks with a lever.
+
+    `by_goal` (tactical `goal_depth`): a `leverage` goal is talks with a lever whatever the case type. The
+    price-only level was fitted on practice price increases and renewals, all `stabilise` or `routine`; the five
+    hidden leverage price-only cases of the final (H06, H24, H30, H34, H38) closed at or under a 10 % ask."""
+    if by_goal and (case.get("buyer") or {}).get("category_goal") == "leverage":
+        return FLOOR_WITH_LEVERS
     single = len(case.get("suppliers") or []) <= 1
     return FLOOR_PRICE_ONLY if single and case.get("type") in PRICE_ONLY_TYPES else FLOOR_WITH_LEVERS

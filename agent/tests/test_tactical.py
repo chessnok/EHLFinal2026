@@ -240,6 +240,45 @@ def test_ground_truth_bounds_hold_without_data() -> None:
     assert gt.lower is not None and gt.lower <= gt.upper <= 11.0
 
 
+def test_goal_depth_floor_follows_the_goal_not_the_case_type() -> None:
+    """`goal_depth`: a single-supplier price increase under a leverage goal is talks with a lever (H30, H38)."""
+    from negotiator.groundtruth import FLOOR_PRICE_ONLY, FLOOR_WITH_LEVERS, floor_factor
+
+    lev = {"type": "renewal", "suppliers": ["sup:x"], "buyer": {"category_goal": "leverage"}}
+    stab = {**lev, "buyer": {"category_goal": "stabilise"}}
+    assert floor_factor(lev) == FLOOR_PRICE_ONLY  # off: the case type decides
+    assert floor_factor(lev, by_goal=True) == FLOOR_WITH_LEVERS
+    assert floor_factor(stab, by_goal=True) == FLOOR_PRICE_ONLY  # a running relationship barely moves
+
+
+def test_goal_depth_asks_deep_on_a_leverage_price_increase(tmp_path, world) -> None:
+    """S01 is a price increase with one supplier and a leverage goal: 10 % first ask without the flag, 25 % with."""
+    from negotiator.strategy.tactical import ANCHOR_DATA_EXTRA, ANCHOR_PRICE_ONLY, ANCHOR_WITH_LEVERS
+
+    asks = {}
+    for on in (False, True):
+        neg, sid = negotiation(tmp_path / str(on), world, case(), {"unit_price": 17.47, "payment_days": 30})
+        strategy = TacticalStrategy(world, goal_depth=on)
+        strategy.prepare(neg)
+        first = strategy.decide(neg, sid)
+        asks[on] = min(s["terms"]["unit_price"] for s in first.message["term_sheets"])
+        assert strategy.tplans[sid].gt.lower == round(17.47 * (0.86 if on else 0.99), 2)
+    assert asks[False] >= round(17.47 * (1 - ANCHOR_PRICE_ONLY - ANCHOR_DATA_EXTRA), 2) - 0.01
+    assert asks[True] < round(17.47 * (1 - ANCHOR_PRICE_ONLY - ANCHOR_DATA_EXTRA), 2)
+    assert asks[True] >= round(17.47 * (1 - ANCHOR_WITH_LEVERS - ANCHOR_DATA_EXTRA), 2) - 0.01
+
+
+def test_goal_depth_keeps_the_shallow_ask_outside_leverage(tmp_path, world) -> None:
+    c = case(category_goal="routine")
+    first = {}
+    for on in (False, True):
+        neg, sid = negotiation(tmp_path / str(on), world, c, {"unit_price": 17.47, "payment_days": 30})
+        strategy = TacticalStrategy(world, goal_depth=on)
+        strategy.prepare(neg)
+        first[on] = strategy.decide(neg, sid).message["term_sheets"]
+    assert first[True] == first[False]
+
+
 def test_accept_guard_refuses_worse_than_opening_when_walking_is_safe(tmp_path, world) -> None:
     c = case(alternative={"kind": "quote", "ref": None, "terms": {"unit_price": 30.0, "payment_days": 60}})
     neg, sid = negotiation(tmp_path, world, c, {"unit_price": 16.0, "payment_days": 60})

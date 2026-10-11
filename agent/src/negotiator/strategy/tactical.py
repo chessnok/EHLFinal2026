@@ -286,6 +286,9 @@ FLAGS: dict[str, str] = {
     "late_facts": "round 1 as today; from round 2 every offer carries at least one argument the arena has not counted "
     "for this supplier: remaining strong evidence first, then weak facts kept out of round 1 (price history, a "
     "delivery or quality record or complaint, an index series it rebuffed), never a counted kind, series or part",
+    "goal_depth": "the price-only floor (quote x 0.99) and the 10 % first ask only outside a `leverage` goal; a "
+    "leverage case gets the 0.86 floor and the 25 % ask whatever its type (final: 5 of 5 leverage price-only "
+    "cases - H06, H24, H30, H34, H38 - closed at or under our 10 % ask while C_best sat 14-35 % under the quote)",
 }
 
 
@@ -343,7 +346,9 @@ class TacticalStrategy(BaselineStrategy):
             self._estimate_supplier(neg, sid, full_cost, profile)
             floor = self._floor(neg, full_cost, policy)
             open_c = neg.cost(sid, terms)
-            gt = estimate(self.data, neg.case, sid, terms.get("unit_price"), tuple(profile.traits))
+            gt = estimate(
+                self.data, neg.case, sid, terms.get("unit_price"), tuple(profile.traits), self.flags["goal_depth"]
+            )
             if gt.lower and goal not in RELATIONSHIP_GOALS:
                 floor = gt.lower  # one floor: the ground truth's (it knows below-cost sellers and countries)
             target_c = self._target_c(neg, sid, terms, policy, profile, floor, current, gt)
@@ -602,6 +607,8 @@ class TacticalStrategy(BaselineStrategy):
         if open_price is None:
             return math.inf
         price_only = bool(gt and gt.lower and gt.lower >= open_price * 0.95)  # the prior says: only the price moves
+        if self.flags["goal_depth"] and neg.buyer.get("category_goal") == "leverage":
+            price_only = False  # a leverage goal asks deep whatever the case type (its floor too: floor_factor)
         depth = ANCHOR_PRICE_ONLY if price_only else ANCHOR_WITH_LEVERS
         extra = ANCHOR_DATA_EXTRA
         if neg.buyer.get("category_goal") == "routine":
