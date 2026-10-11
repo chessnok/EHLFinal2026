@@ -234,6 +234,8 @@ FLAGS: dict[str, str] = {
     "clause it must have kept, no 'pays early' that is not",
     "fresh_args": "never an argument the arena already counted (one per kind, index series, part); one held back from "
     "the first e-mail for a later round; a bundle's orders per part",
+    "menu_fallback": "under a margin charge, where the price on the lower side of the C minimum is not below its "
+    "offer, ask on the usual side instead of finding no sheet and closing (P03)",
     "clause_rel_only": "an index series named in its quote counts as a request for a clause only with a strategic "
     "goal (P02, what it was built for); in leverage the clause options in round 1 cost P08 0.066 and P18 0.067 "
     "(b3f06da against 11c, same first e-mail otherwise)",
@@ -1360,7 +1362,12 @@ class TacticalStrategy(BaselineStrategy):
                 if asked(terms) and floor_c <= asked_least * (1 + STALL_EPS):
                     return self._cheapest_price(neg, sid, terms)
                 return 0.0
-            return self._iso_cost_price(neg, sid, terms, floor_c + slack - spent, under=True)
+            low = self._iso_cost_price(neg, sid, terms, floor_c + slack - spent, under=True)
+            if self.flags["menu_fallback"] and neg.cost(sid, {**terms, "unit_price": low}) >= their_c * (1 - DONE_EPS):
+                # the lower side of the C minimum is not below its offer: every structure fell out and we closed
+                # early (P03 R2: 404.47 at C 3,938k against its 3,937k, while 430.56 cost 3,925k)
+                return self._iso_cost_price(neg, sid, terms, ask_c)
+            return low
 
         def capped(terms: dict) -> float:
             # never above its own price: where the margin charge falls faster than the price rises (a sustainable
