@@ -173,3 +173,22 @@ def test_fast_pay_offers_the_shortest_term_the_case_allows(tmp_path, world) -> N
         days = [sh["terms"]["payment_days"] for sh in d.message["term_sheets"]]
         assert fastest in days, (options, days)
         assert all(day in options for day in days)
+
+
+# ---------------------------------------------------------------- hide_own_cost
+def test_hide_own_cost_runs_an_own_plant_supplier_on_the_guess(tmp_path, world) -> None:
+    """P01's supplier has its own plant's should-cost; hidden, it gets the guess floor most strategic suppliers get."""
+    c = json.loads((SIM_CASES / "S01.json").read_text(encoding="utf-8"))
+    c["buyer"].update(category_goal="stabilise", sustainable_margin_pct=3, relationship_eur_per_point=5000)
+    c["parts"], c["suppliers"] = ["part:310010"], ["sup:70110"]
+    offer = [{"unit_price": 138.55, "payment_days": 30}]
+    for hide in (False, True):
+        neg = opened(tmp_path, world, c, {"sup:70110": offer})
+        strategy = TacticalStrategy(world, hide_own_cost=hide)
+        strategy.prepare(neg)
+        plan = strategy.tplans["sup:70110"]
+        if hide:
+            assert plan.full_cost is None and not neg.supplier_estimates.get("sup:70110")
+            assert plan.guess and plan.guess["full_cost"] > 0
+        else:
+            assert plan.full_cost and neg.supplier_estimates["sup:70110"] and plan.guess is None

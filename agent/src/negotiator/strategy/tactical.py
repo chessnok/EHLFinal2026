@@ -260,6 +260,8 @@ FLAGS: dict[str, str] = {
     "own_structures": "a structure the supplier itself prices cheaply - its own alternative sheets give the rate, "
     "e.g. P05 Hrvelec 35.00 at 35 days, 31.50 at 52 (snapped to what we may sign: 42) - joins as option B at option "
     "A's C when its drop is 1.5x what the structure costs us; its own lead time beyond our need also without a pair",
+    "hide_own_cost": "measurement only: the own plant's should-cost is not read (`_full_cost` None), so strategic "
+    "own-plant cases (P01, P02, P03, P10) run the guessed-cost path most hidden strategic suppliers get (A3 floor)",
     "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
     "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
@@ -442,8 +444,9 @@ class TacticalStrategy(BaselineStrategy):
         """The should-cost of THIS supplier's plant for a single-part case; None otherwise.
 
         Another supplier's estimate is a different plant (cost base, process) and a bundle's price is
-        not one part's cost: guessing would push the floor and the margin charge the wrong way."""
-        if not self.data or len(parts) != 1:
+        not one part's cost: guessing would push the floor and the margin charge the wrong way.
+        `hide_own_cost`: None always, so a strategic supplier with an own-plant cost runs the guessed-cost path."""
+        if not self.data or len(parts) != 1 or self.flags["hide_own_cost"]:
             return None
         rows = self.data.query(
             "SELECT unit_cost FROM should_cost WHERE part_id = ? AND supplier_id = ? ORDER BY estimate_date DESC",
