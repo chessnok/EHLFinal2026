@@ -3,7 +3,7 @@
   "checkpoint_id": "51b61a7adead",
   "strategy": "manual-commit",
   "branch": "fix/final-robustness",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "agent/docs/TRYED.md",
     "agent/docs/benchmarks/2026-10-11-tactical-flags-b-none.md",
@@ -16,6 +16,12 @@
       "metadata": "/51/b61a7adead/0/metadata.json",
       "transcript": "/51/b61a7adead/0/full.jsonl",
       "content_hash": "/51/b61a7adead/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/51/b61a7adead/1/metadata.json",
+      "transcript": "/51/b61a7adead/1/full.jsonl",
+      "content_hash": "/51/b61a7adead/1/content_hash.txt",
       "prompt": ""
     }
   ],
