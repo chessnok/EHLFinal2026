@@ -220,3 +220,31 @@ def test_llm_opponent_is_shown_the_replies_to_e_mails_in_like_words() -> None:
                 past("Our management has set a ceiling for this part", 0.05)]  # fmt: skip
     first = pick(examples, "open", 1, "Please note the ceiling our management set", limit=1)
     assert first[0]["gave"] == 0.05
+
+
+def test_a_perturbed_session_bends_the_supplier_and_moves_the_round_limit() -> None:
+    """`sim robust`: per session the steps, the final-offer rate and the round limit move; unperturbed, nothing."""
+    from negotiator.sim.arena import MIN_ROUNDS, PERTURB_FINAL, PERTURB_STEP, CalibratedSim
+
+    case = {**CASE, "suppliers": ["sup:T"], "round_limit": 10, "title": "t"}
+    model = {
+        "cases": {"case:T01": case},
+        "profiles": {"case:T01|sup:T": _profile()},
+        "pool": _pool(),
+        "results": {
+            "case:T01": {"c_open": total_cost(CASE, REF), "c_best": total_cost(CASE, {**REF, "unit_price": 8})}
+        },
+    }
+    plain = CalibratedSim(model).open("team", "case:T01")
+    assert plain["case"]["round_limit"] == 10
+    limits, bends = set(), set()
+    for seed in range(12):
+        sim = CalibratedSim(model, seed=seed, perturb=True)
+        opened = sim.open("team", "case:T01")
+        limits.add(opened["case"]["round_limit"])
+        who = sim.sessions[opened["session_id"]]["threads"]["sup:T"]["sim"].persona
+        assert PERTURB_STEP[0] <= who.step <= PERTURB_STEP[1] and PERTURB_FINAL[0] <= who.final <= PERTURB_FINAL[1]
+        assert who.name == "fitted"
+        bends.add(round(who.step, 3))
+    assert len(limits) > 1 and min(limits) >= MIN_ROUNDS and len(bends) > 6
+    assert model["cases"]["case:T01"]["round_limit"] == 10  # the model's case is not touched
