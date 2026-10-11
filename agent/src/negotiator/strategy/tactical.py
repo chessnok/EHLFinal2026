@@ -265,6 +265,13 @@ FLAGS: dict[str, str] = {
     "answered, kept in the options or said honestly why not; implies answers",
     "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
     "12), not only one ending at the latest month; one per series",
+    "ppm_ladder": "quality cases: every message carries one sheet per ppm commitment the must-haves allow, all at the "
+    "lowest chargeback and at option A's C - what a looser commitment is worth to it late in the talks was never "
+    "asked (P11: 45.50 at 300 ppm in round 4, no 800 or 1500 ppm sheet since cheap_yes)",
+    "anchor18": "leverage goal: first ask at most 18 % under the quote (25-30 % today); P08's one four-round session "
+    "of 59 had an 18 % ask, the 56 with a final offer in round 3 asked 25-27 %",
+    "owner_offer": "an open_book supplier is asked for its calculation with the date of the note in which it "
+    "offered to show it, not for 'a cost breakdown' (P08 refused the plain question in every session)",
     "news": "from round 2 one press report about the supplier's idle capacity (or the case's own news item), cited "
     "by ID next to the round's other arguments - the one checkable kind we never cited (docs/argument-audit.md)",
 }
@@ -586,6 +593,8 @@ class TacticalStrategy(BaselineStrategy):
             # P07 (bundling, routine): a 13 % ask got 5.59 and four rounds (0.721, P-13); 25-26 % got "your
             # target prices are not feasible", 5.69 and a final offer in round 2 (0.585 P-15, 0.663 P-22)
             depth, extra = min(depth, ANCHOR_ROUTINE), 0.0
+        if self.flags["anchor18"] and neg.buyer.get("category_goal") == "leverage":
+            depth, extra = min(depth, MAX_ANCHOR_LEVERAGE), 0.0
         if neg.supplier_estimates.get(sid) and not (
             self.flags["rel_anchor4"] and neg.buyer.get("category_goal") in RELATIONSHIP_GOALS
         ):
@@ -1589,9 +1598,41 @@ class TacticalStrategy(BaselineStrategy):
                 keys.add(structure_key(t))
                 out.append({"terms": t})
                 plan.offered[structure_key(t)] = max(plan.offered.get(structure_key(t), 0.0), t["unit_price"])
+        if self.flags["ppm_ladder"]:
+            out = self._ppm_ladder(neg, sid, plan, out, their_c)
         if self.flags["fast_pay"]:
             out = self._fast_pay(neg, sid, plan, out, their_c)
         return out[:3]
+
+    def _ppm_ladder(self, neg: Negotiation, sid: str, plan: Plan, out: list[dict], their_c: float) -> list[dict]:
+        """One sheet per ppm commitment the must-haves allow, tightest first, all at the lowest chargeback and at
+        option A's C. P11's supplier priced a ppm level at about 0.50 a unit and it costs us 0.23-0.32; since
+        cheap_yes our late rounds carried the 300 ppm sheet alone."""
+        case = neg.case
+        options = case.get("term_options", {})
+        levels = sorted(v for v in options.get("ppm_commitment") or [] if isinstance(v, int | float))
+        if not out or "ppm_commitment" not in case["negotiable"] or len(levels) < 2:
+            return out
+        lead = out[0]["terms"]
+        c = neg.cost(sid, lead)
+        backs = [v for v in options.get("chargeback_eur_per_complaint") or [] if isinstance(v, int | float)]
+        ladder = []
+        for level in levels:
+            t = {**lead, "ppm_commitment": level}
+            if backs and "chargeback_eur_per_complaint" in case["negotiable"]:
+                t["chargeback_eur_per_complaint"] = min(backs)
+            t["unit_price"] = self._iso_cost_price(neg, sid, t, c)
+            before = plan.offered.get(structure_key(t))
+            if before is not None and t["unit_price"] < before:
+                t["unit_price"] = before  # a structure offered before never comes back at a lower price
+            if neg.keeps_must_haves(sid, t) and neg.cost(sid, t) < their_c:
+                ladder.append({"terms": t})
+        if len(ladder) < 2:
+            return out
+        for sh in ladder[:3]:
+            key = structure_key(sh["terms"])
+            plan.offered[key] = max(plan.offered.get(key, 0.0), sh["terms"]["unit_price"])
+        return ladder[:3]
 
     @staticmethod
     def _with_alternative_structure(neg, sid, pool: list[dict], picked: list[dict]) -> list[dict]:
@@ -1861,7 +1902,7 @@ class TacticalStrategy(BaselineStrategy):
             plan.justified_note = None
         lines += said
         if not plan.asked_breakdown and p.has("open_book") and not plan.breakdown_read:
-            lines.append("Could you send us a cost breakdown for this part?")
+            lines.append(self._breakdown_question(p))
             plan.asked_breakdown = True
         if len(sheets) > 1:
             reference = neg.threads[plan.supplier_id].standing[1].get("payment_days") or 0
@@ -1899,6 +1940,20 @@ class TacticalStrategy(BaselineStrategy):
             "term_sheets": sheets,
             "refs": sorted({r for c in claims for r in c.refs} | ({volume[1]} if volume and volume[1] else set())),
         }
+
+    def _breakdown_question(self, p: SupplierProfile) -> str:
+        plain = "Could you send us a cost breakdown for this part?"
+        if not self.flags["owner_offer"] or not self.data:
+            return plain
+        for ref in p.traits.get("open_book", []):
+            rows = self.data.query("SELECT date, kind FROM documents WHERE id = ?", (ref,))
+            if rows and rows[0]["date"]:
+                where = "call" if rows[0]["kind"] == "call_note" else "exchange"
+                return (
+                    f"In our {where} of {rows[0]['date']} you offered to walk us through your calculation; we would "
+                    "gladly take that up - could you send it for this part?"
+                )
+        return plain
 
     def _forecast_fits(self, neg, e: Evidence) -> bool:
         """The forecast's volume is this contract's need (within 5 %)."""
