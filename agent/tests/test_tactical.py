@@ -267,6 +267,69 @@ def test_round_limit_one_still_sends_the_first_offer(tmp_path, world) -> None:
     assert strategy.decide(neg, sid).kind != "message"
 
 
+def _strategic(world, tmp_path, offer=None, **buyer):
+    """S01 as a stabilise case: a margin charge in C, the supplier's own plant without a should-cost."""
+    c = case(**{"category_goal": "stabilise", "sustainable_margin_pct": 4, "relationship_eur_per_point": 5000, **buyer})
+    neg, sid = negotiation(tmp_path, world, c, offer or {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    return neg, sid, strategy
+
+
+def test_strategic_supplier_without_should_cost_keeps_the_margin_charge(tmp_path, world) -> None:
+    """No should-cost of its plant (P06): its cost is guessed from its opening, so the charge stays in C, the 95 %
+    floor holds and the first ask never goes under the price that costs us least."""
+    from negotiator.strategy.tactical import RELATIONSHIP_COST_FLOOR, SHOULD_COST_SHARE
+
+    neg, sid, strategy = _strategic(None, tmp_path)
+    plan = strategy.tplans[sid]
+    assert plan.full_cost == round(17.47 * 0.96 * SHOULD_COST_SHARE, 2) and plan.cost_guessed
+    assert neg.supplier_estimates[sid]["full_cost"] == plan.full_cost
+    first = strategy.decide(neg, sid)
+    assert first.kind == "message"
+    for sheet in first.message["term_sheets"]:
+        terms = sheet["terms"]
+        assert RELATIONSHIP_COST_FLOOR * plan.full_cost <= terms["unit_price"] <= 17.47
+        assert terms["unit_price"] >= strategy._cheapest_price(neg, sid, terms) - 0.01
+
+
+def test_generic_should_cost_moves_a_guessed_cost_down_by_little(tmp_path, world) -> None:
+    """part:310070 has only a German-base should-cost: it may lower the opening-based guess by 5 % at most."""
+    from negotiator.strategy.tactical import GENERIC_COST_MAX_DROP, SHOULD_COST_SHARE
+
+    c = case(category_goal="stabilise", sustainable_margin_pct=3, relationship_eur_per_point=5000)
+    c["parts"], c["suppliers"] = ["part:310070"], ["sup:70150"]  # a TR plant: DE base x 0.75
+    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 220.0, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    cost, source = strategy._fallback_full_cost(neg, c["parts"], sid)
+    guess = 220.0 * 0.97 * SHOULD_COST_SHARE
+    assert cost == round(guess * (1 - GENERIC_COST_MAX_DROP), 2) and "DE base x TR" in source
+    neg.threads[sid].messages[0]["term_sheets"][0]["terms"]["unit_price"] = 120.0  # far under it: no move up
+    assert strategy._fallback_full_cost(neg, c["parts"], sid)[0] == round(120.0 * 0.97 * SHOULD_COST_SHARE, 2)
+
+
+def test_own_plant_should_cost_is_not_replaced_by_the_guess(tmp_path, world) -> None:
+    from negotiator.strategy.tactical import SHOULD_COST_SHARE
+
+    c = case(category_goal="stabilise", sustainable_margin_pct=3, relationship_eur_per_point=5000)
+    c["parts"], c["suppliers"] = ["part:310010"], ["sup:70110"]
+    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 138.55, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    own = world.query("SELECT unit_cost FROM should_cost WHERE part_id = 'part:310010' AND supplier_id = 'sup:70110'")
+    assert strategy.tplans[sid].full_cost == round(own[0]["unit_cost"] * SHOULD_COST_SHARE, 2)
+    assert not strategy.tplans[sid].cost_guessed
+
+
+def test_no_reanchor_on_a_strategic_supplier(tmp_path, world) -> None:
+    """Without a margin price there is no estimate - and no 10 % ask under a strategic supplier's price."""
+    neg, sid, strategy = _strategic(None, tmp_path, sustainable_margin_pct=None)
+    assert not neg.supplier_estimates.get(sid)
+    _, theirs = neg.threads[sid].standing
+    plan = strategy.tplans[sid]
+    assert strategy._reanchor(neg, sid, plan, theirs, neg.cost(sid, theirs)) is None and not plan.reanchored
+
+
 def test_reply_signals_tell_room_from_a_last_word() -> None:
     from negotiator.strategy.tactical import reply_signals
 

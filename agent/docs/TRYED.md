@@ -76,6 +76,7 @@ Result: **worked** (kept), **failed** (dropped), **mixed**, **unknown** (not yet
 | P02 without an index clause | practice P-16, P-19 | failed: 0.421, 0.380 | it stops at 372.62-372.96 at 90 days whatever we ask |
 | P02: index clause (5 % deadband) at the price that minimises our C | practice P-20 to P-22 | worked: 0.733 three times | it gives 9-22 off its price for a clause; under 361 the margin charge eats the gain (358.45 → 0.686, 356.17 → 0.576, 345.39 → 0) |
 | Early price match at the assumed floor (1 % under the quote) | practice P-19 | failed: P01 0.728 | P01's supplier goes 4-5 % under its quote; matching 133.50 in round 3 ended the talks |
+| Margin charge without an own-plant should-cost: full cost guessed as opening x (1 - sustainable margin) x 0.98, at most 5 % lower towards a German-base should-cost; no low-side slack on a guess; no re-anchor on strategic suppliers; asks capped at the supplier's price | offline: first decisions of the brief variants (unchanged on P01, P02, P03, P10 with data); `sim bench tactical` | unknown: sim D01 0.809 → 0.671 (strangers 0.642 → 0.580), every other case the same, 100 % deals | protects hidden `stabilise` / `secure_supply` cases from a P02-style squeeze; D01's supplier sells under the guess (the arena charged 0 at 50.80), so the guess costs price there |
 
 ## Read from the replays, not yet played
 

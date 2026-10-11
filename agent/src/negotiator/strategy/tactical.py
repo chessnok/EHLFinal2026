@@ -38,6 +38,7 @@ from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer
 from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
 from negotiator.groundtruth import GroundTruth, estimate
+from negotiator.groundtruth import full_cost as generic_full_cost
 from negotiator.guards import accept_problems
 from negotiator.ledger import CITED_DRIVER, data_facts, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
@@ -82,6 +83,14 @@ SHOULD_COST_SHARE = 0.98
 # What money now is worth to a supplier short of cash, as a multiple of our rate: P01's charges at 14, 45 and
 # 60 days (runs.md P-2 to P-15) fit 9.6 % a year against our 8 %.
 CASH_SHORT_RATE = 1.2
+# Without its own plant's should-cost (the package has one for 18 suppliers) a strategic supplier's cost is
+# estimated - the margin charge must stay in C, or nothing stops another P02 (EUR 345.39 against a should-cost of
+# 380: charge EUR 179k, score 0). The estimate: its opening price less the sustainable margin, x SHOULD_COST_SHARE -
+# the own-plant should-costs of P01, P02 and P03 (moved with their cost drivers, x SHOULD_COST_SHARE) sit at 0.971,
+# 1.009 and 0.988 of it, P10's (secure_supply) at 0.822. A German-base should-cost x country may move it down by at
+# most this share: that estimate is a different plant (it missed the practice floors by 16 % on average,
+# groundtruth.py), and a cost set too low lets us squeeze the supplier into a charge that scores 0.
+GENERIC_COST_MAX_DROP = 0.05
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
 ANCHOR_ROUTINE = 0.13  # routine goal: a deeper first ask is answered with a final offer
@@ -169,6 +178,7 @@ class Plan:
     floor_price: float | None
     full_cost: float | None
     gt: GroundTruth | None = None
+    cost_guessed: bool = False  # full_cost is _fallback_full_cost's guess, not a should-cost of its plant
     belief: FloorBelief | None = None  # where this supplier will stop with us - recomputed after every reply
     lower_c: float = -math.inf  # C at the supplier's estimated floor: take it at once
     upper_c: float = math.inf  # the most we accept when the deal is at risk - never said, never asked for
@@ -244,8 +254,11 @@ class TacticalStrategy(BaselineStrategy):
             profile = build_profile(self.data, sid, neg.case)
             policy = self._policy(goal, profile)
             full_cost = self._full_cost(parts, sid)
+            cost_source = "own plant" if full_cost else ""
             if full_cost and goal in RELATIONSHIP_GOALS:
                 full_cost = round(full_cost * SHOULD_COST_SHARE, 2)  # one cost for the charge and the floor
+            elif goal in RELATIONSHIP_GOALS:
+                full_cost, cost_source = self._fallback_full_cost(neg, parts, sid)
             self._estimate_supplier(neg, sid, full_cost, profile)
             floor = self._floor(neg, full_cost, policy)
             open_c = neg.cost(sid, terms)
@@ -254,6 +267,7 @@ class TacticalStrategy(BaselineStrategy):
                 floor = gt.lower  # one floor: the ground truth's (it knows below-cost sellers and countries)
             target_c = self._target_c(neg, sid, terms, policy, profile, floor, current, gt)
             plan = Plan(sid, self._name(sid), policy, profile, open_c, target_c, floor, full_cost, gt)
+            plan.cost_guessed = bool(full_cost) and cost_source != "own plant"
             plan.lower_c, plan.upper_c = self._bounds_c(neg, sid, terms, gt, target_c, open_c)
             if terms.get("unit_price") is not None:
                 rate = buyer.get("interest_rate", 0.08) * (2 if profile.has("cash_short") else 1)
@@ -290,6 +304,7 @@ class TacticalStrategy(BaselineStrategy):
                 c_alt=neg.c_alt,
                 floor_price=floor,
                 full_cost=full_cost,
+                full_cost_source=cost_source,
                 evidence=[{"kind": e.kind, "refs": e.refs, "sentence": e.sentence} for e in plan.evidence],
             )
             log.info(
@@ -355,6 +370,29 @@ class TacticalStrategy(BaselineStrategy):
             (parts[0], supplier_id),
         )
         return rows[0]["unit_cost"] if rows and rows[0]["unit_cost"] else None
+
+    def _fallback_full_cost(self, neg: Negotiation, parts: list[str], sid: str) -> tuple[float | None, str]:
+        """A strategic supplier's full cost where its own plant has no should-cost: its opening price less the
+        sustainable margin x SHOULD_COST_SHARE, moved at most GENERIC_COST_MAX_DROP down towards the German-base
+        should-cost x its country (single parts only: a bundle's price is not one part's cost). Too high a cost
+        leaves a little price on the table; too low a one can score 0. None where the case puts no price on the
+        supplier's margin (no charge to protect) or nothing is quoted."""
+        buyer = neg.buyer
+        margin = buyer.get("sustainable_margin_pct")
+        if not margin or not buyer.get("relationship_eur_per_point"):
+            return None, ""
+        first = next((m for m in neg.threads[sid].supplier_messages if m.get("term_sheets")), None)
+        quoted = [(s.get("terms") or {}).get("unit_price") for s in (first or {}).get("term_sheets") or []]
+        opening = min((p for p in quoted if isinstance(p, int | float) and p > 0), default=None)
+        if opening is None:
+            return None, ""
+        cost, source = opening * (1 - margin / 100) * SHOULD_COST_SHARE, "opening less the sustainable margin"
+        if self.data and len(parts) == 1:
+            generic, where = generic_full_cost(self.data, parts[0], sid)
+            if generic and where != "own plant" and generic * SHOULD_COST_SHARE < cost:
+                cost = max(generic * SHOULD_COST_SHARE, cost * (1 - GENERIC_COST_MAX_DROP))
+                source = f"{source}, towards the should-cost ({where})"
+        return round(cost, 2), source
 
     def _standard_terms(self, neg: Negotiation, sid: str) -> dict:
         """The supplier's standard terms for the relationship term: its quote PDF, then its master data, then its
@@ -490,7 +528,12 @@ class TacticalStrategy(BaselineStrategy):
         leaves need uncovered, early payment, dear freight) must not pass as a good deal."""
         lower_c, upper_c = -math.inf, min(open_c, neg.c_alt)
         if gt.lower:
-            lower_c = neg.cost(sid, self._ideal(neg, sid, terms, gt.lower))
+            low = self._ideal(neg, sid, terms, gt.lower)
+            if neg.supplier_estimates.get(sid):
+                # under a margin charge a price below the one that costs us least costs more, not less: the bound
+                # sits at that price (a floor factor of 0.86 under a strategic supplier's cost put it above its quote)
+                low["unit_price"] = max(low["unit_price"], round(self._cheapest_price(neg, sid, low), 2))
+            lower_c = neg.cost(sid, low)
         if gt.upper:
             upper_c = min(upper_c, neg.cost(sid, self._ideal(neg, sid, terms, gt.upper)))
         # room to concede above our first ask, whatever the calibration says (P05: an 18 % anchor over a 22 %
@@ -645,7 +688,7 @@ class TacticalStrategy(BaselineStrategy):
             if not full or not price or not 0.3 * price < full < price * 1.05:
                 continue
             plan.breakdown_read = True
-            plan.full_cost = full
+            plan.full_cost, plan.cost_guessed = full, False
             if plan.gt and neg.buyer.get("category_goal") not in RELATIONSHIP_GOALS:
                 floor = round(full * (1 + plan.policy.markup), 2)
                 if plan.gt.lower is None or floor < plan.gt.lower:  # it told us it has more room: use it
@@ -906,6 +949,11 @@ class TacticalStrategy(BaselineStrategy):
         """It came under a floor we only guessed: our guess was timid. Ask again under its new price, once."""
         if plan.reanchored or not self._may_push(neg, sid):
             return None
+        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+            # never 10 % under a strategic supplier's price: without an estimate of its cost nothing stops the
+            # squeeze (P02: 345.39, score 0); with one C is not monotone in the price - a price under the floor
+            # costs more charge than it saves, and the "re-anchor" asked a C above its offer, so no sheet went out
+            return None
         plan.reanchored = True
         price = theirs["unit_price"] * (1 - REANCHOR)
         new_target = neg.cost(sid, self._ideal(neg, sid, theirs, price))
@@ -1045,6 +1093,8 @@ class TacticalStrategy(BaselineStrategy):
         # of the minimum we send the lower one: a deep first ask whose every step up is a move the supplier sees
         # and a gain for us, and if it agrees we pay at most the slack. After that, the usual side.
         slack = ANCHOR_SLACK * max(0.0, plan.open_c - plan.target_c) if neg.supplier_estimates.get(sid) else 0.0
+        if plan.cost_guessed:
+            slack = 0.0  # a guessed cost may sit under the real one: the lower side could be a P02, not the slack
         spent = max(0.0, ask_c - plan.target_c)
         under = spent < slack
 
@@ -1072,7 +1122,12 @@ class TacticalStrategy(BaselineStrategy):
                 return 0.0
             return self._iso_cost_price(neg, sid, terms, floor_c + slack - spent, under=True)
 
-        menu = priced_menu(case, theirs, price_for)
+        def capped(terms: dict) -> float:
+            # never above its own price: where the margin charge falls faster than the price rises (a sustainable
+            # margin above what its quote leaves it) the cost-optimal price sat over its quote (brief variants)
+            return min(price_for(terms), theirs["unit_price"])
+
+        menu = priced_menu(case, theirs, capped)
         valid, under_floor = [], []
         for terms in menu:
             if not neg.keeps_must_haves(sid, terms) or neg.cost(sid, terms) >= their_c:
@@ -1098,7 +1153,7 @@ class TacticalStrategy(BaselineStrategy):
             # against a should-cost of 380 and paid EUR 179k of margin charge (score 0); its C_best sat near 362
             floor = round(plan.full_cost * RELATIONSHIP_COST_FLOOR, 2)
             for t in pool:
-                t["unit_price"] = max(t["unit_price"], floor)
+                t["unit_price"] = min(max(t["unit_price"], floor), theirs["unit_price"])
             pool = [t for t in pool if neg.cost(sid, t) < their_c] or pool
         repeated = {r for r, n in plan.request_counts.items() if n >= 2}
         meets = [t for t in pool if all(satisfies(case, t, theirs, r, plan.proposed) for r in repeated)]
