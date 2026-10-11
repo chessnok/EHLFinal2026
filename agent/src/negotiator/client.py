@@ -94,7 +94,7 @@ class ArenaClient:
         headers = {"X-Move-Id": move_id} if move_id else {}
         endpoint = _endpoint(path)
         response = None
-        first, attempt = time.monotonic(), -1
+        first, attempt, status_tries = time.monotonic(), -1, 0
         while True:
             attempt += 1
             waited = self.pacer.wait()
@@ -125,11 +125,12 @@ class ArenaClient:
             retry_after = response.headers.get("Retry-After", "")
             short = retry_after.isdigit() and int(retry_after) <= MAX_RETRY_AFTER_S
             retryable = response.status_code in RETRY_STATUS and not (response.status_code == 429 and not short)
-            if not retryable or attempt >= self.retries:
+            status_tries += 1  # counted apart: a network outage before must not use up the 5xx retries
+            if not retryable or status_tries > self.retries:
                 break
             if self.recorder:
                 self.recorder.metrics.incr("http.retry")
-            time.sleep(float(retry_after) if retry_after.isdigit() else 0.5 * 2**attempt)
+            time.sleep(float(retry_after) if retry_after.isdigit() else 0.5 * 2 ** (status_tries - 1))
 
         assert response is not None
         if (left := response.headers.get(REMAINING_HEADER, "")).isdigit():

@@ -38,3 +38,17 @@ def test_a_network_that_stays_down_ends_in_an_error() -> None:
     with pytest.raises(ArenaError) as e:
         _client(handler, transport_retry_s=0.0).request("GET", "/v1/me")
     assert e.value.status == 0
+
+
+def test_a_5xx_after_an_outage_still_gets_its_retries() -> None:
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        if len(calls) <= 5:
+            raise httpx.ConnectError("down", request=request)
+        if len(calls) <= 7:
+            return httpx.Response(503, json={"detail": "busy"})
+        return httpx.Response(200, json={"ok": True})
+
+    assert _client(handler).request("GET", "/v1/me") == {"ok": True}
