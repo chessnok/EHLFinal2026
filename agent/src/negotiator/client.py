@@ -21,6 +21,10 @@ TIMEOUT_S = 180.0  # a supplier reply can take about a minute, plus queueing on 
 CALLS_PER_SECOND = 9.0
 RETRY_STATUS = {429, 500, 502, 503, 504}
 MAX_RETRY_AFTER_S = 5
+# a dropped network is tried again for this long (the same X-Move-Id makes a repeat safe): practice P05 was lost to
+# a ~15 s DNS outage after three quick tries (run 20261011-082032, the accept never reached the arena)
+TRANSPORT_RETRY_S = 45.0
+TRANSPORT_PAUSE_MAX_S = 5.0
 REMAINING_HEADER = "X-Practice-Remaining"
 USER_AGENT = "negotiator/0.1 (Undeterministic Tornado)"
 
@@ -63,9 +67,11 @@ class ArenaClient:
         *,
         retries: int = 3,
         timeout: float = TIMEOUT_S,
+        transport_retry_s: float = TRANSPORT_RETRY_S,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.settings, self.recorder, self.retries = settings, recorder, retries
+        self.transport_retry_s = transport_retry_s
         headers = {"User-Agent": USER_AGENT}
         if settings.api_key:
             headers["X-API-Key"] = settings.api_key
@@ -88,7 +94,9 @@ class ArenaClient:
         headers = {"X-Move-Id": move_id} if move_id else {}
         endpoint = _endpoint(path)
         response = None
-        for attempt in range(self.retries + 1):
+        first, attempt = time.monotonic(), -1
+        while True:
+            attempt += 1
             waited = self.pacer.wait()
             start = time.perf_counter()
             error = None
@@ -110,14 +118,14 @@ class ArenaClient:
                 context,
             )
             if error is not None:
-                if attempt == self.retries:
+                if attempt >= self.retries and time.monotonic() - first >= self.transport_retry_s:
                     raise ArenaError(0, error, method, path)
-                time.sleep(0.5 * 2**attempt)
+                time.sleep(min(0.5 * 2**attempt, TRANSPORT_PAUSE_MAX_S))
                 continue
             retry_after = response.headers.get("Retry-After", "")
             short = retry_after.isdigit() and int(retry_after) <= MAX_RETRY_AFTER_S
             retryable = response.status_code in RETRY_STATUS and not (response.status_code == 429 and not short)
-            if not retryable or attempt == self.retries:
+            if not retryable or attempt >= self.retries:
                 break
             if self.recorder:
                 self.recorder.metrics.incr("http.retry")
