@@ -224,6 +224,7 @@ class Plan:
     justified_note: str | None = None  # its own drivers x shares against what its quote asks (said once)
     bigger_step: bool = False  # it called our last step too small
     spent_kinds: set = field(default_factory=set)  # argument kinds the arena called `duplicate` (fresh_args)
+    market_backs_ask: bool = False  # the indices back its ask: no index argument in any round (late_facts too)
 
 
 # Candidate changes, each switchable (`tactical+<flag>`) so practice can measure it on its own before it is
@@ -370,6 +371,7 @@ class TacticalStrategy(BaselineStrategy):
                 plan.banned_kinds.add("index")  # "not our reality" until its hedge runs out
             if gt.market_supports_ask:
                 plan.banned_kinds.add("index")  # the indices back its ask: citing them helps it, not us
+                plan.market_backs_ask = True
             self.tplans[sid] = plan
             neg.recorder.event(
                 "plan",
@@ -821,8 +823,9 @@ class TacticalStrategy(BaselineStrategy):
             trial = {**out, f: want}
             # a share of C, and never more than 1 % of the room: P02's room is 2.3 % of C, so 0.2 % of C there
             # would be up to 0.087 of the score for one yes (stress test of 11 Oct)
-            room = max(0.0, plan.open_c - plan.target_c)
-            limit = min(CHEAP_YES * base, YES_ROOM_SHARE * room) if room else CHEAP_YES * base
+            room = plan.open_c - plan.target_c
+            # no room, no free yes; an unknown room (no estimate) keeps the share of C
+            limit = min(CHEAP_YES * base, YES_ROOM_SHARE * max(0.0, room)) if math.isfinite(room) else CHEAP_YES * base
             if neg.keeps_must_haves(sid, trial) and neg.cost(sid, trial) - neg.cost(sid, out) <= limit:
                 out, granted = trial, granted + [(f, want)]
         if granted:
@@ -1631,12 +1634,16 @@ class TacticalStrategy(BaselineStrategy):
             if structure_key(t) not in keys:
                 keys.add(structure_key(t))
                 out.append({"terms": t})
-                plan.offered[structure_key(t)] = max(plan.offered.get(structure_key(t), 0.0), t["unit_price"])
         if self.flags["own_structures"]:
             out = self._own_structures(neg, sid, plan, out, their_c)
         if self.flags["fast_pay"]:
             out = self._fast_pay(neg, sid, plan, out, their_c)
-        return out[:3]
+        out = out[:3]
+        for o in out:  # only what is sent counts as offered: a dropped option must not floor the next round
+            t = o["terms"]
+            if structure_key(t) in keys:  # the menu's own options, as before (fast_pay's never counted)
+                plan.offered[structure_key(t)] = max(plan.offered.get(structure_key(t), 0.0), t["unit_price"])
+        return out
 
     @staticmethod
     def _own_rates(neg: Negotiation, sid: str) -> dict[str, tuple]:
@@ -1697,7 +1704,7 @@ class TacticalStrategy(BaselineStrategy):
             if value is None or value == a.get(f):
                 continue
             if all(isinstance(v, int | float) for v in (dear, cheap, value, a.get(f))):
-                gain = drop * (value - a[f]) / (cheap - dear)  # its price per unit of the field, from A's value
+                gain = drop * (value - dear) / (cheap - dear)  # its price per unit of the field, within its own pair
             elif a.get(f) == dear and value == cheap:
                 gain = drop
             else:
@@ -1953,7 +1960,11 @@ class TacticalStrategy(BaselineStrategy):
                 if not self.flags["fresh_args"]:
                     extra += self.data.evidence_orders_per_part(parts, sid)
             self.late_extra[sid] = extra
-        hard = self.banned_case_kinds | self.refused_kinds.get(sid, set())
+        hard = (
+            self.banned_case_kinds
+            | self.refused_kinds.get(sid, set())
+            | ({"index"} if plan.market_backs_ask else set())
+        )
         seen: set[str] = set()
         out = []
         for e in plan.counters + plan.evidence + self.late_extra[sid]:
