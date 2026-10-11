@@ -103,3 +103,38 @@ def test_claim_results_are_matched_the_way_the_arena_reads_our_email(tmp_path, w
     t.messages.append(reply)
     strategy._learn_claims(t, plan, reply)
     assert plan.banned_kinds >= {"forecast"} and "index" not in plan.banned_kinds
+
+
+# ---------------------------------------------------------------- no question in the first e-mail (`no_q1`)
+def _round_one(neg, sid, body: str) -> None:
+    t = neg.threads[sid]
+    t.messages.append({"from": "buyer", "body": body, "refs": []})
+    t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": t.messages[0]["term_sheets"]})
+
+
+def _breakdown_asked(tmp_path, world, **flags) -> list[bool]:
+    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world, **flags)
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    plan.profile.traits["open_book"] = []
+    sheets = [{"terms": {"unit_price": 16.5, "payment_days": 30}}]
+    asked = []
+    for _ in range(2):
+        body = strategy._write(neg, plan, sheets, [], probe=False)["body"]
+        asked.append("cost breakdown" in body)
+        assert not ("?" in body and not asked[-1])  # no other question
+        _round_one(neg, sid, body)
+    return asked
+
+
+def test_no_q1_moves_the_breakdown_request_to_round_two(tmp_path, world) -> None:
+    assert _breakdown_asked(tmp_path / "old", world) == [True, False]
+    assert _breakdown_asked(tmp_path / "new", world, no_q1=True) == [False, True]
+
+
+def test_an_unknown_flag_is_refused(world) -> None:
+    import pytest
+
+    with pytest.raises(TypeError):
+        TacticalStrategy(world, late_facts=True)

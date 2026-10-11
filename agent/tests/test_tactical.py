@@ -331,7 +331,8 @@ def test_own_plant_should_cost_is_not_replaced_by_the_guess(tmp_path, world) -> 
     assert neg.supplier_estimates[sid]["full_cost"] == strategy.tplans[sid].full_cost
     assert strategy.tplans[sid].guess is None
     _, theirs = neg.threads[sid].standing
-    assert strategy._reanchor(neg, sid, strategy.tplans[sid], theirs, neg.cost(sid, theirs)) is None
+    # with the own plant's cost in C the re-anchor stays as measured (P01 0.969, runs.md P-29; 0.901 without it)
+    assert strategy._reanchor(neg, sid, strategy.tplans[sid], theirs, neg.cost(sid, theirs)) is not None
 
 
 def test_reanchor_on_a_strategic_supplier_only_with_a_guess(tmp_path) -> None:
@@ -426,7 +427,7 @@ def _reply(neg, sid, sheets: list[dict], status: str = "open", body: str = "") -
 
 
 def test_its_step_is_read_from_its_primary_sheet(tmp_path, world) -> None:
-    """Stalls and its step follow the sheet the arena closes on; its alternatives do not count as moves (P-61)."""
+    """Stalls and its step follow the sheet the arena closes on; its alternatives do not count as moves (P-66)."""
     neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
     strategy = TacticalStrategy(world)
     strategy.prepare(neg)
@@ -486,3 +487,22 @@ def test_one_cost_of_money_for_a_supplier_short_of_cash(tmp_path, world) -> None
     rate = c["buyer"].get("interest_rate", 0.08)
     assert plan.belief.rate == rate * CASH_SHORT_RATE
     assert strategy._supplier_estimate(neg, sid, 16.0, plan.profile)["interest_rate"] == plan.belief.rate
+
+
+def test_accept_guard_counts_only_a_rival_with_a_price(tmp_path, world) -> None:
+    """C >= C_open is refused while a real rival bid stands; a rival thread with no priced sheet is no rival."""
+    c = case(alternative=None)
+    c["suppliers"] = [c["suppliers"][0], "sup:rival"]
+    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 17.47, "payment_days": 30})
+    rival = ThreadState("sup:rival")
+    rival.messages.append({"from": "sales@sup:rival", "status": "open", "term_sheets": []})
+    neg.threads["sup:rival"] = rival
+    assert not any("opening" in p for p in accept_problems(neg, sid, "offer:x-0"))
+    rival.messages.append(
+        {
+            "from": "sales@sup:rival",
+            "status": "open",
+            "term_sheets": [{"term_sheet_id": "offer:r-0", "terms": {"unit_price": 18.0, "payment_days": 30}}],
+        }
+    )
+    assert any("opening" in p for p in accept_problems(neg, sid, "offer:x-0"))

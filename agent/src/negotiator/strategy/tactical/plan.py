@@ -63,6 +63,9 @@ CASH_SHORT_RATE = 1.2
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
 
 
+SOFT_ANCHOR = 0.5  # `soft_anchor`: the first ask's depth as a share of the usual one
+OWN_GAIN = 1.5  # `own_structures`: its own price drop for a structure must exceed what the structure costs us by this
+YES_ROOM_SHARE = 0.01  # ... and at most this share of the room (`open_c - target_c`)
 CHEAP_YES = 0.002  # a condition of its we accept at our price when it costs us at most this share of C
 
 
@@ -167,3 +170,24 @@ class Plan:
 
 def _k(value: float) -> str:
     return f"{value:,.0f}" if math.isfinite(value) else "inf"
+
+
+# Candidate changes, each switchable (`tactical+<flag>`) so practice can measure it on its own before it becomes
+# part of the strategy; all off. A flag that practice has settled leaves this list: adopted, it is the strategy
+# (TRYED.md names the run); rejected, it is deleted with its code.
+FLAGS: dict[str, str] = {
+    "soft_anchor": "a higher first offer under routine and quality_first goals: the first ask half as deep "
+    "(their suppliers moved 0.4-6 % in all; leverage suppliers 15-24 %, P05 36 -> 27.50, need the deep one)",
+    "probe_final": "the old RFQ probe: one price push on a final offer behind a safe rival. Off since main's P-58 "
+    "(P05 0.865 without it, as with it); in 442 sessions re-sending its own sheet was agreed 71 of 74 times, a push "
+    "of 2 %+ walked 13 of 14, the probe walked Hrvelec 10 of 10 times",
+    "own_structures": "a structure the supplier itself prices cheaply - its own alternative sheets give the rate, "
+    "e.g. P05 Hrvelec 35.00 at 35 days, 31.50 at 52 (snapped to what we may sign: 42) - joins as option B at option "
+    "A's C when its drop is 1.5x what the structure costs us; its own lead time beyond our need also without a pair",
+    "hide_own_cost": "measurement only: the own plant's should-cost is not read (`_full_cost` None), so strategic "
+    "own-plant cases (P01, P02, P03, P10) run the guessed-cost path most hidden strategic suppliers get (A3 floor)",
+    "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
+    "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
+    "no_q1": "no question in the first e-mail (each one cost 0.43 pp of the first drop, 9 of 12 suppliers): the "
+    "cost-breakdown request to an open-book supplier waits for round 2",
+}

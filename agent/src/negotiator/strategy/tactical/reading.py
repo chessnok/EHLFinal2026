@@ -271,7 +271,7 @@ class ReadingMixin:
         """C of each reply's primary sheet: its step and its stalls are read from the sheet the arena closes on.
         Read from its best sheet for us instead (the one `decide` judges its offer by), an alternative that came
         and went counted as a move of its own, our next step followed it, and practice lost P11 0.710 -> 0.626 and
-        P18 0.685 -> 0.618 (runs.md P-60 against P-61, nothing else changed)."""
+        P18 0.685 -> 0.618 (runs.md P-65 against P-66, nothing else changed)."""
         out = []
         for m in neg.threads[sid].supplier_messages:
             sheets = m.get("term_sheets") or []

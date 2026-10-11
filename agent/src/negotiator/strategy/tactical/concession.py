@@ -63,13 +63,15 @@ class ConcessionMixin:
 
     def _choose(self, neg, supplier_id: str, plan: Plan, theirs: dict, their_c: float, last_word: bool,
                 rest_pending: bool) -> Decision:  # fmt: skip
-        """Take its offer, ask (and for how much) or probe a last word - here as a chain of rules in order; the
+        """Take its offer or ask (and for how much) - here as a chain of rules in order; the
         `tactical-ev` variant (choice.py) makes the same choice by expected cost."""
         if last_word:
-            # a last word is taken (the guards still check it): across ~65 pushes on final offers, 17 % ended in a
-            # walk-away for ~+0.05 on average - only an RFQ with a safe rival offer may push once, with a real step
+            # a last word is taken (the guards still check it), never pushed: in 442 practice sessions re-sending
+            # its own sheet was agreed 71 of 74 times, a push of 2 %+ walked 13 of 14, and the old RFQ probe behind a
+            # safe rival walked Hrvelec 10 of 10 times (P05 0.865 without it, as with it: main's P-58)
             if (
                 their_c > plan.upper_c
+                and self.flags["probe_final"]
                 and not plan.probed_final
                 and self._may_probe(neg, supplier_id, their_c)
                 and self._may_push(neg, supplier_id)
@@ -207,11 +209,15 @@ class ConcessionMixin:
         """It came under a floor we only guessed: our guess was timid. Ask again under its new price, once."""
         if plan.reanchored or not self._may_push(neg, sid):
             return None
-        if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS and not plan.guess:
-            # never 10 % under a strategic supplier's price: without an estimate of its cost nothing stops the
-            # squeeze (P02: 345.39, score 0); with one C is not monotone in the price - a price under the floor
-            # costs more charge than it saves, and the "re-anchor" asked a C above its offer, so no sheet went out.
-            # A guessed cost allows it: the guess floor (_sheets) keeps every sheet above the cost minimum
+        if (
+            neg.buyer.get("category_goal") in RELATIONSHIP_GOALS
+            and not plan.guess
+            and not neg.supplier_estimates.get(sid)
+        ):
+            # never 10 % under a strategic supplier's price without an estimate of its cost: nothing stops the
+            # squeeze (P02: 345.39, score 0). With an own-plant estimate the charge is in C and the re-anchor stays
+            # as measured (P01 0.969, P-29; off, it held at 133.6 in round 3: 0.901, run 20261011-082032); a guessed
+            # cost allows it too: the guess floor (_sheets) keeps every sheet above the cost minimum
             return None
         plan.reanchored = True
         price = theirs["unit_price"] * (1 - REANCHOR)

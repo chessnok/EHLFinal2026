@@ -5,9 +5,11 @@ import math
 from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer, total_cost
 
 from negotiator.belief import FloorBelief
+from negotiator.data import Evidence
 from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.ledger import data_facts
 from negotiator.profile import SupplierProfile, build_profile
+from negotiator.reply_parser import parse_reply
 from negotiator.session import Negotiation
 from negotiator.strategy.tactical.plan import (
     ANCHOR_DATA_EXTRA,
@@ -19,6 +21,7 @@ from negotiator.strategy.tactical.plan import (
     DEFAULT_POLICY,
     POLICIES,
     SHOULD_COST_SHARE,
+    SOFT_ANCHOR,
     UNDER_FLOOR,
     UPPER_ROOM,
     Plan,
@@ -144,14 +147,37 @@ class PlanningMixin:
             parts = neg.case.get("parts") or []
             out += self.data.evidence_orders(parts, sid, open_price)
             out += data_facts(self.data, parts)
+            if self.flags["double_count"]:
+                out += self._double_count(neg, sid)
         return sorted(out, key=lambda e: -e.strength)
+
+    def _double_count(self, neg: Negotiation, sid: str) -> list[Evidence]:
+        """Our framework agreement with this supplier already indexes the price to a series its quote names as a cost
+        driver: a surcharge on top counts that rise twice (P08: ctr:4600070710#3.2 ties 45 % to AS-14404, and its
+        quote asks +11 % citing AS-14404). A fact from our own contract it may not have in view."""
+        body = (neg.threads[sid].messages[0].get("body") or "") if neg.threads[sid].messages else ""
+        facts = parse_reply(body)
+        cited = set(facts.drivers) | {m[0] for m in facts.driver_moves}
+        out = []
+        for ref, f in self.data.facts.items():
+            if not (ref.startswith("ctr:") and isinstance(f, dict) and f.get("type") == "index"):
+                continue
+            if f.get("supplier") == sid and f.get("series") in cited:
+                share = f.get("material_share") or 0
+                sentence = (
+                    f"Our framework agreement already ties {share:.0%} of the price to {f['series']} ({ref}): "
+                    "a surcharge for the same material would count its rise twice."
+                )
+                out.append(Evidence(kind="contract_index", refs=[ref], sentence=sentence, strength=6.0))
+        return out
 
     def _full_cost(self, parts: list[str], supplier_id: str) -> float | None:
         """The should-cost of THIS supplier's plant for a single-part case; None otherwise.
 
         Another supplier's estimate is a different plant (cost base, process) and a bundle's price is
-        not one part's cost: guessing would push the floor and the margin charge the wrong way."""
-        if not self.data or len(parts) != 1:
+        not one part's cost: guessing would push the floor and the margin charge the wrong way.
+        `hide_own_cost`: None always, so a strategic supplier with an own-plant cost runs the guessed-cost path."""
+        if not self.data or len(parts) != 1 or self.flags["hide_own_cost"]:
             return None
         rows = self.data.query(
             "SELECT unit_cost FROM should_cost WHERE part_id = ? AND supplier_id = ? ORDER BY estimate_date DESC",
@@ -258,6 +284,8 @@ class PlanningMixin:
             depth, extra = ANCHOR_PRICE_ONLY, 0.0
         elif neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
             depth, extra = min(depth, ANCHOR_RELATIONSHIP), 0.0  # squeezing a strategic supplier costs us C
+        if self.flags["soft_anchor"] and neg.buyer.get("category_goal") in ("routine", "quality_first"):
+            depth, extra = depth * SOFT_ANCHOR, 0.0
         # round 1 carries 67 % of all supplier movement and no supplier ever walked over a deep first offer
         # (0 of 917 replies); within a case deeper first offers went with better scores - so we open deep
         candidates = [open_price * (1 - depth)]

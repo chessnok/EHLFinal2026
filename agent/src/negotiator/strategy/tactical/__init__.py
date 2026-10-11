@@ -25,7 +25,7 @@ Per round (decide), all in C (our total cost, the score's currency):
   - arguments: checkable evidence picked by the profile; what came back irrelevant or contradicted
     is not used again.
 Closing: the cheapest standing sheet that passes the guards (guards.py), else walk away; a
-`final_offer` is probed once with a trade when walking would cost us little. Our estimate of its floor
+`final_offer` is taken, never pushed. Our estimate of its floor
 never ends an open thread: the supplier does (a final offer, firm words, a stall) or the rounds run out.
 Conduct (conduct.py): honest, sourced, no empty threats, the supplier's margin respected - code-checked on send.
 
@@ -53,6 +53,7 @@ from negotiator.strategy.tactical.plan import (
     DEFAULT_POLICY,
     DONE_EPS,
     EQUAL_C,
+    FLAGS,
     MAX_SPREAD,
     MIN_STEP,
     PATIENT_GAP,
@@ -91,6 +92,7 @@ __all__ = [
     "DEFAULT_POLICY",
     "DONE_EPS",
     "EQUAL_C",
+    "FLAGS",
     "MAX_SPREAD",
     "MIN_STEP",
     "PATIENT_GAP",
@@ -120,8 +122,12 @@ __all__ = [
 class TacticalStrategy(PlanningMixin, ReadingMixin, ConcessionMixin, SheetsMixin, WritingMixin, BaselineStrategy):
     name = "tactical"
 
-    def __init__(self, data: WorldData | None = None, llm=None) -> None:
+    def __init__(self, data: WorldData | None = None, llm=None, **flags) -> None:
         super().__init__(data, llm)
+        unknown = set(flags) - set(FLAGS)
+        if unknown:
+            raise TypeError(f"unknown flag(s): {sorted(unknown)}")
+        self.flags = {flag: bool(flags.get(flag, False)) for flag in FLAGS}
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
         # with a model, its reading of each reply is added to the regular expressions' (reading.Signals)

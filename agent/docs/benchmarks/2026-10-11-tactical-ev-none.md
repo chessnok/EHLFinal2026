@@ -41,12 +41,17 @@ Neither variant of this branch reaches main at the fork. Both lose on P18 and P0
   (`tactical/choice.py`). The first table keyed the supplier's response on the share of the distance between us that
   our ask closes; the second on our step against the supplier's room to its estimated stop.
 
-**Bisect (P-61, P-62; 6 more sessions).** With the supplier's step read from its primary sheet again (`96442d9`,
+**Bisect (P-66, P-67; 6 more sessions).** With the supplier's step read from its primary sheet again (`96442d9`,
 nothing else changed) `tactical` scores P11 0.710, P18 0.685, P07 0.728, P08 0.571. Main at the fork (`36a9752`),
 played again, scores P07 0.728 and P08 0.571: its 0.626 and 0.740 above were played before `fast_pay` became a
 default. So the best-sheet reading was the one fix that cost score (P11 −0.084, P18 −0.067; reverted), and with it
 reverted the branch's chain equals main at the fork on all ten cases: mean 0.765. Against that, `tactical-ev`
 (0.754) wins P08 by 0.099 and loses P01 by 0.069 and P18 by 0.133.
+
+**After the merge of `origin/main` (`10c8036`).** Main's changes since the fork are in the package; no practice
+session was played on the merged code. Sandbox `runs/20261011-125828-sandbox-tactical`: D01 0.669, D02 0.660 (S-45).
+`negotiator sim bench tactical` on the merged branch next to `origin/main`, 5 repeats: every decision and e-mail of
+the 50 single-supplier threads is identical.
 
 ## Runs
 

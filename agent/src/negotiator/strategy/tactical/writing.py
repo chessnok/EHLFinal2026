@@ -31,6 +31,7 @@ EVIDENCE_FIRST = {  # profile trait / goal -> evidence kinds to put first
 
 class WritingMixin:
     def _choose_claims(self, neg, sid, plan, first: bool) -> list[Evidence]:
+        self._drop_hedged_series(neg, plan)
         banned = plan.banned_kinds | self.banned_case_kinds
         if neg.buyer.get("category_goal") != "quality_first":
             banned = banned | {"scorecard"}
@@ -67,6 +68,27 @@ class WritingMixin:
                 self.used_refs.update(e.refs)
         return picked
 
+    @staticmethod
+    def _drop_hedged_series(neg, plan: Plan) -> None:
+        """Its material is bought at fixed prices: a fall of the series its clause would follow is "not our reality"
+        (P08, every session) - the slot goes to the next argument (main's P-57: P08 0.626 -> 0.659, the other nine
+        identical). One fact is cited once (the counters may hold it)."""
+        clauses = neg.case.get("term_options", {}).get("index_clause") or []
+        series = {o.get("series") for o in clauses if o}
+        if not (plan.profile.has("hedged") and series):
+            return
+        prefixes = tuple(f"idx:{s}@" for s in series)
+
+        def keep(e: Evidence) -> bool:
+            return not any(r.startswith(prefixes) for r in e.refs or []) and not any(
+                s in (e.sentence or "") for s in series
+            )
+
+        plan.counters = [e for e in plan.counters if keep(e)]
+        plan.evidence = [e for e in plan.evidence if keep(e)]
+        cited = {r for e in plan.counters for r in e.refs or []}
+        plan.evidence = [e for e in plan.evidence if not set(e.refs or []) & cited]
+
     def _write(self, neg, plan: Plan, sheets: list[dict], claims: list[Evidence], probe: bool) -> dict:
         p, case = plan.profile, neg.case
         first = neg.threads[plan.supplier_id].rounds_used == 0
@@ -92,8 +114,15 @@ class WritingMixin:
         if plan.yes_line:
             said.append(plan.yes_line)
             plan.yes_line = None
+        if first and self.flags["no_q1"]:
+            said = [x for x in said if not x.rstrip().endswith("?")]
         lines += said
-        if not plan.asked_breakdown and p.has("open_book") and not plan.breakdown_read:
+        if (
+            not plan.asked_breakdown
+            and p.has("open_book")
+            and not plan.breakdown_read
+            and not (first and self.flags["no_q1"])  # asked from round 2 on
+        ):
             lines.append("Could you send us a cost breakdown for this part?")
             plan.asked_breakdown = True
         if len(sheets) > 1:

@@ -11,6 +11,7 @@ from negotiator.strategy.experiments import TACTICS, ExperimentStrategy
 from negotiator.strategy.llm_strategy import LLMStrategy
 from negotiator.strategy.patient import SCALES, PatientStrategy
 from negotiator.strategy.playbook import VARIANTS, PlaybookStrategy
+from negotiator.strategy.tactical import FLAGS as TACTICAL_FLAGS
 from negotiator.strategy.tactical import ExpectedValueStrategy, TacticalStrategy
 from negotiator.strategy.written import WrittenStrategy
 
@@ -26,6 +27,8 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     **{name: partial(PlaybookStrategy, playbook) for name, playbook in VARIANTS.items()},
     **{name: partial(PatientStrategy, scale, name) for name, scale in SCALES.items()},
     "decided": DecidedStrategy,
+    # tactical with one candidate change switched on, to measure it on its own (see FLAGS in tactical/plan.py)
+    **{f"tactical+{flag}": partial(TacticalStrategy, **{flag: True}) for flag in TACTICAL_FLAGS},
     # tactical's numbers, a model for the words (and, with +reader, for the levers the regular expressions miss)
     "tactical-llm": WrittenStrategy,
     "tactical-llm+reader": partial(WrittenStrategy, reader=True),

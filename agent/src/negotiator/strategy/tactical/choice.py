@@ -25,7 +25,7 @@ import math
 # replies to an open thread that were no agreement: under 2 %: 0.105 (n 122), 2-10 %: 0.149 (n 146), 10-25 %:
 # 0.194 (n 122), 25-50 %: 0.382 (n 74), 50-100 %: 0.322 (n 75). Keyed on the share of the distance between us
 # instead (a first version: full response from a tenth of it), practice answered the small steps with early final
-# offers (runs.md P-58: P18 0.532, P08 0.571).
+# offers (runs.md P-63: P18 0.532, P08 0.571).
 RESPONSE = ((0.02, 0.10), (0.10, 0.15), (0.25, 0.19), (math.inf, 0.35))
 PENDING_GIVES = 0.55  # the second half of a step it had approved ("pending", n 61): whatever we send
 # its reply number n (to our n-th e-mail) is a final offer: 0.04, 0.03, 0.40, 0.81, 0.88 (n 253, 221, 205, 116, 17)
