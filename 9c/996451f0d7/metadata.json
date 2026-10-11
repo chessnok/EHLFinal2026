@@ -3,7 +3,7 @@
   "checkpoint_id": "9c996451f0d7",
   "strategy": "manual-commit",
   "branch": "fix/p01-reanchor",
-  "checkpoints_count": 1,
+  "checkpoints_count": 19,
   "files_touched": [
     "agent/src/negotiator/strategy/tactical.py",
     "agent/tests/test_tactical.py"
@@ -14,13 +14,19 @@
       "transcript": "/9c/996451f0d7/0/full.jsonl",
       "content_hash": "/9c/996451f0d7/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/9c/996451f0d7/1/metadata.json",
+      "transcript": "/9c/996451f0d7/1/full.jsonl",
+      "content_hash": "/9c/996451f0d7/1/content_hash.txt",
+      "prompt": "/9c/996451f0d7/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 164,
+    "cache_creation_tokens": 63662,
+    "cache_read_tokens": 22059519,
+    "output_tokens": 29211,
+    "api_call_count": 69
   }
 }
