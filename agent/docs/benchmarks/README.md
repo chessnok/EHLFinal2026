@@ -117,3 +117,11 @@ Practice with gpt-4o: P11 0.672 (as `tactical`), P08 0.507 (`tactical` 0.550).
 |---|---|---|---|---|
 | tactical (control) | 0.669 (S-29) | 0.587 | 0.628 | [record](2026-10-11-tactical-news-none.md) |
 | tactical+news | 0.669 | 0.713 | 0.691 | [record](2026-10-11-tactical-news-none.md) |
+
+## 2026-10-11 · practice (P11, P08) · no LLM · `ppm_ladder`, `anchor18`, `owner_offer`
+
+| Strategy | Case | Score | Control | Record |
+|---|---|---|---|---|
+| tactical+ppm_ladder | P11 | 0.710 | 0.710 (P-54) | [record](2026-10-11-tactical-p08-p11-flags-none.md) |
+| tactical+anchor18 | P08 | 0.670 | 0.659 (P-57) | [record](2026-10-11-tactical-p08-p11-flags-none.md) |
+| tactical+owner_offer | P08 | 0.416 | 0.659 (P-57) | [record](2026-10-11-tactical-p08-p11-flags-none.md) |
