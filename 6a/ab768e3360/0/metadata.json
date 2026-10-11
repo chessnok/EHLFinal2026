@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "6aab768e3360",
+  "session_id": "16e44bb6-93ff-43e6-bb57-47d067f3ad74",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-11T01:44:53.756917Z",
+  "branch": "fix/final-robustness",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "agent/src/negotiator/runner.py",
+    "agent/src/negotiator/session.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "492e6dbfcd72",
+  "token_usage": {
+    "input_tokens": 1450,
+    "cache_creation_tokens": 1495538,
+    "cache_read_tokens": 303127207,
+    "output_tokens": 628397,
+    "api_call_count": 722
+  },
+  "session_metrics": {
+    "turn_count": 25
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-11T01:44:53.581221Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 1136,
+    "human_modified": 85,
+    "human_removed": 0,
+    "total_committed": 1136,
+    "total_lines_changed": 1222,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

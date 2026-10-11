@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "6aab768e3360",
+  "strategy": "manual-commit",
+  "branch": "fix/final-robustness",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "agent/src/negotiator/runner.py",
+    "agent/src/negotiator/session.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/6a/ab768e3360/0/metadata.json",
+      "transcript": "/6a/ab768e3360/0/full.jsonl",
+      "content_hash": "/6a/ab768e3360/0/content_hash.txt",
+      "prompt": "/6a/ab768e3360/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1450,
+    "cache_creation_tokens": 1495538,
+    "cache_read_tokens": 303127207,
+    "output_tokens": 628397,
+    "api_call_count": 722
+  }
+}
