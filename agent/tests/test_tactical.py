@@ -279,6 +279,42 @@ def test_goal_depth_keeps_the_shallow_ask_outside_leverage(tmp_path, world) -> N
     assert first[True] == first[False]
 
 
+def _held_after(tmp_path, world, rounds: int, status: str, **flags):
+    """S01 after `rounds` e-mails of ours, the supplier's latest reply with `status`, round limit 10."""
+    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world, **flags)
+    strategy.prepare(neg)
+    t = neg.threads[sid]
+    reply = dict(t.messages[0])
+    for _ in range(rounds):
+        t.messages += [{"from": "buyer", "body": "offer"}, {**reply, "status": "open"}]
+    t.messages[-1]["status"] = status
+    neg.case["round_limit"] = 10
+    return neg, sid, strategy
+
+
+def test_keepalive_asks_for_validity_without_the_flag(tmp_path, world) -> None:
+    neg, sid, strategy = _held_after(tmp_path, world, 2, "final_offer")
+    assert "validity" in strategy.keepalive(neg, sid)["body"]
+
+
+def test_quiet_keepalive_asks_a_final_offer_only_for_capacity(tmp_path, world) -> None:
+    """`quiet_keepalive`: the validity question to a held final offer walked H09's and H10's bidders."""
+    for rounds in range(1, 7):
+        neg, sid, strategy = _held_after(tmp_path / str(rounds), world, rounds, "final_offer", quiet_keepalive=True)
+        assert "delivery capacity" in strategy.keepalive(neg, sid)["body"]
+
+
+def test_quiet_keepalive_never_asks_for_validity(tmp_path, world) -> None:
+    bodies = set()
+    for rounds in range(1, 7):
+        neg, sid, strategy = _held_after(tmp_path / str(rounds), world, rounds, "open", quiet_keepalive=True)
+        body = strategy.keepalive(neg, sid)["body"]
+        assert "validity" not in body
+        bodies.add(body)
+    assert len(bodies) == 2  # capacity and lead time take turns on an open thread
+
+
 def test_accept_guard_refuses_worse_than_opening_when_walking_is_safe(tmp_path, world) -> None:
     c = case(alternative={"kind": "quote", "ref": None, "terms": {"unit_price": 30.0, "payment_days": 60}})
     neg, sid = negotiation(tmp_path, world, c, {"unit_price": 16.0, "payment_days": 60})

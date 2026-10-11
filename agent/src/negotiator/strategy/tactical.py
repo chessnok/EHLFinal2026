@@ -289,6 +289,9 @@ FLAGS: dict[str, str] = {
     "goal_depth": "the price-only floor (quote x 0.99) and the 10 % first ask only outside a `leverage` goal; a "
     "leverage case gets the 0.86 floor and the 25 % ask whatever its type (final: 5 of 5 leverage price-only "
     "cases - H06, H24, H30, H34, H38 - closed at or under our 10 % ask while C_best sat 14-35 % under the quote)",
+    "quiet_keepalive": "the keepalive never asks to confirm the validity of the offer, and a held final offer hears "
+    "only the delivery-capacity question (in our runs the validity question to a final offer walked 2 of 4, the "
+    "capacity one 0 of 11; H09 and H10 each lost a bidder this way)",
 }
 
 
@@ -2217,6 +2220,10 @@ class TacticalStrategy(BaselineStrategy):
             "could you confirm the lead time you can commit to for the first call-off?",
             "could you confirm the validity of your offer?",
         ]
+        if self.flags["quiet_keepalive"]:
+            # never the validity question (to a final offer it walked 2 of 4 times, the capacity one 0 of 11);
+            # a held final offer hears only the capacity question
+            asks = asks[:1] if t.status == "final_offer" else asks[:2]
         question = asks[t.rounds_used % len(asks)]
         return {
             "subject": neg.case.get("title", "Your quote"),
