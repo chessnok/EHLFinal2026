@@ -11,11 +11,13 @@ from negotiator.strategy.experiments import TACTICS, ExperimentStrategy
 from negotiator.strategy.llm_strategy import LLMStrategy
 from negotiator.strategy.patient import SCALES, PatientStrategy
 from negotiator.strategy.playbook import VARIANTS, PlaybookStrategy
-from negotiator.strategy.tactical import TacticalStrategy
+from negotiator.strategy.tactical import ExpectedValueStrategy, TacticalStrategy
 from negotiator.strategy.written import WrittenStrategy
 
 STRATEGIES: dict[str, Callable[..., Strategy]] = {
     "tactical": TacticalStrategy,
+    # the round's choice by expected cost over a belief about where the supplier stops (tactical/choice.py)
+    "tactical-ev": ExpectedValueStrategy,
     "baseline": BaselineStrategy,
     "llm": LLMStrategy,
     **{name: partial(ExperimentStrategy, tactic) for name, tactic in TACTICS.items()},

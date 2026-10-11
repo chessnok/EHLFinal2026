@@ -64,6 +64,12 @@ class ConcessionMixin:
                 return reanchor
         if alt := self._take_alternative(neg, supplier_id, plan):
             return alt  # its cheapest sheet is an alternative: the arena closes on the primary one, so ask for it
+        return self._choose(neg, supplier_id, plan, theirs, their_c, last_word, rest_pending)
+
+    def _choose(self, neg, supplier_id: str, plan: Plan, theirs: dict, their_c: float, last_word: bool,
+                rest_pending: bool) -> Decision:  # fmt: skip
+        """Take its offer, ask (and for how much) or probe a last word - here as a chain of rules in order; the
+        `tactical-ev` variant (choice.py) makes the same choice by expected cost."""
         if last_word:
             # a last word is taken (the guards still check it): across ~65 pushes on final offers, 17 % ended in a
             # walk-away for ~+0.05 on average - only an RFQ with a safe rival offer may push once, with a real step

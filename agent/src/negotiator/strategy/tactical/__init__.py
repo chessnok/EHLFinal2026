@@ -35,6 +35,7 @@ says), `concession` (decide, conclude), `sheets` (the term sheets of a message),
 
 from negotiator.data import WorldData
 from negotiator.strategy.baseline import BaselineStrategy
+from negotiator.strategy.tactical.choice import ChoiceMixin
 from negotiator.strategy.tactical.concession import ConcessionMixin
 from negotiator.strategy.tactical.plan import (
     ALT_MIN_EUR,
@@ -106,6 +107,7 @@ __all__ = [
     "UPPER_ROOM_SHARE",
     "Plan",
     "Policy",
+    "ExpectedValueStrategy",
     "TacticalStrategy",
     "parse_breakdown",
     "prices_in_text",
@@ -121,3 +123,9 @@ class TacticalStrategy(PlanningMixin, ReadingMixin, ConcessionMixin, SheetsMixin
         super().__init__(data, llm)
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
+
+
+class ExpectedValueStrategy(ChoiceMixin, TacticalStrategy):
+    """`tactical` with the round's choice (take, ask and how much, probe) made by expected cost: choice.py."""
+
+    name = "tactical-ev"
