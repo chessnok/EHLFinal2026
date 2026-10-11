@@ -331,7 +331,8 @@ def test_own_plant_should_cost_is_not_replaced_by_the_guess(tmp_path, world) -> 
     assert neg.supplier_estimates[sid]["full_cost"] == strategy.tplans[sid].full_cost
     assert strategy.tplans[sid].guess is None
     _, theirs = neg.threads[sid].standing
-    assert strategy._reanchor(neg, sid, strategy.tplans[sid], theirs, neg.cost(sid, theirs)) is None
+    # with the own plant's cost in C the re-anchor stays as measured (P01 0.969, runs.md P-29; 0.901 without it)
+    assert strategy._reanchor(neg, sid, strategy.tplans[sid], theirs, neg.cost(sid, theirs)) is not None
 
 
 def test_reanchor_on_a_strategic_supplier_only_with_a_guess(tmp_path) -> None:
