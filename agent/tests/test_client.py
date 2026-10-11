@@ -52,3 +52,16 @@ def test_a_5xx_after_an_outage_still_gets_its_retries() -> None:
         return httpx.Response(200, json={"ok": True})
 
     assert _client(handler).request("GET", "/v1/me") == {"ok": True}
+
+
+def test_connections_carry_tcp_keepalive() -> None:
+    """A socket stranded by a network change fails in seconds, not at the 180 s read timeout."""
+    import socket
+
+    from negotiator.client import keepalive_options
+
+    opts = keepalive_options()
+    assert (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1) in opts
+    assert len(opts) >= 2  # an idle time at least, on Linux and macOS
+    client = ArenaClient(Settings.from_env(arena_url="http://arena.test", api_key="k"))
+    assert client.http._transport._pool._socket_options == opts  # the default transport uses them
