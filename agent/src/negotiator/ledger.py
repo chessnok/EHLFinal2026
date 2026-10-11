@@ -26,6 +26,49 @@ HEDGE = re.compile(
 FREE_CAPACITY = re.compile(r"free capacity|spare capacity|capacity available", re.I)
 MIN_DROP = 0.5  # % - a smaller move is noise, not an argument
 
+# ---------------------------------------------------------------- what the arena counts as one argument
+DATA_ID = re.compile(r"\b(?:idx|sc|po|fc|qn|offer|quote|cost|doc|ctr|news):[A-Za-z0-9@._:-]*[A-Za-z0-9]")
+# The arena reads the cited IDs of a message into arguments of one kind each, merges the IDs of one kind (two
+# windows of one index series, a scorecard and a complaint), orders them by kind and reads at most three. This
+# model reproduces the arena's own reading (`interpreted.claims` in the trace) of 1031 of the 1033 buyer messages
+# in our 293 practice replays (one-off script over agent/data/replays, 11 Oct 2026).
+KIND_ORDER = {"index": 0, "rival": 1, "record": 2, "orders": 3, "forecast": 4, "should_cost": 5, "notice": 6}
+# Kinds the arena counts once per supplier whatever the ID: a second forecast (fc:360011 after fc:360010 on
+# case P07, 33 times) and a complaint after the scorecard or another complaint (P08, P11) came back `duplicate`.
+# An index counts once per series (runs.md P-33), orders once per part (api.md), a rival offer once per ID.
+
+
+def argument_key(ref: str, facts: dict | None = None) -> tuple:
+    """The unit the arena counts an argument by: the kind, plus the series, part or ID where those count apart."""
+    prefix = ref.split(":", 1)[0]
+    if prefix == "idx":
+        return ("index", ref.split(":", 1)[1].split("@")[0])
+    if prefix in ("offer", "quote"):
+        return ("rival", ref)
+    if prefix in ("sc", "qn"):
+        return ("record",)
+    if prefix == "po":
+        return ("orders", ((facts or {}).get(ref) or {}).get("part") or ref)
+    if prefix == "fc":
+        return ("forecast",)
+    if prefix == "cost":
+        return ("should_cost",)
+    if prefix in ("doc", "ctr"):
+        return ("notice",)
+    return (prefix, ref)
+
+
+def arguments_read(body: str, refs: list[str] | None, facts: dict | None = None) -> list[tuple[tuple, set[str]]]:
+    """The arguments the arena reads from one of our messages, in the order of its `claim_results`."""
+    ids = DATA_ID.findall(body or "")
+    ids += [r for r in refs or [] if r not in ids]
+    groups: dict[tuple, set[str]] = {}
+    for ref in ids:
+        groups.setdefault(argument_key(ref, facts), set()).add(ref)
+    seen = {k: i for i, k in enumerate(groups)}
+    order = sorted(groups, key=lambda k: (KIND_ORDER.get(k[0], 9), k[1] if k[0] == "index" else "", seen[k]))
+    return [(k, groups[k]) for k in order][:3]
+
 
 def recent_drop(data: WorldData, series: str) -> tuple[str, str, float, int] | None:
     """The steepest fall of a series over a window that ends at its latest month (1-12 months)."""

@@ -39,7 +39,7 @@ from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
 from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
-from negotiator.ledger import CITED_DRIVER, data_facts, reply_facts
+from negotiator.ledger import CITED_DRIVER, argument_key, arguments_read, data_facts, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
 from negotiator.profile import SupplierProfile, build_profile
 from negotiator.session import Negotiation
@@ -200,6 +200,7 @@ class Plan:
     figures_asked: bool = False  # its last e-mail asked for the figures behind our proposal
     figures_reply: bool = False
     answered_fixed: set = field(default_factory=set)  # fixed fields whose request we have answered
+    spent_kinds: set = field(default_factory=set)  # argument kinds the arena called `duplicate` (fresh_args)
 
 
 # Candidate changes, each switchable (`tactical+<flag>`) so practice can measure it on its own before it is
@@ -216,6 +217,8 @@ FLAGS: dict[str, str] = {
     "60 % of the usual but never under 0.6 % of C",
     "answers": "plain answers: the volume we need, an opener that matches its move, a fixed field said once, a "
     "clause it must have kept, no 'pays early' that is not",
+    "fresh_args": "never an argument the arena already counted (one per kind, index series, part); one held back from "
+    "the first e-mail for a later round; a bundle's orders per part",
 }
 
 
@@ -333,6 +336,8 @@ class TacticalStrategy(BaselineStrategy):
         if self.data:
             parts = neg.case.get("parts") or []
             out += self.data.evidence_orders(parts, sid, open_price)
+            if self.flags["fresh_args"]:
+                out += self.data.evidence_orders_per_part(parts, sid)
             out += data_facts(self.data, parts)
             if self.flags["fresh_claims"]:
                 later = self.data.evidence_complaints(parts, sid, since="2025-10-01")
@@ -576,7 +581,9 @@ class TacticalStrategy(BaselineStrategy):
         t = neg.threads[sid]
         replies = t.supplier_messages
         for reply in replies[plan.seen_replies :]:
-            for res in reply.get("claim_results") or []:
+            if self.flags["fresh_args"]:
+                self._learn_claims(t, plan, reply)
+            for res in [] if self.flags["fresh_args"] else reply.get("claim_results") or []:
                 i, result = res.get("index"), res.get("result")
                 if not isinstance(i, int) or not 0 <= i < len(plan.last_claims):
                     continue
@@ -633,6 +640,41 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief.observe(reply)
             self._update_upper(neg, sid, plan)
         plan.seen_replies = len(replies)
+
+    def _learn_claims(self, t, plan: Plan, reply: dict) -> None:
+        """The arena's checks of our last e-mail, matched to its arguments the way the arena reads them (the
+        `index` counts the arena's arguments, not our sentences: P11's two scorecard lines were one)."""
+        before = t.messages[: next((i for i, m in enumerate(t.messages) if m is reply), len(t.messages))]
+        ours = next((m for m in reversed(before) if m.get("from") == "buyer" and not m.get("action")), None)
+        if not ours:
+            return
+        read = arguments_read(ours.get("body", ""), ours.get("refs"), self._facts())
+        for res in reply.get("claim_results") or []:
+            i, result = res.get("index"), res.get("result")
+            if not isinstance(i, int) or not 0 <= i < len(read):
+                continue
+            key, refs = read[i]
+            if result == "duplicate" and key[0] not in ("index", "rival"):
+                plan.spent_kinds.add(key[0])  # counted once per kind, whatever the part or ID
+            kinds = {c.kind for c in plan.last_claims if set(c.refs) & refs}
+            if result == "contradicted":
+                self.banned_case_kinds |= kinds
+            elif result == "irrelevant":
+                plan.banned_kinds |= kinds
+
+    def _facts(self) -> dict:
+        return self.data.facts if self.data else {}
+
+    def _spent_keys(self, neg: Negotiation, sid: str) -> set:
+        """Every argument the arena has read from our e-mails to this supplier: citing it again is a duplicate."""
+        out = set()
+        for m in neg.threads[sid].messages:
+            if m.get("from") == "buyer":
+                out |= {k for k, _ in arguments_read(m.get("body", ""), m.get("refs"), self._facts())}
+        return out
+
+    def _arg_key(self, e: Evidence) -> tuple | None:
+        return argument_key(e.refs[0], self._facts()) if e.refs else None
 
     def _read_breakdown(self, neg: Negotiation, sid: str, plan: Plan, reply: dict) -> None:
         """A cost breakdown XLSX: the supplier's own cost per unit is the floor it will not go below."""
@@ -1238,29 +1280,58 @@ class TacticalStrategy(BaselineStrategy):
         for key in [*sorted(plan.profile.traits), neg.buyer.get("category_goal", "")]:
             prefer += EVIDENCE_FIRST.get(key, [])
         pool.sort(key=lambda e: (e not in fresh, e.kind not in prefer, -e.strength))
-        picked, kinds = [], set()
         limit = plan.policy.claims_first if first else (2 if fresh else 1)
         if self.flags["fresh_claims"] and not first:
             limit = 3  # the arena reads up to 3 per message, and every round anew (P01's best session)
             if plan.figures_asked:
                 order = ["should_cost", "recent_drop", "index", "notice", "quality", "complaint", "orders"]
                 pool.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
-        for e in pool:
-            if len(picked) >= limit:
-                break
-            if e.kind == "rival_offer":
-                if any((sid, r) in self.used_rival_refs for r in e.refs):
+        spent = self._spent_keys(neg, sid) if self.flags["fresh_args"] else set()
+
+        def select(limit: float) -> list[Evidence]:
+            picked, kinds, keys, companions = [], set(), set(), 0
+            for e in pool:
+                if len(picked) - companions >= limit:
+                    break
+                if e.kind == "rival_offer":
+                    if any((sid, r) in self.used_rival_refs for r in e.refs):
+                        continue
+                elif any(r in self.used_refs for r in e.refs) or (e.kind in kinds and e.kind != "recent_drop"):
                     continue
-            elif any(r in self.used_refs for r in e.refs) or (e.kind in kinds and e.kind != "recent_drop"):
-                continue
-            if first and (e.meta or {}).get("later"):
-                continue
-            if self.flags["answers"] and e.kind == "forecast" and not self._forecast_fits(neg, e):
-                continue  # a forecast of another quantity (P18: 118,500 against 23,700) only raises the volume question
-            if self.flags["fresh_claims"] and not first and set(e.refs) & {r for x in picked for r in x.refs}:
-                continue  # the same index point twice in one e-mail reads as a duplicate
-            picked.append(e)
-            kinds.add(e.kind)
+                if first and (e.meta or {}).get("later"):
+                    continue
+                if self.flags["answers"] and e.kind == "forecast" and not self._forecast_fits(neg, e):
+                    # a forecast of another quantity (P18: 118,500 against 23,700) only raises the volume question
+                    continue
+                if self.flags["fresh_claims"] and not first and set(e.refs) & {r for x in picked for r in x.refs}:
+                    continue  # the same index point twice in one e-mail reads as a duplicate
+                key = self._arg_key(e) if self.flags["fresh_args"] else None
+                if key and key in keys and key == ("record",):
+                    # the same scorecard row for delivery and quality is read as one argument (the quality one,
+                    # P11): it goes along with the first and takes no slot
+                    partner = next((i for i, x in enumerate(picked) if set(e.refs) <= set(x.refs)), None)
+                    if partner is not None:
+                        picked.insert(partner + 1, e)
+                        kinds.add(e.kind)
+                        companions += 1
+                    continue
+                if key and (key in spent or key in keys or key[0] in plan.spent_kinds):
+                    continue  # counted already (a forecast, a series, a part): it would come back `duplicate`
+                picked.append(e)
+                kinds.add(e.kind)
+                if key:
+                    keys.add(key)
+            return picked
+
+        if self.flags["fresh_args"] and first:
+            # arguments kept for rounds 2-4, at least one: a reply in round 2+ to a verified argument was a final
+            # offer 4-7 % of the time, to an e-mail without one 53 % (our 293 practice replays). The first e-mail
+            # keeps two where there are three or more (two or more arguments: a deeper first step, bot-mechanics.md)
+            checkable = len({self._arg_key(e) for e in select(math.inf) if e.refs})
+            if checkable >= 2:
+                limit = min(limit, max(min(2, checkable - 1), checkable - 3))
+        picked = select(limit)
+        for e in picked:
             plan.used_sentences.add(e.sentence)
         plan.figures_reply, plan.figures_asked = (
             self.flags["fresh_claims"] and plan.figures_asked and bool(picked),
@@ -1398,7 +1469,7 @@ class TacticalStrategy(BaselineStrategy):
         forecast we share with suppliers, by ID, so it reads as documentation and not as a claim."""
         if "volume_per_year" not in plan.requests or plan.volume_proved or not self.data:
             return None
-        if any(r.startswith("fc:") for r in self.used_refs):
+        if any(r.startswith("fc:") for r in self.used_refs) or "forecast" in plan.spent_kinds:
             plan.volume_proved = True  # a duplicate earns nothing ("we have already taken that data into account")
             return None
         parts = neg.case.get("parts") or []
