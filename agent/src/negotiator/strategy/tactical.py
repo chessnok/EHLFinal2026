@@ -250,6 +250,8 @@ FLAGS: dict[str, str] = {
     "(P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
+    "no_hedged_series": "a hedged supplier hears no argument on the series a clause option follows (P08 "
+    "answered 'not our reality' in every session; the slot goes to the next argument) and no fact twice",
     "soft_anchor": "a higher first offer under routine and quality_first goals: the first ask half as deep "
     "(their suppliers moved 0.4-6 % in all; leverage suppliers 15-24 %, P05 36 -> 27.50, need the deep one)",
     "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
@@ -1693,6 +1695,8 @@ class TacticalStrategy(BaselineStrategy):
 
     # ------------------------------------------------------------------ arguments and words
     def _choose_claims(self, neg, sid, plan, first: bool) -> list[Evidence]:
+        if self.flags["no_hedged_series"]:
+            self._drop_hedged_series(neg, plan)
         banned = plan.banned_kinds | self.banned_case_kinds
         if neg.buyer.get("category_goal") != "quality_first":
             banned = banned | {"scorecard"}
@@ -1792,6 +1796,26 @@ class TacticalStrategy(BaselineStrategy):
             else:
                 self.used_refs.update(e.refs)
         return picked
+
+    @staticmethod
+    def _drop_hedged_series(neg, plan: Plan) -> None:
+        """Its material is bought at fixed prices: a fall of the series its clause would follow is "not our reality"
+        (P08, every session) - the slot goes to the next argument. One fact is cited once (the counters may hold it)."""
+        clauses = neg.case.get("term_options", {}).get("index_clause") or []
+        series = {o.get("series") for o in clauses if o}
+        if not (plan.profile.has("hedged") and series):
+            return
+        prefixes = tuple(f"idx:{s}@" for s in series)
+
+        def keep(e: Evidence) -> bool:
+            return not any(r.startswith(prefixes) for r in e.refs or []) and not any(
+                s in (e.sentence or "") for s in series
+            )
+
+        plan.counters = [e for e in plan.counters if keep(e)]
+        plan.evidence = [e for e in plan.evidence if keep(e)]
+        cited = {r for e in plan.counters for r in e.refs or []}
+        plan.evidence = [e for e in plan.evidence if not set(e.refs or []) & cited]
 
     def _write(self, neg, plan: Plan, sheets: list[dict], claims: list[Evidence], probe: bool) -> dict:
         p, case = plan.profile, neg.case
