@@ -324,6 +324,36 @@ class WorldData:
             )
         ]
 
+    def evidence_orders_per_part(self, part_ids: list[str], supplier_id: str) -> list[Evidence]:
+        """A bundle: our last orders of each part from this supplier, one argument per part ("order lines of
+        different parts are separate arguments", api.md). The bundle's price is not the parts' prices, so there is no
+        comparison with the quote - the orders say what we pay today, checked by the arena."""
+        if len(part_ids) < 2:
+            return []
+        out = []
+        for part in part_ids:
+            rows = self.query(
+                "SELECT id, price FROM po_lines WHERE part_id = ? AND supplier_id = ? ORDER BY order_date DESC LIMIT 3",
+                (part, supplier_id),
+            )
+            rows = [r for r in rows if self.fact(r["id"])]
+            if len(rows) < 2 or len({r["price"] for r in rows}) != 1:
+                continue
+            ids = [r["id"] for r in rows]
+            per = self.fact(ids[0]).get("price_unit") or 1
+            unit = f" per {per:,}" if per != 1 else ""
+            out.append(
+                Evidence(
+                    kind="orders",
+                    refs=ids,
+                    sentence=f"Our last orders for {part} were at EUR {rows[0]['price']:,.2f}{unit} "
+                    f"({', '.join(ids)}).",
+                    strength=0.5,
+                    meta={"paid": rows[0]["price"], "part": part, "price_unit": per},
+                )
+            )
+        return out
+
     def evidence_quote(self, quote_id: str | None) -> list[Evidence]:
         """The buyer's alternative quote, if the case has one."""
         q = self.fact(quote_id) if quote_id else None

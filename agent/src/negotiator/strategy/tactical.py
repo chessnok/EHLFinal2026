@@ -39,7 +39,7 @@ from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
 from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
-from negotiator.ledger import CITED_DRIVER, data_facts, reply_facts
+from negotiator.ledger import CITED_DRIVER, argument_key, arguments_read, data_facts, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
 from negotiator.profile import SupplierProfile, build_profile
 from negotiator.session import Negotiation
@@ -98,6 +98,8 @@ MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D0
 # without a cost estimate, anchor this far under the reference price (baseline v2's sandbox-tested depths)
 GUESS_ANCHOR = {"leverage": 0.18, "routine": 0.12, "quality_first": 0.10, "stabilise": 0.06, "secure_supply": 0.05}
 UNDER_FLOOR = 0.02  # the first ask sits this far under the supplier's estimated floor
+ALT_ROOM_SHARE = 0.001  # cheap_alt: its alternative must save this share of the room ...
+ALT_MIN_EUR = 10.0  # ... and at least this much: below it a rounding of the sheet decides
 # what a supplier's e-mail says between the lines (the replay of case:D01/D02 showed both kinds)
 ROOM_SIGNALS = re.compile(
     r"can move further|come back to you on price|free capacity|step from your side|bridge the (?:remaining )?gap"
@@ -208,6 +210,7 @@ class Plan:
     figures_asked: bool = False  # its last e-mail asked for the figures behind our proposal
     figures_reply: bool = False
     answered_fixed: set = field(default_factory=set)  # fixed fields whose request we have answered
+    spent_kinds: set = field(default_factory=set)  # argument kinds the arena called `duplicate` (fresh_args)
 
 
 # Candidate changes, each switchable (`tactical+<flag>`) so practice can measure it on its own before it is
@@ -224,6 +227,12 @@ FLAGS: dict[str, str] = {
     "60 % of the usual but never under 0.6 % of C",
     "answers": "plain answers: the volume we need, an opener that matches its move, a fixed field said once, a "
     "clause it must have kept, no 'pays early' that is not",
+    "fresh_args": "never an argument the arena already counted (one per kind, index series, part); one held back from "
+    "the first e-mail for a later round; a bundle's orders per part",
+    "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
+    "12), not only one ending at the latest month; one per series",
+    "cheap_alt": "take its alternative sheet when it saves 0.1 % of the room (not 0.2 % of C), and only when the sheet "
+    "we send for it still costs less than its primary one",
 }
 
 
@@ -349,7 +358,9 @@ class TacticalStrategy(BaselineStrategy):
         if self.data:
             parts = neg.case.get("parts") or []
             out += self.data.evidence_orders(parts, sid, open_price)
-            out += data_facts(self.data, parts)
+            if self.flags["fresh_args"]:
+                out += self.data.evidence_orders_per_part(parts, sid)
+            out += data_facts(self.data, parts, all_windows=self.flags["all_windows"])
             if self.flags["fresh_claims"]:
                 later = self.data.evidence_complaints(parts, sid, since="2025-10-01")
                 if open_price and not any(e.kind == "should_cost" for e in out):
@@ -635,7 +646,9 @@ class TacticalStrategy(BaselineStrategy):
         t = neg.threads[sid]
         replies = t.supplier_messages
         for reply in replies[plan.seen_replies :]:
-            for res in reply.get("claim_results") or []:
+            if self.flags["fresh_args"]:
+                self._learn_claims(t, plan, reply)
+            for res in [] if self.flags["fresh_args"] else reply.get("claim_results") or []:
                 i, result = res.get("index"), res.get("result")
                 if not isinstance(i, int) or not 0 <= i < len(plan.last_claims):
                     continue
@@ -661,7 +674,7 @@ class TacticalStrategy(BaselineStrategy):
             for series in CITED_DRIVER.findall(reply.get("body", "")):
                 if series[0] not in plan.pressures:
                     plan.pressures.append(series[0])
-            for fact in reply_facts(self.data, reply.get("body", "")):
+            for fact in reply_facts(self.data, reply.get("body", ""), all_windows=self.flags["all_windows"]):
                 if fact.sentence not in plan.used_sentences and all(fact.sentence != c.sentence for c in plan.counters):
                     plan.counters.append(fact)
             for f, values in proposed_values(neg.case, reply.get("term_sheets") or []).items():
@@ -692,6 +705,41 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief.observe(reply)
             self._update_upper(neg, sid, plan)
         plan.seen_replies = len(replies)
+
+    def _learn_claims(self, t, plan: Plan, reply: dict) -> None:
+        """The arena's checks of our last e-mail, matched to its arguments the way the arena reads them (the
+        `index` counts the arena's arguments, not our sentences: P11's two scorecard lines were one)."""
+        before = t.messages[: next((i for i, m in enumerate(t.messages) if m is reply), len(t.messages))]
+        ours = next((m for m in reversed(before) if m.get("from") == "buyer" and not m.get("action")), None)
+        if not ours:
+            return
+        read = arguments_read(ours.get("body", ""), ours.get("refs"), self._facts())
+        for res in reply.get("claim_results") or []:
+            i, result = res.get("index"), res.get("result")
+            if not isinstance(i, int) or not 0 <= i < len(read):
+                continue
+            key, refs = read[i]
+            if result == "duplicate" and key[0] not in ("index", "rival"):
+                plan.spent_kinds.add(key[0])  # counted once per kind, whatever the part or ID
+            kinds = {c.kind for c in plan.last_claims if set(c.refs) & refs}
+            if result == "contradicted":
+                self.banned_case_kinds |= kinds
+            elif result == "irrelevant":
+                plan.banned_kinds |= kinds
+
+    def _facts(self) -> dict:
+        return self.data.facts if self.data else {}
+
+    def _spent_keys(self, neg: Negotiation, sid: str) -> set:
+        """Every argument the arena has read from our e-mails to this supplier: citing it again is a duplicate."""
+        out = set()
+        for m in neg.threads[sid].messages:
+            if m.get("from") == "buyer":
+                out |= {k for k, _ in arguments_read(m.get("body", ""), m.get("refs"), self._facts())}
+        return out
+
+    def _arg_key(self, e: Evidence) -> tuple | None:
+        return argument_key(e.refs[0], self._facts()) if e.refs else None
 
     def _read_breakdown(self, neg: Negotiation, sid: str, plan: Plan, reply: dict) -> None:
         """A cost breakdown XLSX: the supplier's own cost per unit is the floor it will not go below."""
@@ -841,8 +889,9 @@ class TacticalStrategy(BaselineStrategy):
         best_id, best = neg.best_offer(sid)
         if not best_id or best_id == primary_id or best_id in plan.alternatives_taken or not self._may_push(neg, sid):
             return None
-        best_c = neg.cost(sid, best)
-        if best_c >= neg.cost(sid, primary) * (1 - 0.002):
+        best_c, primary_c = neg.cost(sid, best), neg.cost(sid, primary)
+        margin = self._alt_margin(neg, plan, primary_c) if self.flags["cheap_alt"] else 0.0
+        if best_c >= (primary_c - margin if self.flags["cheap_alt"] else primary_c * (1 - 0.002)):
             return None
         # only when we would close anyway - in round 1 its alternative is an opening, not a deal (P18 dry run)
         closing = (
@@ -868,6 +917,8 @@ class TacticalStrategy(BaselineStrategy):
                 return None
         if not neg.keeps_must_haves(sid, sheet) or neg.cost(sid, sheet) >= neg.c_alt:
             return None
+        if self.flags["cheap_alt"] and neg.cost(sid, sheet) >= primary_c - margin:
+            return None  # completed with its standard terms, the sheet no longer beats its primary offer
         plan.alternatives_taken.add(best_id)
         plan.our_c.append(neg.cost(sid, sheet))
         plan.last_keys = self._keys([{"terms": sheet}])
@@ -888,6 +939,17 @@ class TacticalStrategy(BaselineStrategy):
             message={"subject": neg.case.get("title", "Your quote"), "body": body, "term_sheets": [{"terms": sheet}]},
             rationale={"move": "take its alternative", "alternative": best_id, "c": neg.cost(sid, sheet)},
         )
+
+    @staticmethod
+    def _alt_margin(neg: Negotiation, plan: Plan, primary_c: float) -> float:
+        """How much cheaper its alternative must be to be worth a round: 0.1 % of the room between the opening and
+        the supplier's estimated floor, i.e. about 0.001 of the score (the score is the saving as a share of a room
+        of the same order). P08's 5 % deadband alternative saved 0.16 % of C, 0.0094 of the score, and fell under
+        the old bar of 0.2 % of C in 4 of 4 sessions. Without a floor estimate: 0.05 % of C."""
+        room = neg.c_open - plan.lower_c
+        if math.isfinite(room) and room > 0:
+            return max(ALT_MIN_EUR, ALT_ROOM_SHARE * room)
+        return max(ALT_MIN_EUR, 0.0005 * primary_c)
 
     def _alternative_line(self, neg, sheet: dict, best: dict) -> str:
         if not self.flags["answers"]:
@@ -1365,29 +1427,63 @@ class TacticalStrategy(BaselineStrategy):
         for key in [*sorted(plan.profile.traits), neg.buyer.get("category_goal", "")]:
             prefer += EVIDENCE_FIRST.get(key, [])
         pool.sort(key=lambda e: (e not in fresh, e.kind not in prefer, -e.strength))
-        picked, kinds = [], set()
         limit = plan.policy.claims_first if first else (2 if fresh else 1)
         if self.flags["fresh_claims"] and not first:
             limit = 3  # the arena reads up to 3 per message, and every round anew (P01's best session)
             if plan.figures_asked:
                 order = ["should_cost", "recent_drop", "index", "notice", "quality", "complaint", "orders"]
                 pool.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
-        for e in pool:
-            if len(picked) >= limit:
-                break
-            if e.kind == "rival_offer":
-                if any((sid, r) in self.used_rival_refs for r in e.refs):
+        spent = self._spent_keys(neg, sid) if self.flags["fresh_args"] or self.flags["all_windows"] else set()
+
+        def select(limit: float) -> list[Evidence]:
+            picked, kinds, keys, companions = [], set(), set(), 0
+            for e in pool:
+                if len(picked) - companions >= limit:
+                    break
+                if e.kind == "rival_offer":
+                    if any((sid, r) in self.used_rival_refs for r in e.refs):
+                        continue
+                elif any(r in self.used_refs for r in e.refs) or (e.kind in kinds and e.kind != "recent_drop"):
                     continue
-            elif any(r in self.used_refs for r in e.refs) or (e.kind in kinds and e.kind != "recent_drop"):
-                continue
-            if first and (e.meta or {}).get("later"):
-                continue
-            if self.flags["answers"] and e.kind == "forecast" and not self._forecast_fits(neg, e):
-                continue  # a forecast of another quantity (P18: 118,500 against 23,700) only raises the volume question
-            if self.flags["fresh_claims"] and not first and set(e.refs) & {r for x in picked for r in x.refs}:
-                continue  # the same index point twice in one e-mail reads as a duplicate
-            picked.append(e)
-            kinds.add(e.kind)
+                if first and (e.meta or {}).get("later"):
+                    continue
+                if self.flags["answers"] and e.kind == "forecast" and not self._forecast_fits(neg, e):
+                    # a forecast of another quantity (P18: 118,500 against 23,700) only raises the volume question
+                    continue
+                if self.flags["fresh_claims"] and not first and set(e.refs) & {r for x in picked for r in x.refs}:
+                    continue  # the same index point twice in one e-mail reads as a duplicate
+                key = (
+                    self._arg_key(e)
+                    if self.flags["fresh_args"]
+                    or (self.flags["all_windows"] and e.kind in ("index", "recent_drop"))  # one window per series
+                    else None
+                )
+                if key and key in keys and key == ("record",):
+                    # the same scorecard row for delivery and quality is read as one argument (the quality one,
+                    # P11): it goes along with the first and takes no slot
+                    partner = next((i for i, x in enumerate(picked) if set(e.refs) <= set(x.refs)), None)
+                    if partner is not None:
+                        picked.insert(partner + 1, e)
+                        kinds.add(e.kind)
+                        companions += 1
+                    continue
+                if key and (key in spent or key in keys or key[0] in plan.spent_kinds):
+                    continue  # counted already (a forecast, a series, a part): it would come back `duplicate`
+                picked.append(e)
+                kinds.add(e.kind)
+                if key:
+                    keys.add(key)
+            return picked
+
+        if self.flags["fresh_args"] and first:
+            # arguments kept for rounds 2-4, at least one: a reply in round 2+ to a verified argument was a final
+            # offer 4-7 % of the time, to an e-mail without one 53 % (our 293 practice replays). The first e-mail
+            # keeps two where there are three or more (two or more arguments: a deeper first step, bot-mechanics.md)
+            checkable = len({self._arg_key(e) for e in select(math.inf) if e.refs})
+            if checkable >= 2:
+                limit = min(limit, max(min(2, checkable - 1), checkable - 3))
+        picked = select(limit)
+        for e in picked:
             plan.used_sentences.add(e.sentence)
         plan.figures_reply, plan.figures_asked = (
             self.flags["fresh_claims"] and plan.figures_asked and bool(picked),
@@ -1525,7 +1621,7 @@ class TacticalStrategy(BaselineStrategy):
         forecast we share with suppliers, by ID, so it reads as documentation and not as a claim."""
         if "volume_per_year" not in plan.requests or plan.volume_proved or not self.data:
             return None
-        if any(r.startswith("fc:") for r in self.used_refs):
+        if any(r.startswith("fc:") for r in self.used_refs) or "forecast" in plan.spent_kinds:
             plan.volume_proved = True  # a duplicate earns nothing ("we have already taken that data into account")
             return None
         parts = neg.case.get("parts") or []
