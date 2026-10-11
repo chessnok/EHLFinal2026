@@ -101,3 +101,12 @@ Two full runs, 20 practice sessions, and 22 sessions of partial runs (`../runs.m
 
 Practice with gpt-4o: P11 0.672 (as `tactical`), P08 0.507 (`tactical` 0.550).
 
+
+## 2026-10-11 · practice (P07, P08, P02) · no LLM · block B's flags
+
+| Strategy | P07 | P08 | P02 | Mean | Record |
+|---|---|---|---|---|---|
+| tactical (`94a612b`) | 0.740 | 0.550 | 0.733 | 0.674 | [record](2026-10-11-tactical-flags-b-none.md) |
+| tactical+fresh_args | 0.721 | 0.528 | 0.733 | 0.661 | [record](2026-10-11-tactical-flags-b-none.md) |
+| tactical+all_windows | 0.753 | 0.528 | 0.733 | 0.671 | [record](2026-10-11-tactical-flags-b-none.md) |
+| tactical+cheap_alt (now default) | 0.740 | 0.560 | 0.733 | 0.678 | [record](2026-10-11-tactical-flags-b-none.md) |

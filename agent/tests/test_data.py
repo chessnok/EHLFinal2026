@@ -21,6 +21,17 @@ def test_evidence_is_checkable(world: WorldData) -> None:
     assert notice and notice[0].meta == {"given": 51, "agreed": 90}
 
 
+def test_case_facts_stay_in_their_case(world: WorldData) -> None:
+    """The final plays cases in parallel on one WorldData: a hidden case's facts belong to that case alone."""
+    a = world.with_case({"facts": {"doc:HIDDEN-A": {"type": "doc"}}})
+    b = world.with_case({"facts": {"doc:HIDDEN-B": {"type": "doc"}}})
+    assert a.fact("doc:HIDDEN-A") and not a.fact("doc:HIDDEN-B")
+    assert b.fact("doc:HIDDEN-B") and not b.fact("doc:HIDDEN-A")
+    assert not world.fact("doc:HIDDEN-A") and not world.fact("doc:HIDDEN-B")
+    assert a.fact("idx:PPI-D351@2026-08") and a.db is world.db  # the package's facts and tables are shared
+    assert world.with_case({}).facts == world.facts
+
+
 def test_read_only_queries(world: WorldData) -> None:
     try:
         world.query("DELETE FROM parts")
