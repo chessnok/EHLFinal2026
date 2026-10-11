@@ -453,8 +453,9 @@ class TacticalStrategy(BaselineStrategy):
         leader = self.arg_leader
         if leader is None or sid == leader or e.kind == "rival_offer" or not e.refs:
             return False
-        if leader not in neg.threads or not neg.threads[leader].live:
-            return False
+        lt = neg.threads.get(leader)
+        if lt is None or not lt.live or lt.status == "final_offer":
+            return False  # it ended, or it has given its last word: the others may use them
         return bool(set(e.refs) & self.reserved_refs) or any(argument_key(r) in self.reserved_keys for r in e.refs)
 
     def _fair_distance(self, neg: Negotiation, sid: str, theirs: dict, terms: dict) -> tuple:
@@ -2064,6 +2065,8 @@ class TacticalStrategy(BaselineStrategy):
         out = []
         for e in plan.counters + plan.evidence + self.late_extra[sid]:
             if e.refs and e.kind not in hard and e.sentence not in plan.used_sentences and e.sentence not in seen:
+                if self.flags["rfq_fair"] and self._reserved_for_leader(neg, sid, e):
+                    continue  # the leader's once-per-case argument, also in later rounds
                 seen.add(e.sentence)
                 out.append(e)
         order = {"orders": 0, "scorecard": 1, "quality": 1, "complaint": 2, "index": 3, "recent_drop": 3}
