@@ -1,0 +1,1 @@
+try to get higher score on P08,P11,P02. spend max 5 submissions per strategym, so 15 in total. lets firstly analyze what is going on and may be then implement -because rn we modify strategies
