@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "6ad855d99b71",
+  "strategy": "manual-commit",
+  "branch": "refactor/strategy-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/docs/TRYED.md",
+    "agent/docs/benchmarks/2026-10-11-tactical-ev-none.md",
+    "agent/docs/runs.md",
+    "agent/src/negotiator/strategy/tactical/reading.py",
+    "agent/tests/test_tactical.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/6a/d855d99b71/0/metadata.json",
+      "transcript": "/6a/d855d99b71/0/full.jsonl",
+      "compact_transcript": "/6a/d855d99b71/0/transcript.jsonl",
+      "content_hash": "/6a/d855d99b71/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 8,
+    "cache_creation_tokens": 6776,
+    "cache_read_tokens": 1646667,
+    "output_tokens": 7375,
+    "api_call_count": 4
+  }
+}
