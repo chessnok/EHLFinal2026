@@ -1606,6 +1606,8 @@ class TacticalStrategy(BaselineStrategy):
             return out
         if 14 not in options or any((sh["terms"].get("payment_days") or 999) <= 14 for sh in out):
             return out
+        if len(neg.threads) < 2:
+            return out  # measured to win only in an RFQ (P05 +0.041); alone it lost P08 0.055 and P07 0.012 (P-51)
         if neg.supplier_estimates.get(sid) or neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
             return (
                 out  # under a margin charge the 14-day option prices high and pulls its price up (P01 0.943 -> 0.818)

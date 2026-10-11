@@ -72,6 +72,7 @@ suppliers, leverage).
 | P-48 | 11 Oct 08:56 | `635bc5d` | `tactical+winner` (clause_rel_only + justified_arg + cheap_yes) | P01, P04, P08, P11, P18 (the other five are message-identical offline) | Claude session (David) | David's winner strategy | P01 0.943, P04 0.860, P08 0.571, P11 0.710, P18 0.685 · with the unchanged five: mean 0.764 against 0.748 (P-43) | adopted as default on David's decision |
 | P-49 | 11 Oct 09:14 | `ec948f4` | `tactical-nojust` (winner without justified_arg) | P01, P08 | Claude session (David) | is justified_arg what costs P08? | P01 0.924, P08 0.626 | yes: without it P08 +0.055 against winner, P01 −0.019 |
 | P-50 | 11 Oct 09:14 | `ec948f4` | `tactical+fast_pay` (on the winner default) | P05, P01, P02 | Claude session (David) | a 14-day option for a supplier that asks for faster payment | P05 0.865, P02 0.733, P01 see report | adopted with nojust as default (David) |
+| P-51 | 11 Oct 09:22 | `36a9752` | `tactical` (clause_rel_only + cheap_yes + fast_pay with the margin lock) | all 10, `--parallel 5`, release | Claude session (David) | control run of the default | P01 0.924, P02 0.733, P03 0.923, P04 0.860, P05 0.865, P07 0.728, P08 0.571, P10 0.647, P11 0.710, P18 0.618→0.685 · mean 0.764, 10/10 | fast_pay lost P08 (0.626 → 0.571) and P07 (0.740 → 0.728): restricted to RFQs |
 
 **Team best per case** (what the practice board counts), as of P-12:
 
