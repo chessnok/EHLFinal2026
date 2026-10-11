@@ -270,6 +270,8 @@ FLAGS: dict[str, str] = {
     "answered, kept in the options or said honestly why not; implies answers",
     "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
     "12), not only one ending at the latest month; one per series",
+    "no_q1": "no question in the first e-mail (each one cost 0.43 pp of the first drop, 9 of 12 suppliers): the "
+    "cost-breakdown request to an open-book supplier waits for round 2",
     "late_facts": "round 1 as today; from round 2 every offer carries at least one argument the arena has not counted "
     "for this supplier: remaining strong evidence first, then weak facts kept out of round 1 (price history, a "
     "delivery or quality record or complaint, an index series it rebuffed), never a counted kind, series or part",
@@ -1904,8 +1906,15 @@ class TacticalStrategy(BaselineStrategy):
         if first and plan.justified_note:
             said.append(plan.justified_note)  # the head's sum of its own figures, said by the mouth once
             plan.justified_note = None
+        if first and self.flags["no_q1"]:
+            said = [x for x in said if not x.rstrip().endswith("?")]
         lines += said
-        if not plan.asked_breakdown and p.has("open_book") and not plan.breakdown_read:
+        if (
+            not plan.asked_breakdown
+            and p.has("open_book")
+            and not plan.breakdown_read
+            and not (first and self.flags["no_q1"])  # asked from round 2 on
+        ):
             lines.append("Could you send us a cost breakdown for this part?")
             plan.asked_breakdown = True
         if len(sheets) > 1:

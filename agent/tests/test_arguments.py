@@ -282,3 +282,25 @@ def test_late_facts_answers_figures_asked_with_a_fact(tmp_path, world) -> None:
     plan.figures_asked = True
     assert strategy._choose_claims(neg, sid, plan, first=False)
     assert plan.figures_reply and not plan.figures_asked  # "You asked for the figures behind our proposal:"
+
+
+# ---------------------------------------------------------------- no question in the first e-mail (`no_q1`)
+def _breakdown_asked(tmp_path: Path, world: WorldData, **flags) -> list[bool]:
+    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world, **flags)
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    plan.profile.traits["open_book"] = []
+    sheets = [{"terms": {"unit_price": 16.5, "payment_days": 30}}]
+    asked = []
+    for _ in range(2):
+        body = strategy._write(neg, plan, sheets, [], probe=False)["body"]
+        asked.append("cost breakdown" in body)
+        assert not ("?" in body and not asked[-1])  # no other question
+        _round_one(neg, sid, body)
+    return asked
+
+
+def test_no_q1_moves_the_breakdown_request_to_round_two(tmp_path, world) -> None:
+    assert _breakdown_asked(tmp_path / "old", world) == [True, False]
+    assert _breakdown_asked(tmp_path / "new", world, no_q1=True) == [False, True]
