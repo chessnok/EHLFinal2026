@@ -13,8 +13,15 @@ uv run negotiator sim check                            # how well the fit predic
 uv run negotiator sim bench baseline tactical --reps 5 # strategies on the simulator, next to their arena scores
 uv run negotiator sim bench tactical --strangers       # each supplier with the habits of another one
 uv run negotiator sim bench old new --opponents all --jitter --reps 3   # the opponent pool, floors moved
+uv run negotiator sim robust old new --reps 6          # perturbed suppliers: mean, worst case, tune / held out
 uv run negotiator sim serve --port 8100                # as a local arena for `negotiator --url ...`
 ```
+
+`sim robust` is the check against fitting one deterministic bot: per session the floor moves (as `--jitter`), the
+supplier's steps are scaled 0.8-1.25, its final-offer rate 0.7-1.5 and the round limit moves by -3 to +1; every
+strategy meets the same seeds. It prints the tuning cases only; `--holdout` adds P02, P03 and P18 once a change is
+fixed. `negotiator readcheck` reads logged replies with a model next to the regular expressions (model calls, no
+quota).
 
 **The usual commands, on the simulator.** `sim serve` is the arena's API on `http://127.0.0.1:8100`; add `--sim` to
 any command and it talks to it instead of the arena - same client, runner, strategies, reports and chats:

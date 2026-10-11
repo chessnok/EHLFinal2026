@@ -110,3 +110,12 @@ Practice with gpt-4o: P11 0.672 (as `tactical`), P08 0.507 (`tactical` 0.550).
 | tactical+fresh_args | 0.721 | 0.528 | 0.733 | 0.661 | [record](2026-10-11-tactical-flags-b-none.md) |
 | tactical+all_windows | 0.753 | 0.528 | 0.733 | 0.671 | [record](2026-10-11-tactical-flags-b-none.md) |
 | tactical+cheap_alt (now default) | 0.740 | 0.560 | 0.733 | 0.678 | [record](2026-10-11-tactical-flags-b-none.md) |
+
+`refactor/strategy-review` (the review of `tactical.py`: fixes, flags settled, package, choice by expected cost), all
+ten practice cases:
+
+| Strategy | Mean | Record |
+|---|---|---|
+| tactical-ev, first response table (`ed34340`) | 0.749 | [record](2026-10-11-tactical-ev-none.md) |
+| tactical-ev (`1d30525`) | 0.754 | [record](2026-10-11-tactical-ev-none.md) |
+| tactical (`1d30525`) | 0.750 | [record](2026-10-11-tactical-ev-none.md) |
