@@ -1,0 +1,7 @@
+<task-notification>
+<task-id>bz706c3r2</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-mikhail-fadin-EHLFinal2026/16e44bb6-93ff-43e6-bb57-47d067f3ad74/tasks/bz706c3r2.output</output-file>
+<status>completed</status>
+<summary>Background command "Practice runs: 8 commands x 3 sessions (approved)" completed (exit code 0)</summary>
+</task-notification>
