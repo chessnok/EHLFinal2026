@@ -234,6 +234,8 @@ FLAGS: dict[str, str] = {
     "clause it must have kept, no 'pays early' that is not",
     "fresh_args": "never an argument the arena already counted (one per kind, index series, part); one held back from "
     "the first e-mail for a later round; a bundle's orders per part",
+    "respond_lite": "every question of its last e-mail answered and every fixed lever said honestly, but no "
+    "structure given away (P-42: yes to its start date cost P01 0.14)",
     "respond_all": "every question, condition, wish and signal of its last e-mail is taken up (reply_parser): "
     "answered, kept in the options or said honestly why not; implies answers",
     "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
@@ -256,7 +258,7 @@ class TacticalStrategy(BaselineStrategy):
         if unknown:
             raise ValueError(f"unknown tactical flags: {sorted(unknown)}")
         self.flags = {name: bool(flags.get(name, False)) for name in FLAGS}
-        if self.flags["respond_all"]:
+        if self.flags["respond_all"] or self.flags["respond_lite"]:
             self.flags["answers"] = True  # its plain answers are part of answering everything
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
@@ -677,8 +679,11 @@ class TacticalStrategy(BaselineStrategy):
             facts = self._read_reply(neg, sid, reply)
             if facts and self.flags["respond_all"]:
                 self._take_in(neg, sid, plan, facts)
+            elif facts and self.flags["respond_lite"]:
+                self._take_in_words(plan, facts)
             if (
                 self.flags["answers"]
+                and not self.flags["respond_lite"]
                 and MUST_CLAUSE.search(reply.get("body", ""))
                 and "index_clause" in neg.case["negotiable"]
             ):
@@ -769,6 +774,24 @@ class TacticalStrategy(BaselineStrategy):
         for sig in f.signals:
             if sig.startswith("builds_on_option_"):
                 self._keep_its_option(neg, sid, plan, sig.rsplit("_", 1)[-1])
+        useless = {"price history": "orders", "delivery record": "scorecard", "volume change": "forecast"}
+        for data_kind, verdict in f.claim_reactions:
+            if verdict in ("no_change", "known") and data_kind.strip() in useless:
+                plan.banned_kinds.add(useless[data_kind.strip()])
+
+    @staticmethod
+    def _take_in_words(plan: Plan, f: ReplyFacts) -> None:
+        """What changes our answer and our arguments - never our menu: its questions, the index series it rejected,
+        the argument kinds that did not move it, a breakdown it will not send."""
+        plan.facts = f
+        if "figures" in f.questions:
+            plan.figures_asked = True
+        if f.signals & {"figures_confirm_its_case", "argument_not_its_reality"}:
+            for e in plan.last_claims:
+                if e.kind in ("index", "recent_drop") and (e.meta or {}).get("series"):
+                    plan.banned_series.add(e.meta["series"])
+        if "breakdown_answer" in f.signals:
+            plan.asked_breakdown = True
         useless = {"price history": "orders", "delivery record": "scorecard", "volume change": "forecast"}
         for data_kind, verdict in f.claim_reactions:
             if verdict in ("no_change", "known") and data_kind.strip() in useless:
@@ -1515,13 +1538,17 @@ class TacticalStrategy(BaselineStrategy):
             prefer += EVIDENCE_FIRST.get(key, [])
         pool.sort(key=lambda e: (e not in fresh, e.kind not in prefer, -e.strength))
         limit = plan.policy.claims_first if first else (2 if fresh else 1)
-        if self.flags["respond_all"] and not first and plan.figures_asked:
+        if (self.flags["respond_all"] or self.flags["respond_lite"]) and not first and plan.figures_asked:
             limit = max(limit, 2)
             order = ["should_cost", "recent_drop", "index", "notice", "quality", "orders", "rival_offer"]
             pool.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
-        if self.flags["respond_all"] and plan.banned_series:
+        if (self.flags["respond_all"] or self.flags["respond_lite"]) and plan.banned_series:
             pool = [e for e in pool if (e.meta or {}).get("series") not in plan.banned_series]
-        asked_rival = self.flags["respond_all"] and plan.facts is not None and "competitor" in plan.facts.questions
+        asked_rival = (
+            (self.flags["respond_all"] or self.flags["respond_lite"])
+            and plan.facts is not None
+            and "competitor" in plan.facts.questions
+        )
         if self.flags["fresh_claims"] and not first:
             limit = 3  # the arena reads up to 3 per message, and every round anew (P01's best session)
             if plan.figures_asked:
@@ -1585,7 +1612,9 @@ class TacticalStrategy(BaselineStrategy):
         for e in picked:
             plan.used_sentences.add(e.sentence)
         plan.figures_reply, plan.figures_asked = (
-            (self.flags["fresh_claims"] or self.flags["respond_all"]) and plan.figures_asked and bool(picked),
+            (self.flags["fresh_claims"] or self.flags["respond_all"] or self.flags["respond_lite"])
+            and plan.figures_asked
+            and bool(picked),
             False,
         )
         for e in picked:
@@ -1631,7 +1660,7 @@ class TacticalStrategy(BaselineStrategy):
                 for s in said
             ]
             said += self._fixed_field_answers(neg, plan)
-        if self.flags["respond_all"]:
+        if self.flags["respond_all"] or self.flags["respond_lite"]:
             said += self._take_up_lines(neg, plan, sheets)
         lines += said
         if not plan.asked_breakdown and p.has("open_book") and not plan.breakdown_read:
@@ -1654,7 +1683,7 @@ class TacticalStrategy(BaselineStrategy):
         for i, sheet in enumerate(sheets if plan.requests else []):
             if said := self._answered(neg, plan, sheet["terms"], theirs, f"Option {chr(65 + i)}").strip():
                 lines.append(
-                    ("Yes - " + said.strip()) if self.flags["answers"] else said
+                    ("Yes - " + said.strip()) if self.flags["answers"] and not self.flags["respond_lite"] else said
                 )  # its requests met, said as a yes
                 break
         volume = (
@@ -1697,7 +1726,7 @@ class TacticalStrategy(BaselineStrategy):
             return out
         if "call" in f.questions:
             out.append("We would rather settle it here in writing: the options below are ready to sign.")
-        if f.signals & {"price_frozen", "terms_room"}:
+        if f.signals & {"price_frozen", "terms_room"} and not self.flags["respond_lite"]:
             out.append("We understand that your price list stays; the options below move on the terms instead.")
         if any(k == "index_clause" for k, _ in f.conditions) and "index_clause" in neg.case["negotiable"]:
             if sheets and all(sh["terms"].get("index_clause") for sh in sheets):

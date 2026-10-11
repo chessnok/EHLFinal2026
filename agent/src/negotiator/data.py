@@ -10,6 +10,7 @@ one sentence each - the strategy decides which to use.
 import copy
 import csv
 import json
+import logging
 import sqlite3
 import threading
 from dataclasses import dataclass, field
@@ -38,7 +39,11 @@ def _release_root(release: Path | None) -> Path | None:
     if (release / "facts.json").is_file():
         return release
     inner = [d for d in release.glob("*/") if (d / "facts.json").is_file()] if release.is_dir() else []
-    return inner[0] if len(inner) == 1 else None
+    if len(inner) == 1:
+        return inner[0]
+    if release.exists():
+        logging.getLogger(__name__).warning("release folder %s holds no facts.json: the release is NOT loaded", release)
+    return None
 
 
 class WorldData:
