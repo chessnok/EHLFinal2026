@@ -3,7 +3,7 @@
   "checkpoint_id": "ccab7c41f3a9",
   "strategy": "manual-commit",
   "branch": "feat/gen-safety",
-  "checkpoints_count": 1,
+  "checkpoints_count": 4,
   "files_touched": [
     "agent/src/negotiator/strategy/tactical.py"
   ],
@@ -13,13 +13,19 @@
       "transcript": "/cc/ab7c41f3a9/0/full.jsonl",
       "content_hash": "/cc/ab7c41f3a9/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/cc/ab7c41f3a9/1/metadata.json",
+      "transcript": "/cc/ab7c41f3a9/1/full.jsonl",
+      "content_hash": "/cc/ab7c41f3a9/1/content_hash.txt",
+      "prompt": "/cc/ab7c41f3a9/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 650,
+    "cache_creation_tokens": 442527,
+    "cache_read_tokens": 89906073,
+    "output_tokens": 166939,
+    "api_call_count": 313
   }
 }
