@@ -280,8 +280,9 @@ def snap_option(options, value):
 
 # On by default since 11 Oct 09:20 (David's decision): clause_rel_only + cheap_yes (P-49: P01 0.924, P08 0.626,
 # P11 0.710, P18 0.685) and fast_pay (P-50: P05 0.824 -> 0.865). justified_arg is off: alone it lost P01 and P08
-# (P-47), and in the combination P08 fell from 0.626 to 0.571. Switch one off with flag=False.
-DEFAULT_ON = {"clause_rel_only", "cheap_yes", "fast_pay"}
+# (P-47), and in the combination P08 fell from 0.626 to 0.571. no_hedged_series on since 11 Oct 10:15 (P-56: P08
+# 0.626 -> 0.659, the other nine identical). Switch one off with flag=False.
+DEFAULT_ON = {"clause_rel_only", "cheap_yes", "fast_pay", "no_hedged_series"}
 
 
 class TacticalStrategy(BaselineStrategy):
