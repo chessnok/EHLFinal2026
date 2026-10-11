@@ -7,9 +7,11 @@
 | `tactical+ppm_ladder` | P11 | 0.710 | 750,082.50 | 45.50, 300 ppm, chargeback 0, round 4 | 0.710 (`../runs.md` P-54) |
 | `tactical+anchor18` | P08 | **0.670** | 1,018,176.02 | 5.24, 90 days, 24 months, deadband 0 %, round 5 | 0.659 (P-57) |
 | `tactical+owner_offer` | P08 | 0.416 | 1,062,866.95 | 5.47, 90 days, 24 months, deadband 0 %, round 3 | 0.659 (P-57) |
+| `tactical+anchor18` | P18 | 0.532 | 256,557.24 | 5.40, final offer in round 4 | 0.685 (P-57) |
+| `tactical+anchor18` | P05 | 0.522 | 262,700.48 | sup:70250 at 31.00, 9 rounds, 8 arena timeouts | 0.865 (P-57) |
 
-3 of 3 deals. Run cost: 3 practice sessions (329, 328 and 327 left after them), 0 LLM tokens, about 1.5 to 2 minutes
-wall time per session. No LLM, so one run per flag.
+5 of 5 deals. Run cost: 5 practice sessions, 0 LLM tokens, about 1.5 to 2 minutes wall time per session and
+5.5 minutes for P05. No LLM, so one run per flag and case.
 
 What the arena answered:
 
@@ -19,6 +21,10 @@ What the arena answered:
   small step, but we are still quite far apart."
 - **P08, `anchor18`.** First ask 4.96 (control 4.54). Replies 5.41 → 5.44 with a 5 % deadband (alternative 5.39 at
   3 %) → 5.29 → 5.26 → final 5.24, the last three at deadband 0.
+- **P18, `anchor18`** (code `19a72f4`). Replies 5.50 → 5.30 → 5.40 → final 5.40.
+- **P05, `anchor18`** (code `19a72f4`). The arena counted 8 timeouts over the three threads; sup:70210 walked away
+  from a final offer of 28.00 on one of them, sup:70240 walked away in round 4, the deal is sup:70250's 31.00. The
+  score says little about the flag.
 - **P08, `owner_offer`.** The same sheets and the same three verified arguments as the control; the first reply came
   at 5.52 (control 5.40), then 5.49 and final 5.47.
 
@@ -35,4 +41,5 @@ What the arena answered:
 ## Runs
 
 Set practice, the Sunday release loaded (`../runs.md` P-58 to P-60): `20261011-112529-practice-tactical+ppm_ladder`
-(P11), `20261011-112618-practice-tactical+anchor18` (P08), `20261011-112625-practice-tactical+owner_offer` (P08).
+(P11), `20261011-112618-practice-tactical+anchor18` (P08), `20261011-112625-practice-tactical+owner_offer` (P08);
+P-61 and P-62: `20261011-113020-practice-tactical+anchor18` (P18), `20261011-113241-practice-tactical+anchor18` (P05).

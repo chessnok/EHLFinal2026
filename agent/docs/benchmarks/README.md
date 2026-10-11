@@ -125,3 +125,5 @@ Practice with gpt-4o: P11 0.672 (as `tactical`), P08 0.507 (`tactical` 0.550).
 | tactical+ppm_ladder | P11 | 0.710 | 0.710 (P-54) | [record](2026-10-11-tactical-p08-p11-flags-none.md) |
 | tactical+anchor18 | P08 | 0.670 | 0.659 (P-57) | [record](2026-10-11-tactical-p08-p11-flags-none.md) |
 | tactical+owner_offer | P08 | 0.416 | 0.659 (P-57) | [record](2026-10-11-tactical-p08-p11-flags-none.md) |
+| tactical+anchor18 | P18 | 0.532 | 0.685 (P-57) | [record](2026-10-11-tactical-p08-p11-flags-none.md) |
+| tactical+anchor18 | P05 | 0.522 (8 arena timeouts) | 0.865 (P-57) | [record](2026-10-11-tactical-p08-p11-flags-none.md) |
