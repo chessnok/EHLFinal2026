@@ -104,3 +104,47 @@ def test_final_safe_still_sends_back_its_own_cheaper_alternative(tmp_path, world
     d = strategy.decide(neg, sid)
     assert d.kind == "message" and d.rationale["move"] == "take its alternative"
     assert d.message["term_sheets"][0]["terms"]["unit_price"] == 15.2
+
+
+# ---------------------------------------------------------------- own_structures
+def _its_longer_lead_time(tmp_path, world, must_haves=(), **flags):
+    """One supplier: 15.80 at 42 days, or 14.30 at 56 - a value we cannot sign (P05 Hrvelec: 35.00 at 35 days, 31.50
+    at 52 under a 42-day must-have). 49 days, seven over our need, cost us EUR 1,400 in all, 0.04 a unit; at its
+    rate it gives 0.75 for them."""
+    c = rfq(must_haves=list(must_haves))
+    sid = c["suppliers"][0]
+    primary = {"unit_price": 16.0, "payment_days": 60, "lead_time_days": 42}
+    neg = opened(tmp_path, world, {**c, "suppliers": [sid]}, {sid: [primary]})
+    strategy = TacticalStrategy(world, **flags)
+    strategy.prepare(neg)
+    moved = {**primary, "unit_price": 15.8}  # it moves: no stall that would close the thread on its alternative
+    answer(neg, strategy, sid, "open", [moved, {"unit_price": 14.3, "payment_days": 60, "lead_time_days": 56}])
+    return neg, sid, strategy
+
+
+def test_its_own_cheap_lead_time_joins_at_our_cost(tmp_path, world) -> None:
+    from negotiator.strategy.tactical import EQUAL_C
+
+    neg, sid, strategy = _its_longer_lead_time(tmp_path, world, own_structures=True)
+    assert strategy._own_rates(neg, sid) == {"lead_time_days": (42, 56, 1.5)}
+    d = strategy.decide(neg, sid)
+    sheets = [sh["terms"] for sh in d.message["term_sheets"]]
+    assert sheets[1]["lead_time_days"] == 49  # option B: the option nearest to its 56 days
+    cost = [neg.cost(sid, t) for t in sheets]
+    assert max(cost) <= min(cost) * (1 + EQUAL_C)  # every option costs us the same
+    assert sheets[1]["unit_price"] < sheets[0]["unit_price"]
+
+
+def test_without_own_structures_the_menu_keeps_our_lead_time(tmp_path, world) -> None:
+    neg, sid, strategy = _its_longer_lead_time(tmp_path, world)
+    d = strategy.decide(neg, sid)
+    assert all(sh["terms"]["lead_time_days"] <= 42 for sh in d.message["term_sheets"])
+
+
+def test_its_own_structure_snaps_to_what_we_may_sign(tmp_path, world) -> None:
+    must = [{"field": "lead_time_days", "op": "<=", "value": 35}]
+    neg, sid, strategy = _its_longer_lead_time(tmp_path, world, must_haves=must, own_structures=True)
+    d = strategy.decide(neg, sid)
+    sheets = [sh["terms"] for sh in d.message["term_sheets"]]
+    assert all(t["lead_time_days"] <= 35 for t in sheets)
+    assert 35 in {t["lead_time_days"] for t in sheets}
