@@ -2,8 +2,9 @@
 send and every accept, whatever the strategy decided.
 
 Accept:  the sheet is the supplier's current standing offer; it keeps every must-have on the terms
-         it would really close on (sheet, then the supplier's standard terms from its quote PDF) -
-         and a must-have field we cannot read from either counts as broken; C is finite and beats
+         it would really close on (sheet, then the supplier's standard terms from its quote PDF, then
+         its master data for payment and Incoterm) - and a must-have field we cannot read from any
+         of them counts as broken; C is finite and beats
          the alternative - and, when there is one, the cheapest opening too (else the alternative
          scores at least as much).
 Send:    every term sheet carries exactly the negotiable fields with allowed values and keeps the
@@ -34,6 +35,23 @@ def unreadable_must_have_fields(case: dict, terms: dict, standard: dict | None) 
     return [m["field"] for m in case["buyer"].get("must_haves", []) if m["field"] not in known]
 
 
+MASTER_STANDARD = ("payment_days", "incoterm")  # standard terms the supplier master data also carries
+
+
+def closing_standard(neg, supplier_id: str) -> dict:
+    """The supplier's standard terms we close on: its quote PDF, then its master data for a field the PDF does not
+    name (the recorded PDFs of P02, P03, P07, P08 and P10 name neither payment nor Incoterm; where a PDF and the
+    master data both name the payment terms they agree: P01, P05). Without it a must-have on such a field made
+    every accept refused."""
+    std = dict(neg.threads[supplier_id].standard_terms)
+    master = (neg.data.supplier(supplier_id) if neg.data else None) or {}
+    fixed = neg.case.get("fixed_terms") or {}
+    for name in MASTER_STANDARD:
+        if std.get(name) is None and fixed.get(name) is None and master.get(name) is not None:
+            std[name] = master[name]
+    return std
+
+
 def accept_problems(neg, supplier_id: str, term_sheet_id: str | None) -> list[str]:
     """Why accepting this sheet would be a mistake (empty: safe)."""
     t = neg.threads.get(supplier_id)
@@ -47,9 +65,9 @@ def accept_problems(neg, supplier_id: str, term_sheet_id: str | None) -> list[st
     if not terms or terms.get("unit_price") is None:
         problems.append("the standing offer has no price")
         return problems
-    std = t.standard_terms
+    std = closing_standard(neg, supplier_id)
     if missing := unreadable_must_have_fields(neg.case, terms, std):
-        problems.append(f"must-have field(s) {missing} unknown: no quote PDF standard terms")
+        problems.append(f"must-have field(s) {missing} unknown: neither the quote PDF nor the master data")
     if not must_haves_ok(neg.case, terms, std):
         problems.append("breaks a must-have")
     c = neg.cost(supplier_id, terms)
