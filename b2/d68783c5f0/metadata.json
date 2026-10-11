@@ -3,7 +3,7 @@
   "checkpoint_id": "b2d68783c5f0",
   "strategy": "manual-commit",
   "branch": "fix/p01-reanchor",
-  "checkpoints_count": 1,
+  "checkpoints_count": 19,
   "files_touched": [
     "agent/src/negotiator/client.py",
     "agent/tests/test_client.py"
@@ -13,6 +13,12 @@
       "metadata": "/b2/d68783c5f0/0/metadata.json",
       "transcript": "/b2/d68783c5f0/0/full.jsonl",
       "content_hash": "/b2/d68783c5f0/0/content_hash.txt",
+      "prompt": ""
+    },
+    {
+      "metadata": "/b2/d68783c5f0/1/metadata.json",
+      "transcript": "/b2/d68783c5f0/1/full.jsonl",
+      "content_hash": "/b2/d68783c5f0/1/content_hash.txt",
       "prompt": ""
     }
   ],
