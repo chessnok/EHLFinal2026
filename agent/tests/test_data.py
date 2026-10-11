@@ -45,3 +45,14 @@ def test_endpoint_names_hide_ids() -> None:
     assert _endpoint("/v1/sessions/s1/threads/sup:1/messages") == "/v1/sessions/{sid}/threads/{supplier}/messages"
     assert _endpoint("/v1/sessions/s1/attachments/att:1") == "/v1/sessions/{sid}/attachments/{attachment}"
     assert _endpoint("/v1/cases") == "/v1/cases"
+
+
+def test_a_release_unpacked_in_its_own_folder_is_read(world: WorldData, tmp_path) -> None:
+    """The download unpacks the zip's top folder: release-sunday/release-sunday/facts.json."""
+    inner = tmp_path / "release-sunday" / "release-sunday"
+    (inner / "data").mkdir(parents=True)
+    (inner / "facts.json").write_text('{"news:TEST-1": {"kind": "news"}}', encoding="utf-8")
+    for release in (tmp_path / "release-sunday", inner):
+        data = WorldData(world.root, release)
+        assert data.release == inner and "news:TEST-1" in data.facts
+    assert WorldData(world.root, tmp_path / "missing").release is None
