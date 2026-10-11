@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "0af1fafa031d",
+  "strategy": "manual-commit",
+  "branch": "docs/argument-audit",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/docs/TRYED.md",
+    "agent/docs/argument-audit.md",
+    "agent/docs/benchmarks/2026-10-11-tactical-news-none.md",
+    "agent/docs/benchmarks/README.md",
+    "agent/docs/runs.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0a/f1fafa031d/0/metadata.json",
+      "transcript": "/0a/f1fafa031d/0/full.jsonl",
+      "compact_transcript": "/0a/f1fafa031d/0/transcript.jsonl",
+      "content_hash": "/0a/f1fafa031d/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 10541,
+    "cache_read_tokens": 2044852,
+    "output_tokens": 6573,
+    "api_call_count": 7
+  }
+}
