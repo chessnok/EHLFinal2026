@@ -185,6 +185,28 @@ def test_accept_after_a_timeout_takes_the_offer_that_stands(tmp_path) -> None:
     assert len(events(recorder, "accept_retry")) == 1
 
 
+def test_a_worker_accept_on_an_offer_that_changed_meanwhile_is_decided_again(tmp_path) -> None:
+    """A timeout answer read in by another thread's call changes the offer while a worker decides to accept: the
+    accept named the old offer, the guard would refuse it and the case would end with a walk-away. It decides
+    again on the new offer instead."""
+
+    class AcceptStale(Stepper):
+        calls = 0
+
+        def decide(self, neg, sid):
+            t = neg.threads[sid]
+            self.calls += 1
+            if self.calls == 1:
+                t.version += 1  # as `_sync_thread` does when it reads a timeout answer
+                return Decision("accept", sid, term_sheet_id="offer:stale", rationale={"why": "agreed"})
+            return Decision("accept", sid, term_sheet_id=t.standing[0], rationale={"why": "agreed"})
+
+    arena = FakeArena(rfq("sup:A"), {"sup:A": 0.05}, limit_s=LIMIT_S)
+    strategy = AcceptStale()
+    outcome, recorder, _ = play(tmp_path, arena, strategy)
+    assert outcome["deal"] and strategy.calls == 2
+
+
 def test_a_reply_that_arrives_late_is_followed_by_the_arena_state(tmp_path) -> None:
     """Sandbox, 11 October: a POST hung, its retry returned the reply of round 2 after 181 s - the arena was
     at round 4 by then, two timeouts later. The reply is old news: the thread is read again."""

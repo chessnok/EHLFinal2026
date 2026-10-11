@@ -126,6 +126,10 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
                     raise
                 continue
             if decision.kind in ("accept", "walk_away"):
+                if neg.closing.is_set():
+                    return  # the close compares what stands at the arena now (`conclude`)
+                if t.version != basis:
+                    continue  # its offer changed while we decided (a timeout answer): decide on the new one
                 _apply(neg, decision)
                 return
             held[sid] = decision
