@@ -139,3 +139,9 @@ Our nine local P08 sessions: first replies 5.41 to 6.10, lowest supplier offer 5
 
 Only P05's free-capacity item argues for a lower price; it is the one case in the hosted set where the type could
 be cited to our advantage, and D02 is where it can be tried without quota.
+
+## 6. Measured after the audit
+
+`tactical+news` on sandbox D02 (`runs.md` S-35 to S-38, [record](benchmarks/2026-10-11-tactical-news-none.md)): the
+arena reads the type `news`; cited to the bidder it is about it is `verified` and "taken into account" (D02 0.587 →
+0.713, four of four runs), cited to the other bidder it is `irrelevant`. Not played on practice.

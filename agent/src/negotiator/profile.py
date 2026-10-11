@@ -75,6 +75,7 @@ PATTERNS: dict[str, list[str]] = {
 }
 NEWS_TOPICS = {
     "short_time_work": ["cash_short", "underutilised"],
+    "free_capacity": ["underutilised"],
     "restructuring": ["cash_short"],
     "refocus": ["wants_volume"],
     "full_order_book": ["full_order_book"],

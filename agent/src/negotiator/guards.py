@@ -87,6 +87,8 @@ def known_id(neg, ref: str) -> bool:
         return True
     if ref in (neg.case.get("facts") or {}):
         return True
+    if ref in (neg.case.get("refs") or []):
+        return True  # the case file names it itself (the sandbox's demo facts are in no package)
     return any(
         s.get("term_sheet_id") == ref
         for t in neg.threads.values()

@@ -41,7 +41,8 @@ from negotiator.groundtruth import GroundTruth, estimate
 from negotiator.guards import accept_problems
 from negotiator.ledger import CITED_DRIVER, argument_key, arguments_read, data_facts, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
-from negotiator.profile import SupplierProfile, build_profile
+from negotiator.profile import COMPILED as TRAIT_PATTERNS
+from negotiator.profile import NEWS_TOPICS, SupplierProfile, build_profile
 from negotiator.session import Negotiation
 from negotiator.strategy.base import Decision
 from negotiator.strategy.baseline import SIGNATURE, BaselineStrategy, describe
@@ -231,6 +232,8 @@ FLAGS: dict[str, str] = {
     "the first e-mail for a later round; a bundle's orders per part",
     "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
     "12), not only one ending at the latest month; one per series",
+    "news": "from round 2 one press report about the supplier's idle capacity (or the case's own news item), cited "
+    "by ID next to the round's other arguments - the one checkable kind we never cited (docs/argument-audit.md)",
 }
 
 
@@ -281,6 +284,8 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief = FloorBelief(neg.case, terms, thread.standard_terms, gt.lower, rate)
                 plan.belief.ppm = profile.ppm  # scorecard ppm: what a chargeback really costs it
             plan.evidence = self._evidence(neg, sid, terms.get("unit_price"), current) if terms else []
+            if self.flags["news"] and terms:
+                plan.evidence += self._news_evidence(neg, sid, profile)
             body = thread.latest.get("body") or ""
             clauses = [o for o in neg.case.get("term_options", {}).get("index_clause") or [] if o]
             if "index_clause" in neg.case["negotiable"] and any(o.get("series") in body for o in clauses):
@@ -1488,6 +1493,15 @@ class TacticalStrategy(BaselineStrategy):
             if checkable >= 2:
                 limit = min(limit, max(min(2, checkable - 1), checkable - 3))
         picked = select(limit)
+        if self.flags["news"] and not first and len(picked) < 3 and all(e.kind != "news" for e in picked):
+            # beside the round's arguments, not in place of one: the arena reads up to three per message
+            report = next(
+                (e for e in plan.evidence if e.kind == "news" and e.sentence not in plan.used_sentences), None
+            )
+            # a case's own item names no supplier: each bidder is asked once, `irrelevant` bans it for that one
+            open_ref = report is not None and (report.meta or {}).get("any_supplier")
+            if report and "news" not in banned and (open_ref or not set(report.refs) & self.used_refs):
+                picked.append(report)
         for e in picked:
             plan.used_sentences.add(e.sentence)
         plan.figures_reply, plan.figures_asked = (
@@ -1500,6 +1514,32 @@ class TacticalStrategy(BaselineStrategy):
             else:
                 self.used_refs.update(e.refs)
         return picked
+
+    def _news_evidence(self, neg, sid: str, profile) -> list[Evidence]:
+        """Press reports the arena can check ("that it is about this supplier", api.md): the ones that show idle
+        capacity (the package's, read by the profile, and a hidden case's own facts), and a news item the case
+        points to without its text (the sandbox). D02: verified, 14.50 -> 13.90 (runs.md S-37, S-38)."""
+        idle = [r for r in profile.traits.get("underutilised", []) if r.startswith("news:")]
+        for ref, fact in self.data.facts.items():
+            if not ref.startswith("news:") or fact.get("supplier") != sid or ref in idle:
+                continue
+            headline = fact.get("headline") or ""
+            if "underutilised" in NEWS_TOPICS.get(fact.get("topic") or "", []) or any(
+                p.search(headline) for p in TRAIT_PATTERNS["underutilised"]
+            ):
+                idle.append(ref)
+        out = []
+        for ref in idle:
+            headline = (self.data.fact(ref) or {}).get("headline")
+            if headline:
+                sentence = f'The trade press reports: "{headline}" ({ref}).'
+                out.append(Evidence(kind="news", refs=[ref], sentence=sentence, meta={"later": True}))
+        for ref in neg.case.get("refs") or []:
+            if ref.startswith("news:") and not self.data.fact(ref):
+                sentence = f"We have read the press report on your company ({ref})."
+                meta = {"later": True, "any_supplier": True}
+                out.append(Evidence(kind="news", refs=[ref], sentence=sentence, meta=meta))
+        return out
 
     def _write(self, neg, plan: Plan, sheets: list[dict], claims: list[Evidence], probe: bool) -> dict:
         p, case = plan.profile, neg.case

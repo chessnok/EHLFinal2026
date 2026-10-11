@@ -110,3 +110,10 @@ Practice with gpt-4o: P11 0.672 (as `tactical`), P08 0.507 (`tactical` 0.550).
 | tactical+fresh_args | 0.721 | 0.528 | 0.733 | 0.661 | [record](2026-10-11-tactical-flags-b-none.md) |
 | tactical+all_windows | 0.753 | 0.528 | 0.733 | 0.671 | [record](2026-10-11-tactical-flags-b-none.md) |
 | tactical+cheap_alt (now default) | 0.740 | 0.560 | 0.733 | 0.678 | [record](2026-10-11-tactical-flags-b-none.md) |
+
+## 2026-10-11 · sandbox (D01, D02) · no LLM · the `news` flag
+
+| Strategy | D01 | D02 | Mean | Record |
+|---|---|---|---|---|
+| tactical (control) | 0.669 (S-29) | 0.587 | 0.628 | [record](2026-10-11-tactical-news-none.md) |
+| tactical+news | 0.669 | 0.713 | 0.691 | [record](2026-10-11-tactical-news-none.md) |
