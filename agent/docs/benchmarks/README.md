@@ -110,3 +110,13 @@ Practice with gpt-4o: P11 0.672 (as `tactical`), P08 0.507 (`tactical` 0.550).
 | tactical+fresh_args | 0.721 | 0.528 | 0.733 | 0.661 | [record](2026-10-11-tactical-flags-b-none.md) |
 | tactical+all_windows | 0.753 | 0.528 | 0.733 | 0.671 | [record](2026-10-11-tactical-flags-b-none.md) |
 | tactical+cheap_alt (now default) | 0.740 | 0.560 | 0.733 | 0.678 | [record](2026-10-11-tactical-flags-b-none.md) |
+
+## 2026-10-11 · practice · no LLM · generalisation flags
+
+| Strategy | Cases | Scores | Record |
+|---|---|---|---|
+| tactical+final_safe (now default) | P05 | 0.865 | [record](2026-10-11-tactical-gen-flags-none.md) |
+| tactical+own_structures | P05 | 0.865 | [record](2026-10-11-tactical-gen-flags-none.md) |
+| tactical+late_facts | P07, P08, P18, P05 | 0.734, 0.593, 0.685, 0.865 | [record](2026-10-11-tactical-gen-flags-none.md) |
+| tactical+no_q1 | P08, P18 | 0.582, 0.542 | [record](2026-10-11-tactical-gen-flags-none.md) |
+| tactical+hide_own_cost | P01, P02, P03, P10 | 0.871, 0.599, 0.923, 0.633 | [record](2026-10-11-tactical-gen-flags-none.md) |
