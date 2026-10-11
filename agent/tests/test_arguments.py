@@ -185,7 +185,7 @@ def test_all_windows_cites_a_series_once_per_supplier(tmp_path, world) -> None:
     assert all("idx:TA" not in r for e in picked for r in e.refs)  # another window of TA is a duplicate
 
 
-# ---------------------------------------------------------------- its cheaper alternative sheet (`cheap_alt`)
+# ---------------------------------------------------------------- its cheaper alternative sheet
 def _with_alternative(tmp_path: Path, world: WorldData, alternative: dict, **flags):
     neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.0, "payment_days": 14})
     strategy = TacticalStrategy(world, **flags)
@@ -203,21 +203,19 @@ def _with_alternative(tmp_path: Path, world: WorldData, alternative: dict, **fla
     return neg, sid, strategy, strategy.tplans[sid]
 
 
-def test_cheap_alt_takes_an_alternative_under_the_old_bar(tmp_path, world) -> None:
+def test_an_alternative_under_the_old_bar_is_taken(tmp_path, world) -> None:
     alternative = {"unit_price": 16.98, "payment_days": 14}
-    neg, sid, old, plan = _with_alternative(tmp_path / "old", world, alternative)
+    neg, sid, new, plan = _with_alternative(tmp_path, world, alternative)
     saving = neg.cost(sid, {"unit_price": 17.0, "payment_days": 14}) - neg.cost(sid, alternative)
-    assert 0 < saving < 0.002 * neg.cost(sid, alternative)  # under 0.2 % of C: the old rule passes it over
-    assert old._take_alternative(neg, sid, plan) is None
-    neg, sid, new, plan = _with_alternative(tmp_path / "new", world, alternative, cheap_alt=True)
+    assert 0 < saving < 0.002 * neg.cost(sid, alternative)  # under 0.2 % of C: the old rule passed it over
     assert saving > new._alt_margin(neg, plan, neg.cost(sid, alternative))
     taken = new._take_alternative(neg, sid, plan)
     assert taken and taken.message["term_sheets"][0]["terms"]["unit_price"] == 16.98
 
 
-def test_cheap_alt_needs_the_completed_sheet_to_be_cheaper(tmp_path, world) -> None:
+def test_an_alternative_needs_the_completed_sheet_to_be_cheaper(tmp_path, world) -> None:
     # without payment terms the alternative closes on the standard 30 days and looks cheaper; the sheet we would
     # send for it takes the primary's 14 days and is the primary offer again
-    neg, sid, strategy, plan = _with_alternative(tmp_path, world, {"unit_price": 17.0}, cheap_alt=True)
+    neg, sid, strategy, plan = _with_alternative(tmp_path, world, {"unit_price": 17.0})
     assert neg.cost(sid, {"unit_price": 17.0}) < neg.cost(sid, {"unit_price": 17.0, "payment_days": 14}) - 100
     assert strategy._take_alternative(neg, sid, plan) is None

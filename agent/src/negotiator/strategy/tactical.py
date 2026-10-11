@@ -98,7 +98,7 @@ MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D0
 # without a cost estimate, anchor this far under the reference price (baseline v2's sandbox-tested depths)
 GUESS_ANCHOR = {"leverage": 0.18, "routine": 0.12, "quality_first": 0.10, "stabilise": 0.06, "secure_supply": 0.05}
 UNDER_FLOOR = 0.02  # the first ask sits this far under the supplier's estimated floor
-ALT_ROOM_SHARE = 0.001  # cheap_alt: its alternative must save this share of the room ...
+ALT_ROOM_SHARE = 0.001  # its alternative must save this share of the room ...
 ALT_MIN_EUR = 10.0  # ... and at least this much: below it a rounding of the sheet decides
 # what a supplier's e-mail says between the lines (the replay of case:D01/D02 showed both kinds)
 ROOM_SIGNALS = re.compile(
@@ -231,8 +231,6 @@ FLAGS: dict[str, str] = {
     "the first e-mail for a later round; a bundle's orders per part",
     "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
     "12), not only one ending at the latest month; one per series",
-    "cheap_alt": "take its alternative sheet when it saves 0.1 % of the room (not 0.2 % of C), and only when the sheet "
-    "we send for it still costs less than its primary one",
 }
 
 
@@ -890,8 +888,10 @@ class TacticalStrategy(BaselineStrategy):
         if not best_id or best_id == primary_id or best_id in plan.alternatives_taken or not self._may_push(neg, sid):
             return None
         best_c, primary_c = neg.cost(sid, best), neg.cost(sid, primary)
-        margin = self._alt_margin(neg, plan, primary_c) if self.flags["cheap_alt"] else 0.0
-        if best_c >= (primary_c - margin if self.flags["cheap_alt"] else primary_c * (1 - 0.002)):
+        # 0.1 % of the room, not 0.2 % of C: P08's 5 % deadband alternative saved 0.16 % of C and was passed over;
+        # taken, P08 0.550 -> 0.560 (runs.md P-34 to P-41)
+        margin = self._alt_margin(neg, plan, primary_c)
+        if best_c >= primary_c - margin:
             return None
         # only when we would close anyway - in round 1 its alternative is an opening, not a deal (P18 dry run)
         closing = (
@@ -917,7 +917,7 @@ class TacticalStrategy(BaselineStrategy):
                 return None
         if not neg.keeps_must_haves(sid, sheet) or neg.cost(sid, sheet) >= neg.c_alt:
             return None
-        if self.flags["cheap_alt"] and neg.cost(sid, sheet) >= primary_c - margin:
+        if neg.cost(sid, sheet) >= primary_c - margin:
             return None  # completed with its standard terms, the sheet no longer beats its primary offer
         plan.alternatives_taken.add(best_id)
         plan.our_c.append(neg.cost(sid, sheet))
