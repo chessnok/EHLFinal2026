@@ -223,9 +223,12 @@ def play_final(
         while len(closed) < waves or not all(f.done() for f in started.values()):
             try:
                 cases = client.cases("final")
-            except ArenaError as e:
-                if e.status != 403:  # 403: no wave yet
-                    raise
+            except Exception as e:
+                if not (isinstance(e, ArenaError) and e.status == 403):  # 403: no wave yet
+                    # 5xx, transport error, ...: the poll loop must never die - a case it misses has no deal
+                    _poll_failed(recorder, e)
+                    time.sleep(poll)
+                    continue
                 cases = []
             for case in cases:
                 wave = case.get("wave")
@@ -261,3 +264,10 @@ def play_final(
         except Exception as e:
             out.append({"case_id": case_id, "error": repr(e)})
     return out
+
+
+def _poll_failed(recorder: Recorder, error: Exception) -> None:
+    """A failed read of the final's case list (5xx, transport error): logged, and polled again."""
+    status = error.status if isinstance(error, ArenaError) else None
+    recorder.event("final_poll_failed", status=status, error=repr(error))
+    log.warning("final: reading the case list failed (%s) - polling again", error)
