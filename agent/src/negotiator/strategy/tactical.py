@@ -234,6 +234,9 @@ FLAGS: dict[str, str] = {
     "clause it must have kept, no 'pays early' that is not",
     "fresh_args": "never an argument the arena already counted (one per kind, index series, part); one held back from "
     "the first e-mail for a later round; a bundle's orders per part",
+    "clause_rel_only": "an index series named in its quote counts as a request for a clause only with a strategic "
+    "goal (P02, what it was built for); in leverage the clause options in round 1 cost P08 0.066 and P18 0.067 "
+    "(b3f06da against 11c, same first e-mail otherwise)",
     "respond_lite": "every question of its last e-mail answered and every fixed lever said honestly, but no "
     "structure given away (P-42: yes to its start date cost P01 0.14)",
     "respond_all": "every question, condition, wish and signal of its last e-mail is taken up (reply_parser): "
@@ -300,7 +303,12 @@ class TacticalStrategy(BaselineStrategy):
             plan.evidence = self._evidence(neg, sid, terms.get("unit_price"), current) if terms else []
             body = thread.latest.get("body") or ""
             clauses = [o for o in neg.case.get("term_options", {}).get("index_clause") or [] if o]
-            if "index_clause" in neg.case["negotiable"] and any(o.get("series") in body for o in clauses):
+            relationship_only = self.flags["clause_rel_only"] and goal not in RELATIONSHIP_GOALS
+            if (
+                "index_clause" in neg.case["negotiable"]
+                and any(o.get("series") in body for o in clauses)
+                and not relationship_only
+            ):
                 # it argues its price with the very index a clause would follow: the clause answers it. P02's
                 # supplier dropped its price by 15-22 for one and never went under 372.96 without (P-13, P-15, P-19)
                 plan.requests.add("index_clause")
