@@ -247,8 +247,8 @@ FLAGS: dict[str, str] = {
     "error was up to +3.5 %; D01 fell 0.969 -> 0.669 with it)",
     "rel_anchor4": "strategic suppliers keep the 4 % first ask even when their margin charge is estimated (the 10 % "
     "ask of 11c: D01 0.969 -> 0.669, P01 0.946 -> 0.901, P10 0.663 -> 0.647); the charge stays in C",
-    "fast_pay": "it asked for faster payment and no option pays at 14 days: a 14-day option joins at option A's C "
-    "(P05 0.824 -> 0.865)",
+    "fast_pay": "it asked for faster payment and no option pays at the shortest term allowed (14 days): such an "
+    "option joins at option A's C (P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
     "no_hedged_series": "a hedged supplier hears no argument on the series a clause option follows (P08 "
@@ -1746,13 +1746,20 @@ class TacticalStrategy(BaselineStrategy):
         return picked
 
     def _fast_pay(self, neg: Negotiation, sid: str, plan: Plan, out: list[dict], their_c: float) -> list[dict]:
-        """It asked for faster payment and no option pays at 14 days: one that does joins, at the same C as option A.
+        """It asked for faster payment and no option pays at the shortest term the case allows (14 days in every
+        practice case): one that does joins, at the same C as option A.
         It costs us ~0.10 EUR a unit for 16 days; P05's 70210 gave 0.50 for it ("I can drop the price to 27.50 for
         14 days payment": 0.824 -> 0.865)."""
-        options = neg.case.get("term_options", {}).get("payment_days") or []
-        if not out or "payment_days" not in neg.case["negotiable"] or "payment_days" not in plan.requests:
+        options = [o for o in neg.case.get("term_options", {}).get("payment_days") or [] if isinstance(o, int | float)]
+        if (
+            not out
+            or not options
+            or "payment_days" not in neg.case["negotiable"]
+            or "payment_days" not in plan.requests
+        ):
             return out
-        if 14 not in options or any((sh["terms"].get("payment_days") or 999) <= 14 for sh in out):
+        fastest = min(options)  # the shortest term the case allows (14 days in every practice case)
+        if any((sh["terms"].get("payment_days") or 999) <= fastest for sh in out):
             return out
         if len(neg.threads) < 2:
             return out  # measured to win only in an RFQ (P05 +0.041); alone it lost P08 0.055 and P07 0.012 (P-51)
@@ -1761,7 +1768,7 @@ class TacticalStrategy(BaselineStrategy):
                 out  # under a margin charge the 14-day option prices high and pulls its price up (P01 0.943 -> 0.818)
             )
         a = out[0]["terms"]
-        base = complete_offer(neg.case, {**a, "payment_days": 14})
+        base = complete_offer(neg.case, {**a, "payment_days": fastest})
         base["unit_price"] = self._iso_cost_price(neg, sid, base, neg.cost(sid, a))
         if base["unit_price"] > a["unit_price"]:
             return out  # never an option dearer than A: it anchors its price up

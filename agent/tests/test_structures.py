@@ -148,3 +148,28 @@ def test_its_own_structure_snaps_to_what_we_may_sign(tmp_path, world) -> None:
     sheets = [sh["terms"] for sh in d.message["term_sheets"]]
     assert all(t["lead_time_days"] <= 35 for t in sheets)
     assert 35 in {t["lead_time_days"] for t in sheets}
+
+
+# ---------------------------------------------------------------- fast_pay
+def _asks_for_faster_payment(tmp_path, world, payment_options):
+    c = rfq()
+    c["term_options"]["payment_days"] = payment_options
+    a, b = c["suppliers"]
+    sheet = {"unit_price": 16.0, "payment_days": 60, "lead_time_days": 42}
+    neg = opened(tmp_path, world, c, {a: [sheet], b: [{**sheet, "unit_price": 15.0}]})
+    strategy = TacticalStrategy(world)  # fast_pay is on by default
+    strategy.prepare(neg)
+    said = (
+        "We see your figures, but we cannot give up margin right now. Faster payment would help us more than anything."
+    )
+    answer(neg, strategy, a, "open", [{**sheet, "unit_price": 15.8}], body=said)
+    return neg, a, strategy
+
+
+def test_fast_pay_offers_the_shortest_term_the_case_allows(tmp_path, world) -> None:
+    for options, fastest in (([14, 30, 45, 60, 90], 14), ([7, 30, 60, 90], 7)):
+        neg, sid, strategy = _asks_for_faster_payment(tmp_path, world, options)
+        d = strategy.decide(neg, sid)
+        days = [sh["terms"]["payment_days"] for sh in d.message["term_sheets"]]
+        assert fastest in days, (options, days)
+        assert all(day in options for day in days)
