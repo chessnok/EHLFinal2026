@@ -8,8 +8,8 @@ about where the supplier stops and a model of how the arena's suppliers answer:
             with the error that estimate has shown, never above its standing offer;
   response  to our next ask (pooled over every supplier of the tuning cases, 828 recorded replies; the held-out
             cases P02, P03 and P18 are not in the tables - `RESPONSE` below):
-              - it gives a share of its room to S that depends on how much of the distance between us our ask
-                closes: next to nothing for a crumb, the most from a tenth of the distance on;
+              - it gives a share of its room to S that depends on how large our step is against that room: next
+                to nothing for a crumb, the most from a quarter of its room on;
               - it calls its offer final with a chance that depends on the number of the reply;
               - if our ask reaches what it would have offered, it agrees to our ask - our concession is taken;
               - after a final offer a further sheet moves it a little or makes it walk away.
@@ -21,17 +21,18 @@ the tables are the arena's habits, the belief is this supplier's.
 
 import math
 
-# share of the distance between our last ask and its offer that our next ask closes -> (up to this share, the
-# share of its room to S it then gives). Tuning cases, replies to an open thread that were no agreement:
-# under 2 %: 0.133 (n 153), 2-10 %: 0.158 (n 191), 10-25 %: 0.309 (n 156), 25-50 %: 0.336 (n 32), over: 0.316 (n 22)
-RESPONSE = ((0.02, 0.13), (0.10, 0.16), (math.inf, 0.31))
+# our step as a share of its room to S -> (up to this share, the share of that room it then gives). Tuning cases,
+# replies to an open thread that were no agreement: under 2 %: 0.105 (n 122), 2-10 %: 0.149 (n 146), 10-25 %:
+# 0.194 (n 122), 25-50 %: 0.382 (n 74), 50-100 %: 0.322 (n 75). Keyed on the share of the distance between us
+# instead (a first version: full response from a tenth of it), practice answered the small steps with early final
+# offers (runs.md P-58: P18 0.532, P08 0.571).
+RESPONSE = ((0.02, 0.10), (0.10, 0.15), (0.25, 0.19), (math.inf, 0.35))
 PENDING_GIVES = 0.55  # the second half of a step it had approved ("pending", n 61): whatever we send
 # its reply number n (to our n-th e-mail) is a final offer: 0.04, 0.03, 0.40, 0.81, 0.88 (n 253, 221, 205, 116, 17)
 FINAL_BY_REPLY = (0.04, 0.03, 0.40, 0.81, 0.88, 1.0)
 AFTER_FINAL_GIVES = 0.07  # a sheet sent after its final offer: mean share of its room it still gave (n 79) ...
 AFTER_FINAL_WALKS = 0.16  # ... and how often it walked away
-STEPS = (0.02, 0.05, 0.10, 0.15, 0.25, 0.40, 0.60)  # candidate shares of the distance to close
-CONTINUE = 0.10  # ... and the share the rounds after this one are played with: where its full step begins
+STEPS = (0.02, 0.05, 0.10, 0.15, 0.25, 0.40, 0.60)  # candidate shares of the distance between us to close
 # the stop estimate's error as a share of C, by replies seen (reading.py `_update_upper`: within 8 % before the
 # first reply, 1-3 % by rounds 3-4), and on which side it erred (too high: backlog.md 2.2)
 STOP_ERROR = (0.08, 0.05, 0.03, 0.02)
@@ -40,8 +41,8 @@ QUANTILES = ((-1.5, 0.13), (-0.75, 0.24), (0.0, 0.26), (0.75, 0.24), (1.5, 0.13)
 WORTH_A_ROUND = 0.002  # a round is played for an expected gain of at least this share of the room
 
 
-def gives(share_closed: float) -> float:
-    return next(g for upto, g in RESPONSE if share_closed < upto)
+def gives(step_of_room: float) -> float:
+    return next((g for upto, g in RESPONSE if step_of_room < upto), RESPONSE[-1][1])
 
 
 def stops(stop_c: float, their_c: float, target_c: float, replies: int) -> list[tuple[float, float]]:
@@ -54,23 +55,26 @@ def stops(stop_c: float, their_c: float, target_c: float, replies: int) -> list[
 
 
 def played(their_c: float, ask: float, stop: float, step: float, reply: int, rounds: int, pending: bool) -> float:
-    """Expected C when our next ask closes `step` of the distance and every later one `CONTINUE`, against a
-    supplier that stops at `stop`."""
+    """Expected C when every ask from here closes `step` of the distance between us, against a supplier that
+    stops at `stop`."""
     if rounds <= 0:
         return their_c
-    ask = ask + step * (their_c - ask)
+    moved = step * (their_c - ask)
+    ask = ask + moved
     room = max(0.0, their_c - stop)
-    offer = their_c - (PENDING_GIVES if pending else gives(step)) * room
+    offer = their_c - (PENDING_GIVES if pending else gives(moved / room if room > 0 else math.inf)) * room
     if ask >= offer:
         return ask  # our ask reaches what it would have offered: it agrees to ours
     final = FINAL_BY_REPLY[min(reply, len(FINAL_BY_REPLY) - 1)]
-    return final * offer + (1 - final) * played(offer, ask, stop, CONTINUE, reply + 1, rounds - 1, False)
+    return final * offer + (1 - final) * played(offer, ask, stop, step, reply + 1, rounds - 1, False)
 
 
 def best_step(their_c: float, ask: float, belief: list[tuple[float, float]], reply: int, rounds: int,
               pending: bool = False) -> tuple[float | None, dict]:  # fmt: skip
     """The share of the distance to close with the lowest expected C - None: take its offer. On a tie the smaller
     step: what we do not concede cannot be taken. Returns the expected C of every candidate too."""
+    if pending:  # the rest of its step comes whatever we send: the smallest visible move, nothing to weigh
+        return min(STEPS), {min(STEPS): their_c - PENDING_GIVES * sum(w * (their_c - s) for s, w in belief)}
     expected = {
         step: sum(w * played(their_c, ask, stop, step, reply, rounds, pending) for stop, w in belief) for step in STEPS
     }
