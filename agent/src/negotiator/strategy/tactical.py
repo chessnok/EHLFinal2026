@@ -249,6 +249,8 @@ FLAGS: dict[str, str] = {
     "(P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
+    "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
+    "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
     "it asks, where it asks at least 1 point more",
     "menu_fallback": "under a margin charge, where the price on the lower side of the C minimum is not below its "
@@ -413,6 +415,8 @@ class TacticalStrategy(BaselineStrategy):
             if self.flags["fresh_args"]:
                 out += self.data.evidence_orders_per_part(parts, sid)
             out += data_facts(self.data, parts, all_windows=self.flags["all_windows"])
+            if self.flags["double_count"]:
+                out += self._double_count(neg, sid)
             if self.flags["fresh_claims"]:
                 later = self.data.evidence_complaints(parts, sid, since="2025-10-01")
                 if open_price and not any(e.kind == "should_cost" for e in out):
@@ -792,6 +796,26 @@ class TacticalStrategy(BaselineStrategy):
         if granted:
             words = " and ".join(f"{FIELD_WORDS.get(f, f.replace('_', ' '))} {v}" for f, v in granted)
             plan.yes_line = f"Yes to {words}, as you asked - at the same price."
+        return out
+
+    def _double_count(self, neg: Negotiation, sid: str) -> list[Evidence]:
+        """Our framework agreement with this supplier already indexes the price to a series its quote names as a cost
+        driver: a surcharge on top counts that rise twice (P08: ctr:4600070710#3.2 ties 45 % to AS-14404, and its
+        quote asks +11 % citing AS-14404). A fact from our own contract it may not have in view."""
+        body = (neg.threads[sid].messages[0].get("body") or "") if neg.threads[sid].messages else ""
+        facts = parse_reply(body)
+        cited = set(facts.drivers) | {m[0] for m in facts.driver_moves}
+        out = []
+        for ref, f in self.data.facts.items():
+            if not (ref.startswith("ctr:") and isinstance(f, dict) and f.get("type") == "index"):
+                continue
+            if f.get("supplier") == sid and f.get("series") in cited:
+                share = f.get("material_share") or 0
+                sentence = (
+                    f"Our framework agreement already ties {share:.0%} of the price to {f['series']} ({ref}): "
+                    "a surcharge for the same material would count its rise twice."
+                )
+                out.append(Evidence(kind="contract_index", refs=[ref], sentence=sentence, strength=6.0))
         return out
 
     @staticmethod
