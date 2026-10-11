@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "d0e81b387cfb",
+  "strategy": "manual-commit",
+  "branch": "fix/final-robustness",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/src/negotiator/ledger.py",
+    "agent/src/negotiator/strategy/tactical.py",
+    "agent/tests/test_arguments.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d0/e81b387cfb/0/metadata.json",
+      "transcript": "/d0/e81b387cfb/0/full.jsonl",
+      "content_hash": "/d0/e81b387cfb/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
