@@ -3,7 +3,7 @@
   "checkpoint_id": "f0cf7421bc4c",
   "strategy": "manual-commit",
   "branch": "docs/gameplan-tag-c",
-  "checkpoints_count": 1,
+  "checkpoints_count": 5,
   "files_touched": [
     "agent/docs/gameplan-2026-10-11.md",
     "agent/docs/runs.md"
@@ -14,13 +14,19 @@
       "transcript": "/f0/cf7421bc4c/0/full.jsonl",
       "content_hash": "/f0/cf7421bc4c/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/f0/cf7421bc4c/1/metadata.json",
+      "transcript": "/f0/cf7421bc4c/1/full.jsonl",
+      "content_hash": "/f0/cf7421bc4c/1/content_hash.txt",
+      "prompt": "/f0/cf7421bc4c/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 38,
+    "cache_creation_tokens": 12086,
+    "cache_read_tokens": 5572262,
+    "output_tokens": 7112,
+    "api_call_count": 19
   }
 }
