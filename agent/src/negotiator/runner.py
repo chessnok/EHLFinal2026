@@ -31,6 +31,11 @@ from negotiator.telemetry import Recorder, log
 KEEPALIVE_AFTER_S = 20.0
 CLOSE_BEFORE_DEADLINE_S = 90.0
 POLL_S = 0.5
+# Opening a case with a deadline (the final) is tried again after a 429 (too many open sessions), a 5xx or a
+# transport error, with a growing pause, while this much of the cap is left: a case never opened has no deal.
+OPEN_RETRY_STATUS = {0, 429, 500, 502, 503, 504}
+OPEN_MIN_LEFT_S = 60.0
+OPEN_PAUSE_S = (2.0, 15.0)  # first pause, longest pause
 
 StrategyFactory = Callable[[], Strategy]
 
@@ -53,7 +58,7 @@ def play_case(
             strategy.before_open(case)
     neg = Negotiation(client, recorder, data, strategy_name=strategy.name)
     neg.deadline = deadline() if callable(deadline) else deadline
-    neg.open(case_id, case)
+    _open(neg, case_id, case, deadline)
     if neg.ended.is_set():  # resumed a case that had already ended
         return neg.finalize()
     try:
@@ -69,6 +74,26 @@ def play_case(
             except Exception:
                 log.exception("%s: could not close", case_id)
     return neg.finalize()
+
+
+def _open(neg: Negotiation, case_id: str, case: dict | None, deadline) -> None:
+    """Open the case; with a deadline, try again on an error that may pass. A session that did open answers
+    the next try with 409 and is resumed (`Negotiation.open`), so a retry never opens a case twice."""
+    pause, longest = OPEN_PAUSE_S
+    while True:
+        try:
+            neg.open(case_id, case)
+            return
+        except ArenaError as e:
+            cap = deadline() if callable(deadline) else deadline
+            if cap is None or e.status not in OPEN_RETRY_STATUS or e.quota_used_up:
+                raise
+            if cap - time.time() - pause < OPEN_MIN_LEFT_S:  # too late for a negotiation: the wave is lost
+                raise
+            neg.recorder.event("open_retry", case_id=case_id, status=e.status, detail=str(e.detail), pause=pause)
+            log.warning("%s: opening failed (%s) - trying again in %.0f s", case_id, e, pause)
+            time.sleep(pause)
+            pause = min(pause * 2, longest)
 
 
 def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:

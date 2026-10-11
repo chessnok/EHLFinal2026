@@ -12,6 +12,7 @@ import pytest
 from fake_arena import FakeArena
 
 from negotiator import runner, session
+from negotiator.client import ArenaError
 from negotiator.config import REPO_ROOT
 from negotiator.runner import play_case
 from negotiator.session import Negotiation, thread_messages, timeouts_by_supplier
@@ -74,9 +75,9 @@ class Stepper:
         return {"subject": "Your quote", "body": "Could you confirm the validity of your offer?"}
 
 
-def play(tmp_path: Path, arena: FakeArena, strategy: Stepper) -> tuple[dict, Recorder, dict]:
+def play(tmp_path: Path, arena: FakeArena, strategy: Stepper, deadline=None) -> tuple[dict, Recorder, dict]:
     recorder = Recorder(tmp_path, "timeouts")
-    outcome = play_case(arena, recorder, arena.case["case_id"], lambda: strategy)  # type: ignore[arg-type]
+    outcome = play_case(arena, recorder, arena.case["case_id"], lambda: strategy, deadline=deadline)  # type: ignore[arg-type]
     recorder.close()
     saved = json.loads((recorder.dir / "sessions" / "fake1.json").read_text(encoding="utf-8"))
     return outcome, recorder, saved
@@ -205,6 +206,55 @@ def test_walk_away_goes_through_a_thread_that_is_still_open(tmp_path) -> None:
     neg.walk_away("sup:A", {"why": "test"})
     assert arena.status == "ended" and arena.end_reason == "walked_away"
     assert arena.calls[-1] == ("walk_away", "sup:B")
+
+
+# ---------------------------------------------------------------- opening in the final
+def failing_open(arena: FakeArena, *errors: ArenaError) -> list[str]:
+    """The arena refuses the first openings with these errors; returns the list of attempts."""
+    attempts, inner, queue = [], arena.open_session, list(errors)
+
+    def open_session(case_id):
+        attempts.append(case_id)
+        if queue:
+            raise queue.pop(0)
+        return inner(case_id)
+
+    arena.open_session = open_session  # type: ignore[method-assign]
+    return attempts
+
+
+def test_a_final_case_is_opened_again_after_a_refusal_that_may_pass(tmp_path, monkeypatch) -> None:
+    """429 without Retry-After (too many open sessions: the client does not retry it), a 5xx after the client's
+    own retries, a transport error: the case is opened again while the wave has time left."""
+    monkeypatch.setattr(runner, "OPEN_PAUSE_S", (0.01, 0.02))
+    arena = FakeArena(rfq("sup:A"), {"sup:A": 0.05}, limit_s=LIMIT_S)
+    attempts = failing_open(
+        arena,
+        ArenaError(429, "too many open sessions", "POST", "/v1/sessions"),
+        ArenaError(503, "unavailable", "POST", "/v1/sessions"),
+        ArenaError(0, "ReadTimeout", "POST", "/v1/sessions"),
+    )
+    outcome, recorder, _ = play(tmp_path, arena, Stepper(rounds=1), deadline=time.time() + 1000)
+    assert len(attempts) == 4 and outcome["deal"]
+    assert [e["status"] for e in events(recorder, "open_retry")] == [429, 503, 0]
+
+
+@pytest.mark.parametrize(
+    "deadline, error",
+    [
+        (None, ArenaError(429, "too many open sessions")),  # practice, sandbox: as before
+        (1000, ArenaError(429, "practice limit reached")),  # the quota does not come back within a wave
+        (1000, ArenaError(422, "unknown case")),
+        (30, ArenaError(503, "unavailable")),  # too little of the wave left to negotiate
+    ],
+)
+def test_a_case_is_not_opened_again_when_a_retry_cannot_help(tmp_path, monkeypatch, deadline, error) -> None:
+    monkeypatch.setattr(runner, "OPEN_PAUSE_S", (0.01, 0.02))
+    arena = FakeArena(rfq("sup:A"), {"sup:A": 0.05}, limit_s=LIMIT_S)
+    attempts = failing_open(arena, error)
+    with pytest.raises(ArenaError):
+        play(tmp_path, arena, Stepper(rounds=1), deadline=deadline and time.time() + deadline)
+    assert len(attempts) == 1
 
 
 # ---------------------------------------------------------------- reading the arena's thread
