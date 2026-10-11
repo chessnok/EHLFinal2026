@@ -1,0 +1,24 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "b95690728915",
+  "session_id": "57b3d38b-9f7d-4637-99aa-9bbda442e731",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-11T08:45:25.622056Z",
+  "branch": "feat/gen-safety",
+  "checkpoints_count": 3,
+  "save_step_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "303ebb24f1df",
+  "token_usage": {
+    "input_tokens": 652,
+    "cache_creation_tokens": 443272,
+    "cache_read_tokens": 90385803,
+    "output_tokens": 167756,
+    "api_call_count": 314
+  },
+  "session_metrics": {
+    "turn_count": 55
+  }
+}
