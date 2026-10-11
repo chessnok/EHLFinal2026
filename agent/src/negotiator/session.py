@@ -29,6 +29,9 @@ MOVE_LIMIT_S = 60.0
 # Our copy of a thread's clock starts when the reply reaches us, a moment after the arena's: read the arena's
 # state once a clock is this close to its end.
 SYNC_MARGIN_S = 3.0
+# With a deadline (a wave's cap) the case closes this long before it: no new e-mail goes out after that, so the
+# closing move does not wait behind a supplier's answer.
+CLOSE_BEFORE_DEADLINE_S = 90.0
 
 
 class Turn:
@@ -193,6 +196,7 @@ class Negotiation:
         self.decisions: list[dict] = []
         self.result: dict | None = None
         self.ended = threading.Event()
+        self.closing = threading.Event()  # the close has begun: no new e-mail
         self.started = time.time()
         self.supplier_estimates: dict[str, dict] = {}  # for the relationship term (stabilise, secure_supply)
         self.turn = Turn()  # one arena call of this session at a time
@@ -355,11 +359,16 @@ class Negotiation:
     def seconds_to_deadline(self) -> float:
         return math.inf if self.deadline is None else self.deadline - time.time()
 
+    def closing_soon(self, margin: float = 0.0) -> bool:
+        """True once the close has begun, or when the deadline is less than CLOSE_BEFORE_DEADLINE_S + `margin`
+        away. Never by the clock without a deadline (practice, sandbox)."""
+        return self.closing.is_set() or self.seconds_to_deadline() < CLOSE_BEFORE_DEADLINE_S + margin
+
     # ------------------------------------------------------------------ moves
     def send(
         self, supplier_id: str, message: dict, rationale: dict | None = None, *, basis: int | None = None
     ) -> dict | None:
-        """Send one e-mail; returns the supplier's reply (None if the case ended meanwhile).
+        """Send one e-mail; returns the supplier's reply (None if the case ended or its close began meanwhile).
 
         `basis` is the thread's `version` the message was written for. If the supplier has answered a timeout
         since, the message is not sent - it would answer an offer that no longer stands - and the supplier's
@@ -368,6 +377,13 @@ class Negotiation:
         t = self.threads[supplier_id]
         with self.turn.take(t.urgency):
             if self.ended.is_set():
+                return None
+            if self.closing_soon():  # checked once the turn is ours: the e-mail may have waited for it
+                self.recorder.metrics.incr("moves.not_sent_closing")
+                self.recorder.event(
+                    "move_not_sent", session_id=self.session_id, supplier_id=supplier_id, why="the case is closing"
+                )
+                log.warning("%s: e-mail not sent - the case is closing", supplier_id)
                 return None
             self._sync_if_due()
             if self.ended.is_set():
