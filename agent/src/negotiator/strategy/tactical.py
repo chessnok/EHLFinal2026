@@ -249,6 +249,8 @@ FLAGS: dict[str, str] = {
     "(P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
+    "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
+    "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
     "it asks, where it asks at least 1 point more",
     "menu_fallback": "under a margin charge, where the price on the lower side of the C minimum is not below its "
@@ -271,9 +273,10 @@ def snap_option(options, value):
     return min(numeric, key=lambda o: abs(o - value)) if numeric and value not in numeric else value
 
 
-# On by default since 11 Oct, the winner strategy (P-48: mean 0.764 against 0.748 of the control run P-43;
-# P01 +0.042, P11 +0.038, P18 +0.067, P08 +0.011, the other six unchanged). Switch one off with flag=False.
-DEFAULT_ON = {"clause_rel_only", "justified_arg", "cheap_yes"}
+# On by default since 11 Oct 09:20 (David's decision): clause_rel_only + cheap_yes (P-49: P01 0.924, P08 0.626,
+# P11 0.710, P18 0.685) and fast_pay (P-50: P05 0.824 -> 0.865). justified_arg is off: alone it lost P01 and P08
+# (P-47), and in the combination P08 fell from 0.626 to 0.571. Switch one off with flag=False.
+DEFAULT_ON = {"clause_rel_only", "cheap_yes", "fast_pay"}
 
 
 class TacticalStrategy(BaselineStrategy):
@@ -412,6 +415,8 @@ class TacticalStrategy(BaselineStrategy):
             if self.flags["fresh_args"]:
                 out += self.data.evidence_orders_per_part(parts, sid)
             out += data_facts(self.data, parts, all_windows=self.flags["all_windows"])
+            if self.flags["double_count"]:
+                out += self._double_count(neg, sid)
             if self.flags["fresh_claims"]:
                 later = self.data.evidence_complaints(parts, sid, since="2025-10-01")
                 if open_price and not any(e.kind == "should_cost" for e in out):
@@ -791,6 +796,26 @@ class TacticalStrategy(BaselineStrategy):
         if granted:
             words = " and ".join(f"{FIELD_WORDS.get(f, f.replace('_', ' '))} {v}" for f, v in granted)
             plan.yes_line = f"Yes to {words}, as you asked - at the same price."
+        return out
+
+    def _double_count(self, neg: Negotiation, sid: str) -> list[Evidence]:
+        """Our framework agreement with this supplier already indexes the price to a series its quote names as a cost
+        driver: a surcharge on top counts that rise twice (P08: ctr:4600070710#3.2 ties 45 % to AS-14404, and its
+        quote asks +11 % citing AS-14404). A fact from our own contract it may not have in view."""
+        body = (neg.threads[sid].messages[0].get("body") or "") if neg.threads[sid].messages else ""
+        facts = parse_reply(body)
+        cited = set(facts.drivers) | {m[0] for m in facts.driver_moves}
+        out = []
+        for ref, f in self.data.facts.items():
+            if not (ref.startswith("ctr:") and isinstance(f, dict) and f.get("type") == "index"):
+                continue
+            if f.get("supplier") == sid and f.get("series") in cited:
+                share = f.get("material_share") or 0
+                sentence = (
+                    f"Our framework agreement already ties {share:.0%} of the price to {f['series']} ({ref}): "
+                    "a surcharge for the same material would count its rise twice."
+                )
+                out.append(Evidence(kind="contract_index", refs=[ref], sentence=sentence, strength=6.0))
         return out
 
     @staticmethod
@@ -1618,9 +1643,17 @@ class TacticalStrategy(BaselineStrategy):
             return out
         if 14 not in options or any((sh["terms"].get("payment_days") or 999) <= 14 for sh in out):
             return out
+        if len(neg.threads) < 2:
+            return out  # measured to win only in an RFQ (P05 +0.041); alone it lost P08 0.055 and P07 0.012 (P-51)
+        if neg.supplier_estimates.get(sid) or neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+            return (
+                out  # under a margin charge the 14-day option prices high and pulls its price up (P01 0.943 -> 0.818)
+            )
         a = out[0]["terms"]
         base = complete_offer(neg.case, {**a, "payment_days": 14})
         base["unit_price"] = self._iso_cost_price(neg, sid, base, neg.cost(sid, a))
+        if base["unit_price"] > a["unit_price"]:
+            return out  # never an option dearer than A: it anchors its price up
         if not neg.keeps_must_haves(sid, base) or neg.cost(sid, base) >= their_c:
             return out
         plan.offered[structure_key(base)] = max(plan.offered.get(structure_key(base), 0.0), base["unit_price"])
