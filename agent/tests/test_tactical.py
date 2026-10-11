@@ -335,6 +335,20 @@ def test_own_plant_should_cost_is_not_replaced_by_the_guess(tmp_path, world) -> 
     assert strategy._reanchor(neg, sid, strategy.tplans[sid], theirs, neg.cost(sid, theirs)) is not None
 
 
+def test_no_margin_estimate_without_the_cases_charge_parameters(tmp_path, world) -> None:
+    """A strategic goal without `relationship_eur_per_point`: cost.py charges nothing, so no estimate - with one the
+    price that costs us least was 0 and no sheet was left to send."""
+    c = case(category_goal="stabilise", sustainable_margin_pct=3)
+    c["parts"], c["suppliers"] = ["part:310010"], ["sup:70110"]
+    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 138.55, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    assert not neg.supplier_estimates.get(sid) and strategy.tplans[sid].full_cost
+    first = strategy.decide(neg, sid)
+    assert first.kind == "message"
+    assert all(0 < sh["terms"]["unit_price"] < 138.55 for sh in first.message["term_sheets"])
+
+
 def test_reanchor_on_a_strategic_supplier_only_with_a_guess(tmp_path) -> None:
     """No estimate at all: no 10 % ask under a strategic supplier's price. A guess: allowed, clamped to the floor."""
     neg, sid, strategy = _strategic(None, tmp_path, sustainable_margin_pct=None)

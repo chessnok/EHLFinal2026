@@ -529,7 +529,10 @@ class TacticalStrategy(BaselineStrategy):
 
     def _estimate_supplier(self, neg: Negotiation, sid: str, full_cost: float | None, p: SupplierProfile) -> None:
         """Our estimate of the supplier for the relationship term in C (stabilise, secure_supply)."""
-        if neg.buyer.get("category_goal") not in RELATIONSHIP_GOALS or not full_cost:
+        buyer = neg.buyer
+        charged = buyer.get("sustainable_margin_pct") and buyer.get("relationship_eur_per_point")
+        if buyer.get("category_goal") not in RELATIONSHIP_GOALS or not full_cost or not charged:
+            # without both parameters cost.py charges nothing: an estimate would only make C's minimum a price of 0
             neg.supplier_estimates.pop(sid, None)
             return
         neg.supplier_estimates[sid] = self._supplier_estimate(neg, sid, full_cost, p)
