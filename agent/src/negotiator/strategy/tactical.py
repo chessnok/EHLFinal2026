@@ -158,6 +158,7 @@ FIELD_WORDS = {
 }
 MAX_SPREAD = 0.08  # options of one message stay within 8 % of each other's price
 EQUAL_C = 0.005  # ... and within 0.5 % of each other's C
+OWN_GAIN = 1.5  # `own_structures`: its own price drop for a structure must exceed what the structure costs us by this
 
 
 def reply_signals(body: str) -> dict:
@@ -248,14 +249,21 @@ FLAGS: dict[str, str] = {
     "error was up to +3.5 %; D01 fell 0.969 -> 0.669 with it)",
     "rel_anchor4": "strategic suppliers keep the 4 % first ask even when their margin charge is estimated (the 10 % "
     "ask of 11c: D01 0.969 -> 0.669, P01 0.946 -> 0.901, P10 0.663 -> 0.647); the charge stays in C",
-    "fast_pay": "it asked for faster payment and no option pays at 14 days: a 14-day option joins at option A's C "
-    "(P05 0.824 -> 0.865)",
+    "fast_pay": "it asked for faster payment and no option pays at the shortest term allowed (14 days): such an "
+    "option joins at option A's C (P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
     "no_hedged_series": "a hedged supplier hears no argument on the series a clause option follows (P08 "
     "answered 'not our reality' in every session; the slot goes to the next argument) and no fact twice",
     "soft_anchor": "a higher first offer under routine and quality_first goals: the first ask half as deep "
     "(their suppliers moved 0.4-6 % in all; leverage suppliers 15-24 %, P05 36 -> 27.50, need the deep one)",
+    "final_safe": "after its final offer (or firm words) never a price push: only its own cheapest sheet (primary or "
+    "alternative) goes back - re-sending its own sheet was agreed 71 of 74 times, a push of 2 %+ walked 13 of 14",
+    "own_structures": "a structure the supplier itself prices cheaply - its own alternative sheets give the rate, "
+    "e.g. P05 Hrvelec 35.00 at 35 days, 31.50 at 52 (snapped to what we may sign: 42) - joins as option B at option "
+    "A's C when its drop is 1.5x what the structure costs us; its own lead time beyond our need also without a pair",
+    "hide_own_cost": "measurement only: the own plant's should-cost is not read (`_full_cost` None), so strategic "
+    "own-plant cases (P01, P02, P03, P10) run the guessed-cost path most hidden strategic suppliers get (A3 floor)",
     "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
     "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
@@ -445,8 +453,9 @@ class TacticalStrategy(BaselineStrategy):
         """The should-cost of THIS supplier's plant for a single-part case; None otherwise.
 
         Another supplier's estimate is a different plant (cost base, process) and a bundle's price is
-        not one part's cost: guessing would push the floor and the margin charge the wrong way."""
-        if not self.data or len(parts) != 1:
+        not one part's cost: guessing would push the floor and the margin charge the wrong way.
+        `hide_own_cost`: None always, so a strategic supplier with an own-plant cost runs the guessed-cost path."""
+        if not self.data or len(parts) != 1 or self.flags["hide_own_cost"]:
             return None
         rows = self.data.query(
             "SELECT unit_cost FROM should_cost WHERE part_id = ? AND supplier_id = ? ORDER BY estimate_date DESC",
@@ -696,6 +705,7 @@ class TacticalStrategy(BaselineStrategy):
             # walk-away for ~+0.05 on average - only an RFQ with a safe rival offer may push once, with a real step
             if (
                 their_c > plan.upper_c
+                and not self.flags["final_safe"]
                 and not plan.probed_final
                 and self._may_probe(neg, supplier_id, their_c)
                 and self._may_push(neg, supplier_id)
@@ -1622,9 +1632,105 @@ class TacticalStrategy(BaselineStrategy):
                 keys.add(structure_key(t))
                 out.append({"terms": t})
                 plan.offered[structure_key(t)] = max(plan.offered.get(structure_key(t), 0.0), t["unit_price"])
+        if self.flags["own_structures"]:
+            out = self._own_structures(neg, sid, plan, out, their_c)
         if self.flags["fast_pay"]:
             out = self._fast_pay(neg, sid, plan, out, their_c)
         return out[:3]
+
+    @staticmethod
+    def _own_rates(neg: Negotiation, sid: str) -> dict[str, tuple]:
+        """What the supplier's own sheets say a structure is worth to it: per field, (its value on the dearer sheet,
+        its value on the cheaper one, the price drop) from two sheets of one message that differ in that field only
+        (P05 Hrvelec: 35.00 at 35 days next to 31.50 at 52). The latest message wins."""
+        negotiable = [f for f in neg.case["negotiable"] if f != "unit_price"]
+        rates: dict[str, tuple] = {}
+        for m in neg.threads[sid].supplier_messages:
+            sheets = [s.get("terms") or {} for s in m.get("term_sheets") or []]
+            sheets = [{**sheets[0], **s} for s in sheets if isinstance(s.get("unit_price"), int | float)]
+            for i, x in enumerate(sheets):
+                for y in sheets[i + 1 :]:
+                    diff = [f for f in negotiable if x.get(f) != y.get(f)]
+                    if len(diff) != 1 or x["unit_price"] == y["unit_price"]:
+                        continue
+                    dear, cheap = (x, y) if x["unit_price"] > y["unit_price"] else (y, x)
+                    f = diff[0]
+                    rates[f] = (dear.get(f), cheap.get(f), dear["unit_price"] - cheap["unit_price"])
+        return rates
+
+    def _own_structures(self, neg: Negotiation, sid: str, plan: Plan, out: list[dict], their_c: float) -> list[dict]:
+        """A structure the supplier prices far more cheaply than it costs us joins as option B, at option A's C.
+
+        Lead time is the big asymmetry: our late cost is one sum per day for the whole contract, its overtime is
+        priced per unit - P05 Hrvelec asked 9.9 % less at 52 days than at 35 (n 29; 7 days over our need cost us
+        EUR 1,400 in all), P10's supplier 5.6 % less at 54 days than at 42. Our menu never sent them: at equal C the
+        longer lead time has a slightly lower price, and option A takes the highest price."""
+        if not out:
+            return out
+        case, options = neg.case, neg.case.get("term_options", {})
+        a = out[0]["terms"]
+        a_c = neg.cost(sid, a)
+        keys = {structure_key(sh["terms"]) for sh in out}
+        candidates = []  # (its gain - our cost, terms)
+        rated = False  # a sheet pair already gave its rate for the lead time
+
+        def priced(f, value):
+            terms = complete_offer(case, {**a, f: value})
+            if structure_key(terms) in keys or not neg.keeps_must_haves(sid, terms):
+                return None
+            terms["unit_price"] = max(
+                self._iso_cost_price(neg, sid, terms, a_c), plan.offered.get(structure_key(terms), 0)
+            )
+            return terms
+
+        def allowed(f, near):
+            """The option we may sign nearest to its value (52 days -> 42 under a 42-day must-have)."""
+            opts = [o for o in options.get(f) or [] if o is not None and neg.keeps_must_haves(sid, {**a, f: o})]
+            if not opts:
+                return None
+            if isinstance(near, int | float) and all(isinstance(o, int | float) for o in opts):
+                return min(opts, key=lambda o: (abs(o - near), o))
+            return near if near in opts else None
+
+        for f, (dear, cheap, drop) in self._own_rates(neg, sid).items():
+            value = allowed(f, cheap)
+            if value is None or value == a.get(f):
+                continue
+            if all(isinstance(v, int | float) for v in (dear, cheap, value, a.get(f))):
+                gain = drop * (value - a[f]) / (cheap - dear)  # its price per unit of the field, from A's value
+            elif a.get(f) == dear and value == cheap:
+                gain = drop
+            else:
+                continue
+            terms = priced(f, value)
+            if terms and gain > max(0.0, OWN_GAIN * (a["unit_price"] - terms["unit_price"])):
+                candidates.append((gain - (a["unit_price"] - terms["unit_price"]), terms))
+                rated = rated or f == "lead_time_days"
+        if "lead_time_days" in case["negotiable"] and not rated:
+            # its own lead time beyond our need, where no sheet pair gives its rate yet (P05 Hrvelec opened at 52
+            # days, P10's supplier at 54): at equal C it costs us nothing, and a shorter one means overtime for it
+            own = [
+                v
+                for m in neg.threads[sid].supplier_messages
+                for s in m.get("term_sheets") or []
+                if isinstance(v := (s.get("terms") or {}).get("lead_time_days"), int | float)
+            ]
+            need = neg.buyer.get("need_lead_time_days") or 0
+            if own and max(own) > max(need, a.get("lead_time_days") or 0):
+                value = allowed("lead_time_days", max(own))
+                if value is not None and value > (a.get("lead_time_days") or 0):
+                    terms = priced("lead_time_days", value)
+                    if terms:
+                        candidates.append((0.0, terms))
+        for _, terms in sorted(candidates, key=lambda x: -x[0]):
+            if terms["unit_price"] > a["unit_price"] or terms["unit_price"] <= 0:
+                continue  # never an option dearer than A: it anchors its price up
+            if neg.cost(sid, terms) > a_c * (1 + EQUAL_C) or neg.cost(sid, terms) >= their_c:
+                continue  # every option of a message costs us the same
+            plan.offered[structure_key(terms)] = max(plan.offered.get(structure_key(terms), 0.0), terms["unit_price"])
+            log.info("%s: its own structure %s joins at %.2f", sid, structure_key(terms), terms["unit_price"])
+            return out[:1] + [{"terms": terms}] + out[1:2]  # option B: fast_pay may still take option C
+        return out
 
     @staticmethod
     def _with_alternative_structure(neg, sid, pool: list[dict], picked: list[dict]) -> list[dict]:
@@ -1660,13 +1766,20 @@ class TacticalStrategy(BaselineStrategy):
         return picked
 
     def _fast_pay(self, neg: Negotiation, sid: str, plan: Plan, out: list[dict], their_c: float) -> list[dict]:
-        """It asked for faster payment and no option pays at 14 days: one that does joins, at the same C as option A.
+        """It asked for faster payment and no option pays at the shortest term the case allows (14 days in every
+        practice case): one that does joins, at the same C as option A.
         It costs us ~0.10 EUR a unit for 16 days; P05's 70210 gave 0.50 for it ("I can drop the price to 27.50 for
         14 days payment": 0.824 -> 0.865)."""
-        options = neg.case.get("term_options", {}).get("payment_days") or []
-        if not out or "payment_days" not in neg.case["negotiable"] or "payment_days" not in plan.requests:
+        options = [o for o in neg.case.get("term_options", {}).get("payment_days") or [] if isinstance(o, int | float)]
+        if (
+            not out
+            or not options
+            or "payment_days" not in neg.case["negotiable"]
+            or "payment_days" not in plan.requests
+        ):
             return out
-        if 14 not in options or any((sh["terms"].get("payment_days") or 999) <= 14 for sh in out):
+        fastest = min(options)  # the shortest term the case allows (14 days in every practice case)
+        if any((sh["terms"].get("payment_days") or 999) <= fastest for sh in out):
             return out
         if len(neg.threads) < 2:
             return out  # measured to win only in an RFQ (P05 +0.041); alone it lost P08 0.055 and P07 0.012 (P-51)
@@ -1675,7 +1788,7 @@ class TacticalStrategy(BaselineStrategy):
                 out  # under a margin charge the 14-day option prices high and pulls its price up (P01 0.943 -> 0.818)
             )
         a = out[0]["terms"]
-        base = complete_offer(neg.case, {**a, "payment_days": 14})
+        base = complete_offer(neg.case, {**a, "payment_days": fastest})
         base["unit_price"] = self._iso_cost_price(neg, sid, base, neg.cost(sid, a))
         if base["unit_price"] > a["unit_price"]:
             return out  # never an option dearer than A: it anchors its price up
