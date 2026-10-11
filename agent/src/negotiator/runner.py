@@ -172,7 +172,11 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
                     message = strategy.keepalive(neg, sid)
                 if message is None:
                     # only under a wave cap: practice and sandbox keep the behaviour their scores were measured with
-                    if neg.deadline is not None and t.seconds_since_reply() >= CLOSE_UNKEPT_AFTER_S:
+                    if (
+                        neg.deadline is not None
+                        and t.seconds_since_reply() >= CLOSE_UNKEPT_AFTER_S
+                        and _holds_the_best_offer(neg, sid)
+                    ):
                         neg.recorder.event(
                             "close_unkept_thread",
                             session_id=neg.session_id,
@@ -202,6 +206,18 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
         with neg.recorder.metrics.timer("strategy.conclude"):
             decision = strategy.conclude(neg)
         _apply(neg, decision)
+
+
+def _holds_the_best_offer(neg: Negotiation, sid: str) -> bool:
+    """Its offer is the one a close would take now: losing it to its clock would lose the case's best offer.
+    A dearer held offer may run out while the others still negotiate."""
+
+    def c(s: str) -> float:
+        offer_id, terms = neg.threads[s].standing
+        return neg.cost(s, terms) if offer_id else float("inf")
+
+    mine = c(sid)
+    return all(mine <= c(o) for o, t in neg.threads.items() if o != sid and t.live)
 
 
 def _round_limit(neg: Negotiation) -> int:

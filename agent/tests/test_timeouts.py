@@ -302,6 +302,20 @@ def test_a_held_thread_without_keepalive_is_closed_on_before_its_clock_runs_out(
     assert [e["supplier_id"] for e in events(recorder, "close_unkept_thread")] == ["sup:A"]
 
 
+def test_a_held_dearer_offer_does_not_close_the_case(tmp_path, monkeypatch) -> None:
+    """Only the best offer is worth closing for: a dearer held thread may run out while the others negotiate."""
+    monkeypatch.setattr(runner, "CLOSE_UNKEPT_AFTER_S", 0.5)
+
+    class NoKeepalive(Stepper):
+        def keepalive(self, neg, sid):
+            return None
+
+    # sup:B opens 1 EUR above sup:A and says "final" at once; sup:A keeps moving down
+    arena = FakeArena(rfq("sup:A", "sup:B"), {"sup:A": 0.3, "sup:B": 0.05}, limit_s=LIMIT_S, final_after={"sup:B": 1})
+    _, recorder, _ = play(tmp_path, arena, NoKeepalive(rounds=6), deadline=time.time() + 1000)
+    assert "sup:B" not in [e["supplier_id"] for e in events(recorder, "close_unkept_thread")]
+
+
 def test_without_a_wave_cap_a_held_thread_does_not_close_the_case(tmp_path, monkeypatch) -> None:
     """Practice and sandbox keep the behaviour their scores were measured with: no early close."""
     monkeypatch.setattr(runner, "CLOSE_UNKEPT_AFTER_S", 0.5)
