@@ -368,6 +368,20 @@ def test_no_margin_estimate_without_the_cases_charge_parameters(tmp_path, world)
     assert all(0 < sh["terms"]["unit_price"] < 138.55 for sh in first.message["term_sheets"])
 
 
+def test_lower_bound_never_above_the_upper_one(tmp_path) -> None:
+    """An alternative cheaper than the supplier's estimated floor: an offer above our upper bound is no undercut of
+    that floor, so the lower bound stays at or under the upper one."""
+    c = case()
+    alt = {"unit_price": 15.0, "payment_days": 30, "lead_time_days": 42, "volume_per_year": 6650}
+    c["buyer"]["alternative"] = {"kind": "quote", "ref": "quote:x", "terms": {**alt, "contract_months": 12}}
+    neg, sid = negotiation(tmp_path, None, c, {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(None)
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    assert neg.c_alt < neg.cost(sid, strategy._ideal(neg, sid, {"payment_days": 30}, plan.gt.lower))
+    assert plan.lower_c <= plan.upper_c <= neg.c_alt
+
+
 def test_reanchor_on_a_strategic_supplier_only_with_a_guess(tmp_path) -> None:
     """No estimate at all: no 10 % ask under a strategic supplier's price. A guess: allowed, clamped to the floor."""
     neg, sid, strategy = _strategic(None, tmp_path, sustainable_margin_pct=None)

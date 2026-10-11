@@ -675,7 +675,10 @@ class TacticalStrategy(BaselineStrategy):
             upper_c = min(upper_c, neg.cost(sid, self._ideal(neg, sid, terms, gt.upper)))
         # room to concede above our first ask, whatever the calibration says (P05: an 18 % anchor over a 22 %
         # floor left upper == anchor and only 0.4 % steps) - never above its quote or our alternative
-        return lower_c, min(max(upper_c, target_c * (1 + UPPER_ROOM)), open_c, neg.c_alt)
+        upper_c = min(max(upper_c, target_c * (1 + UPPER_ROOM)), open_c, neg.c_alt)
+        # its estimated floor can cost more than our alternative, or than its quote where a must-have or the
+        # cheapest price under a margin charge moves the structure: an offer above our upper bound is no undercut
+        return min(lower_c, upper_c), upper_c
 
     def _ideal(self, neg, sid, terms: dict, price: float) -> dict:
         return complete_offer(neg.case, self._optimise(neg, sid, {**terms, "unit_price": round(price, 2)}))
