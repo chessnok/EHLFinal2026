@@ -96,6 +96,7 @@ ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the de
 ANCHOR_ROUTINE = 0.13  # routine goal: a deeper first ask is answered with a final offer
 ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
 MAX_ANCHOR = 0.15  # (kept for the experiments that import it)
+SOFT_ANCHOR = 0.5  # `soft_anchor`: the first ask's depth as a share of the usual one
 MAX_ANCHOR_LEVERAGE = 0.18  # ... 18 % in leverage: floors sat 19-31 % under (D02, P05, P18), but a deeper first
 # ask lost credibility (P05: Hrvelec walked after four rounds at 24-25 against its 34)
 # without a cost estimate, anchor this far under the reference price (baseline v2's sandbox-tested depths)
@@ -249,6 +250,8 @@ FLAGS: dict[str, str] = {
     "(P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
+    "soft_anchor": "a higher first offer under routine and quality_first goals: the first ask half as deep "
+    "(their suppliers moved 0.4-6 % in all; leverage suppliers 15-24 %, P05 36 -> 27.50, need the deep one)",
     "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
     "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
@@ -591,6 +594,8 @@ class TacticalStrategy(BaselineStrategy):
             self.flags["guess_anchor"] and self._full_cost(neg.case.get("parts") or [], sid) is None
         ):
             depth, extra = min(depth, ANCHOR_RELATIONSHIP), 0.0  # squeezing a strategic supplier costs us C
+        if self.flags["soft_anchor"] and neg.buyer.get("category_goal") in ("routine", "quality_first"):
+            depth, extra = depth * SOFT_ANCHOR, 0.0
         # round 1 carries 67 % of all supplier movement and no supplier ever walked over a deep first offer
         # (0 of 917 replies); within a case deeper first offers went with better scores - so we open deep
         candidates = [open_price * (1 - depth)]
