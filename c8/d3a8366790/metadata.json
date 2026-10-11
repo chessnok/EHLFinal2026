@@ -3,8 +3,17 @@
   "checkpoint_id": "c8d3a8366790",
   "strategy": "manual-commit",
   "branch": "docs/argument-audit",
-  "checkpoints_count": 2,
-  "files_touched": null,
+  "checkpoints_count": 3,
+  "files_touched": [
+    "agent/docs/TRYED.md",
+    "agent/docs/argument-audit.md",
+    "agent/docs/benchmarks/2026-10-11-tactical-news-none.md",
+    "agent/docs/benchmarks/README.md",
+    "agent/docs/runs.md",
+    "agent/src/negotiator/guards.py",
+    "agent/src/negotiator/profile.py",
+    "agent/src/negotiator/strategy/tactical.py"
+  ],
   "sessions": [
     {
       "metadata": "/c8/d3a8366790/0/metadata.json",
@@ -12,13 +21,20 @@
       "compact_transcript": "/c8/d3a8366790/0/transcript.jsonl",
       "content_hash": "/c8/d3a8366790/0/content_hash.txt",
       "prompt": "/c8/d3a8366790/0/prompt.txt"
+    },
+    {
+      "metadata": "/c8/d3a8366790/1/metadata.json",
+      "transcript": "/c8/d3a8366790/1/full.jsonl",
+      "compact_transcript": "/c8/d3a8366790/1/transcript.jsonl",
+      "content_hash": "/c8/d3a8366790/1/content_hash.txt",
+      "prompt": "/c8/d3a8366790/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 430,
-    "cache_creation_tokens": 454636,
-    "cache_read_tokens": 60832866,
-    "output_tokens": 198114,
-    "api_call_count": 198
+    "input_tokens": 486,
+    "cache_creation_tokens": 706285,
+    "cache_read_tokens": 67101890,
+    "output_tokens": 217835,
+    "api_call_count": 223
   }
 }
