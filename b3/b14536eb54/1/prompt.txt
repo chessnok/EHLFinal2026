@@ -1,0 +1,43 @@
+скажи что произошло после последнего pull на 50 commits
+
+---
+
+так скажи что в целом во всех 100 последниз коммитах тогда проищошло
+
+---
+
+и покажи гдее код стратении можно посмотреть и еще какие-то данные которые используются дл рабаоты.
+
+---
+
+посмотри последниие сколько-то диалогв, типо 10, есть там проблема что агент не отвечает нам все или что не получает часть данных из сообщения. мне кадется нужно наш семантический вычленитель данных улучшить и расширить
+
+---
+
+<pasted_content id="993b">
+Концептуальное: что может знать NoIdea
+
+У NoIdea P08 0.92, у нас 0.56. В TRYED.md записано, что структура условий на P08 не даёт выигрыша, и разрыв с лучшими командами именно в уровне цены. Раз цена у бота двигается аргументами, а первый ответ задаёт уровень, самая вероятная разгадка: есть типы аргументов, которые арена принимает, а мы не используем, или мы ставим их не в том порядке в первом письме.
+
+Это не перебор флагов, а аудит покрытия, и его можно сделать бесплатно по документации и replay:
+
+Free audit, no arena sessions, no strategy changes. Write agent/docs/argument-audit.md.
+
+1. From api.md and the arena docs, list every argument/fact type the arena can verify (claim types, fact ID prefixes, rules per type: one per series, windows, per part, etc.).
+
+2. For each practice case and D01/D02: which facts of each type exist in the case data, and which ones tactical actually cites (from our replays). Mark every type that exists in the data but we never cite.
+
+3. From the 293 replays (bot-mechanics.md): for each argument type, how much price did one verified argument move, and does the order within the first e-mail matter?
+
+4. For P08 specifically: list every fact in its data we have never cited, and estimate from the bot rules what citing it in the first e-mail would do to the first reply.
+
+5. Rank the uncited argument types by expected gain across all case types, not just P08. Flag any that would only help one case.
+
+End with one paragraph: is there a lever we are missing, and what single change would test it.
+
+Если аудит найдёт неиспользуемый тип аргумента, это механизм, который сработает и на закрытых кейсах. Если не найдёт, вы мало что потеряли: это чтение файлов.
+</pasted_content id="993b">
+
+---
+
+давай сделай аудит
