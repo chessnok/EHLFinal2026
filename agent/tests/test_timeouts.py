@@ -275,9 +275,22 @@ def test_a_held_thread_without_keepalive_is_closed_on_before_its_clock_runs_out(
             return None
 
     arena = FakeArena(rfq("sup:A", "sup:B"), {"sup:A": 0.1, "sup:B": 0.25}, limit_s=LIMIT_S, final_after={"sup:A": 1})
-    outcome, recorder, _ = play(tmp_path, arena, NoKeepalive(rounds=8))
+    outcome, recorder, _ = play(tmp_path, arena, NoKeepalive(rounds=8), deadline=time.time() + 1000)
     assert arena.counted()["sup:A"] == 0 and outcome["deal"]
     assert [e["supplier_id"] for e in events(recorder, "close_unkept_thread")] == ["sup:A"]
+
+
+def test_without_a_wave_cap_a_held_thread_does_not_close_the_case(tmp_path, monkeypatch) -> None:
+    """Practice and sandbox keep the behaviour their scores were measured with: no early close."""
+    monkeypatch.setattr(runner, "CLOSE_UNKEPT_AFTER_S", 0.5)
+
+    class NoKeepalive(Stepper):
+        def keepalive(self, neg, sid):
+            return None
+
+    arena = FakeArena(rfq("sup:A", "sup:B"), {"sup:A": 0.1, "sup:B": 0.25}, limit_s=LIMIT_S, final_after={"sup:A": 1})
+    _, recorder, _ = play(tmp_path, arena, NoKeepalive(rounds=8))
+    assert not events(recorder, "close_unkept_thread")
 
 
 # ---------------------------------------------------------------- opening in the final

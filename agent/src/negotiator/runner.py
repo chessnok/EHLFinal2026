@@ -167,7 +167,8 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
                 if t.arena_rounds < _round_limit(neg) - 1 and not neg.closing_soon(KEEPALIVE_REPLY_S):
                     message = strategy.keepalive(neg, sid)
                 if message is None:
-                    if t.seconds_since_reply() >= CLOSE_UNKEPT_AFTER_S:
+                    # only under a wave cap: practice and sandbox keep the behaviour their scores were measured with
+                    if neg.deadline is not None and t.seconds_since_reply() >= CLOSE_UNKEPT_AFTER_S:
                         neg.recorder.event(
                             "close_unkept_thread",
                             session_id=neg.session_id,
