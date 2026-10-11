@@ -90,6 +90,7 @@ CASH_SHORT_RATE = 1.2
 # of P02 (EUR 345.39 against a should-cost of 380: charge EUR 179k, score 0); prices and concessions otherwise
 # follow C without it, as an error of a few per cent in a charge inside C moved D01 from 0.749 to 0.627 (S-26).
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
+YES_ROOM_SHARE = 0.01  # ... and at most this share of the room (`open_c - target_c`)
 CHEAP_YES = 0.002  # `cheap_yes`: a condition of its we accept at our price when it costs us at most this share of C
 GUESS_SLACK = 0.04  # `guess_slack`: the guessed cost floor less its largest observed error (D01 +3.5 %)
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
@@ -799,7 +800,11 @@ class TacticalStrategy(BaselineStrategy):
             if options and want not in options:
                 continue  # a value we may not sign (P10's 54 days) would void the whole option
             trial = {**out, f: want}
-            if neg.keeps_must_haves(sid, trial) and neg.cost(sid, trial) - neg.cost(sid, out) <= CHEAP_YES * base:
+            # a share of C, and never more than 1 % of the room: P02's room is 2.3 % of C, so 0.2 % of C there
+            # would be up to 0.087 of the score for one yes (stress test of 11 Oct)
+            room = max(0.0, plan.open_c - plan.target_c)
+            limit = min(CHEAP_YES * base, YES_ROOM_SHARE * room) if room else CHEAP_YES * base
+            if neg.keeps_must_haves(sid, trial) and neg.cost(sid, trial) - neg.cost(sid, out) <= limit:
                 out, granted = trial, granted + [(f, want)]
         if granted:
             words = " and ".join(f"{FIELD_WORDS.get(f, f.replace('_', ' '))} {v}" for f, v in granted)
@@ -1599,6 +1604,8 @@ class TacticalStrategy(BaselineStrategy):
         # without it practice P02 0.167 -> 0.731)
         cheapest = min(neg.cost(sid, t) for t in picked)
         picked = [t for t in picked if neg.cost(sid, t) <= cheapest * (1 + EQUAL_C)]
+        # never an option dearer for us than its own standing offer: it would simply take that one
+        picked = [t for t in picked if neg.cost(sid, t) < their_c] or picked
         out, keys = [], set()
         for t in picked:
             if structure_key(t) not in keys:
