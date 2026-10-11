@@ -142,8 +142,8 @@ def test_policy_follows_goal_and_traits(world) -> None:
     s = TacticalStrategy(world)
     lev = s._policy("leverage", build_profile(world, "sup:70640"))  # idle second shift
     stab = s._policy("stabilise", build_profile(world, "sup:70110"))
-    assert lev.anchor > POLICIES["leverage"].anchor and lev.beta > POLICIES["leverage"].beta
-    assert stab.anchor <= POLICIES["stabilise"].anchor and "contract_months" in stab.trade_first
+    assert lev.beta > POLICIES["leverage"].beta
+    assert "contract_months" in stab.trade_first
     cash = s._policy("routine", build_profile(world, "sup:70170"))
     assert cash.trade_first[0] == "payment_days"
 
@@ -357,9 +357,8 @@ def test_reply_signals_tell_room_from_a_last_word() -> None:
 
     soft = "We now look forward to a more significant step from your side to bridge the remaining gap."
     firm = "We have made all possible concessions to reach this point and cannot reduce the price further."
-    assert reply_signals(soft) == {"room": True, "firm": False}
-    assert reply_signals(firm)["firm"] and not reply_signals(firm)["room"]
-    assert reply_signals("We have free capacity for your parts.")["room"]
+    assert not reply_signals(soft)["firm"]
+    assert reply_signals(firm)["firm"]
 
 
 def test_timeout_answers_become_the_standing_offer() -> None:
@@ -407,3 +406,84 @@ def test_margin_charge_is_priced_without_payment_terms_in_the_quote_pdf(tmp_path
     # an ask no price can reach: we stop at the price that costs us least, not under it
     assert strategy._iso_cost_price(neg, sid, terms, 0.0) >= round(cheapest, 2) - 0.01
     assert neg.cost(sid, {**terms, "unit_price": cheapest}) < neg.cost(sid, {**terms, "unit_price": 15.0})
+
+
+# ---------------------------------------------------------------- state that one path set and another forgot
+def _reply(neg, sid, sheets: list[dict], status: str = "open", body: str = "") -> None:
+    """Our e-mail went out and the supplier answered with these sheets (the first is its primary one)."""
+    t = neg.threads[sid]
+    n = len(t.supplier_messages)
+    t.messages.append({"from": "buyer", "body": "", "term_sheets": [{"terms": dict(sheets[0])}]})
+    t.messages.append(
+        {
+            "from": f"sales@{sid}",
+            "status": status,
+            "body": body,
+            "term_sheets": [{"term_sheet_id": f"offer:x-{n}-{i}", "terms": s} for i, s in enumerate(sheets)],
+            "attachments": t.messages[0]["attachments"],
+        }
+    )
+
+
+def test_a_move_on_its_alternative_sheet_is_a_move(tmp_path, world) -> None:
+    """It holds its primary sheet and comes down on the alternative we judge it by: no stall, and its step counts."""
+    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    assert strategy.decide(neg, sid).kind == "message"
+    _reply(neg, sid, [{"unit_price": 17.40, "payment_days": 30}, {"unit_price": 17.30, "payment_days": 60}])
+    strategy._learn(neg, sid, plan)
+    _reply(neg, sid, [{"unit_price": 17.40, "payment_days": 30}, {"unit_price": 16.90, "payment_days": 60}])
+    strategy._learn(neg, sid, plan)
+    assert plan.stalls == 0
+    path = strategy._their_c_path(neg, sid)
+    assert path[-1] < path[-2] and path[-1] == neg.cost(sid, neg.best_offer(sid)[1])
+    _reply(neg, sid, [{"unit_price": 17.30, "payment_days": 30}, {"unit_price": 16.90, "payment_days": 60}])
+    strategy._learn(neg, sid, plan)
+    assert plan.stalls == 1  # only its primary sheet fell: the offer we judge it by did not
+
+
+def test_a_message_without_arguments_leaves_no_claims_behind(tmp_path, world) -> None:
+    """A stale rival quote in `last_claims` froze our steps (`_rest_pending`) after an e-mail that cited nothing."""
+    from negotiator.data import Evidence
+
+    c = case(category_goal="stabilise", sustainable_margin_pct=4, relationship_eur_per_point=5000)
+    neg, sid = negotiation(tmp_path, None, c, {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy()
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    plan.last_claims = [Evidence(kind="rival_offer", refs=["offer:y-1"], sentence="Another bidder offers less.")]
+    _, theirs = neg.threads[sid].standing
+    under = {**theirs, "unit_price": round(strategy._guess_floor(neg, sid, plan, theirs) - 0.5, 2)}
+    assert strategy._floor_counter(neg, sid, plan, under) is not None
+    assert plan.last_claims == []
+
+
+def test_prepare_starts_every_case_empty(tmp_path, world) -> None:
+    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    assert strategy.decide(neg, sid).kind == "message" and strategy.used_refs
+    strategy.banned_case_kinds.add("index")
+    strategy.used_rival_refs.add((sid, "offer:y-1"))
+    again, sid2 = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
+    strategy.prepare(again)
+    assert not strategy.used_refs and not strategy.used_rival_refs and not strategy.banned_case_kinds
+    assert set(strategy.tplans) == {sid2}
+
+
+def test_one_cost_of_money_for_a_supplier_short_of_cash(tmp_path, world) -> None:
+    """The floor belief and the margin charge price its money alike: the fitted CASH_SHORT_RATE."""
+    from negotiator.strategy.tactical import CASH_SHORT_RATE
+
+    c = case()
+    c["suppliers"] = ["sup:70170"]  # "could you pay our invoices within 10 days"
+    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    assert plan.profile.has("cash_short")
+    rate = c["buyer"].get("interest_rate", 0.08)
+    assert plan.belief.rate == rate * CASH_SHORT_RATE
+    assert strategy._supplier_estimate(neg, sid, 16.0, plan.profile)["interest_rate"] == plan.belief.rate
