@@ -139,6 +139,7 @@ MUST_CLAUSE = re.compile(
     r"index clause",
     re.I,
 )
+LATE_COMPLAINTS_SINCE = "2025-10-01"  # `late_facts`: our complaints from here on (as `fresh_claims`)
 FIGURES_ASKED = re.compile(
     r"Which figures is that based on|Please (?:send us|provide) the data|data that forms the basis", re.I
 )
@@ -269,6 +270,9 @@ FLAGS: dict[str, str] = {
     "answered, kept in the options or said honestly why not; implies answers",
     "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
     "12), not only one ending at the latest month; one per series",
+    "late_facts": "round 1 as today; from round 2 every offer carries at least one argument the arena has not counted "
+    "for this supplier: remaining strong evidence first, then weak facts kept out of round 1 (price history, a "
+    "delivery or quality record or complaint, an index series it rebuffed), never a counted kind, series or part",
 }
 
 
@@ -299,6 +303,8 @@ class TacticalStrategy(BaselineStrategy):
             self.flags["guess_slack"] = True  # the deep ask needs the (lowered) guessed floor under it
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
+        self.refused_kinds: dict[str, set[str]] = {}  # supplier -> kinds it called `irrelevant` (late_facts)
+        self.late_extra: dict[str, list[Evidence]] = {}  # supplier -> weak facts only for rounds 2+ (late_facts)
 
     # ------------------------------------------------------------------ prepare
     def prepare(self, neg: Negotiation) -> None:
@@ -718,9 +724,10 @@ class TacticalStrategy(BaselineStrategy):
         t = neg.threads[sid]
         replies = t.supplier_messages
         for reply in replies[plan.seen_replies :]:
-            if self.flags["fresh_args"]:
+            arena_reading = self.flags["fresh_args"] or self.flags["late_facts"]
+            if arena_reading:
                 self._learn_claims(t, plan, reply)
-            for res in [] if self.flags["fresh_args"] else reply.get("claim_results") or []:
+            for res in [] if arena_reading else reply.get("claim_results") or []:
                 i, result = res.get("index"), res.get("result")
                 if not isinstance(i, int) or not 0 <= i < len(plan.last_claims):
                     continue
@@ -953,6 +960,7 @@ class TacticalStrategy(BaselineStrategy):
                 self.banned_case_kinds |= kinds
             elif result == "irrelevant":
                 plan.banned_kinds |= kinds
+                self.refused_kinds.setdefault(plan.supplier_id, set()).update(kinds)
 
     def _facts(self) -> dict:
         return self.data.facts if self.data else {}
@@ -1727,7 +1735,8 @@ class TacticalStrategy(BaselineStrategy):
             if plan.figures_asked:
                 order = ["should_cost", "recent_drop", "index", "notice", "quality", "complaint", "orders"]
                 pool.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
-        spent = self._spent_keys(neg, sid) if self.flags["fresh_args"] or self.flags["all_windows"] else set()
+        late = self.flags["late_facts"] and not first
+        spent = self._spent_keys(neg, sid) if self.flags["fresh_args"] or self.flags["all_windows"] or late else set()
 
         def select(limit: float) -> list[Evidence]:
             picked, kinds, keys, companions = [], set(), set(), 0
@@ -1754,6 +1763,7 @@ class TacticalStrategy(BaselineStrategy):
                 key = (
                     self._arg_key(e)
                     if self.flags["fresh_args"]
+                    or late
                     or (self.flags["all_windows"] and e.kind in ("index", "recent_drop"))  # one window per series
                     else None
                 )
@@ -1782,10 +1792,15 @@ class TacticalStrategy(BaselineStrategy):
             if checkable >= 2:
                 limit = min(limit, max(min(2, checkable - 1), checkable - 3))
         picked = select(limit)
+        if late and not self._carries_fact(picked, spent) and len(picked) < 3:
+            # a round-2+ e-mail without a fact the arena has not counted got a final offer 53-60 % of the time, with
+            # one 4-11 % (442 practice sessions, paired within case and round); even a weak one as the only fact: 0 %
+            pool = [e for e in pool if e.refs and e not in picked] + self._late_pool(neg, sid, plan)
+            picked += select(1)
         for e in picked:
             plan.used_sentences.add(e.sentence)
         plan.figures_reply, plan.figures_asked = (
-            (self.flags["fresh_claims"] or self.flags["respond_all"] or self.flags["respond_lite"])
+            (self.flags["fresh_claims"] or self.flags["respond_all"] or self.flags["respond_lite"] or late)
             and plan.figures_asked
             and bool(picked),
             False,
@@ -1796,6 +1811,34 @@ class TacticalStrategy(BaselineStrategy):
             else:
                 self.used_refs.update(e.refs)
         return picked
+
+    def _carries_fact(self, picked: list[Evidence], spent: set) -> bool:
+        """Does a message with these arguments carry one the arena reads and has not counted for this supplier?"""
+        refs = [r for e in picked for r in e.refs]
+        return any(k not in spent for k, _ in arguments_read("", refs, self._facts()))
+
+    def _late_pool(self, neg, sid: str, plan: Plan) -> list[Evidence]:
+        """Weak facts for rounds 2+, kept out of round 1 where they cost the first drop (bot-mechanics.md): the kinds
+        this supplier's plan bans (price history it shrugged off, a delivery record outside quality cases, an index
+        series it rebuffed), our complaints, a bundle's orders per part. Never a kind it found irrelevant or one
+        contradicted in this case. The best kind first: price history, then the record, then a rebuffed series."""
+        if sid not in self.late_extra:
+            extra: list[Evidence] = []
+            parts = neg.case.get("parts") or []
+            if self.data and parts:
+                extra += self.data.evidence_complaints(parts, sid, since=LATE_COMPLAINTS_SINCE)[:1]
+                if not self.flags["fresh_args"]:
+                    extra += self.data.evidence_orders_per_part(parts, sid)
+            self.late_extra[sid] = extra
+        hard = self.banned_case_kinds | self.refused_kinds.get(sid, set())
+        seen: set[str] = set()
+        out = []
+        for e in plan.counters + plan.evidence + self.late_extra[sid]:
+            if e.refs and e.kind not in hard and e.sentence not in plan.used_sentences and e.sentence not in seen:
+                seen.add(e.sentence)
+                out.append(e)
+        order = {"orders": 0, "scorecard": 1, "quality": 1, "complaint": 2, "index": 3, "recent_drop": 3}
+        return sorted(out, key=lambda e: (order.get(e.kind, 4), -e.strength))
 
     @staticmethod
     def _drop_hedged_series(neg, plan: Plan) -> None:

@@ -219,3 +219,66 @@ def test_an_alternative_needs_the_completed_sheet_to_be_cheaper(tmp_path, world)
     neg, sid, strategy, plan = _with_alternative(tmp_path, world, {"unit_price": 17.0})
     assert neg.cost(sid, {"unit_price": 17.0}) < neg.cost(sid, {"unit_price": 17.0, "payment_days": 14}) - 100
     assert strategy._take_alternative(neg, sid, plan) is None
+
+
+# ---------------------------------------------------------------- a fresh fact in every later e-mail (`late_facts`)
+def _late(tmp_path: Path, world: WorldData, **flags):
+    neg, sid, strategy, plan = _setup(tmp_path, world, **flags)
+    plan.evidence.append(_ev("scorecard", ["sc:T@2026Q3"], 1.0))  # a delivery record: banned outside quality cases
+    strategy.late_extra[sid] = [_ev("complaint", ["qn:T1"], 1.5)]
+    return neg, sid, strategy, plan
+
+
+def _round_one(neg, sid, body: str) -> None:
+    t = neg.threads[sid]
+    t.messages.append({"from": "buyer", "body": body, "refs": []})
+    t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": t.messages[0]["term_sheets"]})
+
+
+def test_late_facts_leaves_the_first_email_alone(tmp_path, world) -> None:
+    neg, sid, new, plan = _late(tmp_path / "new", world, late_facts=True)
+    neg2, sid2, old, plan2 = _late(tmp_path / "old", world)
+    first = [e.sentence for e in new._choose_claims(neg, sid, plan, first=True)]
+    assert first == [e.sentence for e in old._choose_claims(neg2, sid2, plan2, first=True)]
+    assert not any("sc:" in s or "qn:" in s for s in first)  # the weak facts stay out of round 1
+
+
+def test_late_facts_cites_a_weak_fact_when_the_strong_ones_are_spent(tmp_path, world) -> None:
+    neg, sid, strategy, plan = _late(tmp_path, world, late_facts=True)
+    strategy._choose_claims(neg, sid, plan, first=True)  # TA, the quote, the forecast
+    _round_one(neg, sid, "TA (idx:TA@2025-08, idx:TA@2026-08). Quote (quote:TQ). Forecast (fc:T1@2026-09).")
+    picked = strategy._choose_claims(neg, sid, plan, first=False)
+    assert [e.refs for e in picked] == [["sc:T@2026Q3"]]  # TA's second window is a duplicate; the record is not
+    _round_one(neg, sid, picked[0].sentence)
+    picked = strategy._choose_claims(neg, sid, plan, first=False)
+    assert picked == []  # the complaint is the same record: nothing countable is left, nothing is cited twice
+
+    neg2, sid2, old, plan2 = _late(tmp_path / "old", world)
+    old._choose_claims(neg2, sid2, plan2, first=True)
+    _round_one(neg2, sid2, "TA (idx:TA@2025-08, idx:TA@2026-08). Quote (quote:TQ). Forecast (fc:T1@2026-09).")
+    assert all("sc:" not in r for e in old._choose_claims(neg2, sid2, plan2, first=False) for r in e.refs)
+
+
+def test_late_facts_takes_strong_evidence_before_weak(tmp_path, world) -> None:
+    neg, sid, strategy, plan = _late(tmp_path, world, late_facts=True)
+    plan.evidence.append(_ev("should_cost", ["cost:T"], 0.1))
+    plan.counters = [Evidence(kind="their_hedge", refs=[], sentence="As you wrote, ...", strength=3.0)]
+    _round_one(neg, sid, "TA (idx:TA@2025-08, idx:TA@2026-08). Quote (quote:TQ). Forecast (fc:T1@2026-09).")
+    picked = strategy._choose_claims(neg, sid, plan, first=False)
+    # the hedge answer takes the round's slot but is no fact: the should-cost (strong pool) joins it, not the record
+    assert [e.kind for e in picked] == ["their_hedge", "should_cost"]
+
+
+def test_late_facts_skips_a_kind_it_found_irrelevant(tmp_path, world) -> None:
+    neg, sid, strategy, plan = _late(tmp_path, world, late_facts=True)
+    _round_one(neg, sid, "TA (idx:TA@2025-08, idx:TA@2026-08). Quote (quote:TQ). Forecast (fc:T1@2026-09).")
+    strategy.refused_kinds[sid] = {"scorecard", "complaint"}
+    assert strategy._choose_claims(neg, sid, plan, first=False) == []
+
+
+def test_late_facts_answers_figures_asked_with_a_fact(tmp_path, world) -> None:
+    neg, sid, strategy, plan = _late(tmp_path, world, late_facts=True)
+    _round_one(neg, sid, "TA (idx:TA@2025-08, idx:TA@2026-08). Quote (quote:TQ). Forecast (fc:T1@2026-09).")
+    plan.figures_asked = True
+    assert strategy._choose_claims(neg, sid, plan, first=False)
+    assert plan.figures_reply and not plan.figures_asked  # "You asked for the figures behind our proposal:"
