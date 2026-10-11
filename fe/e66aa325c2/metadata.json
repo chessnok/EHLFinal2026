@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "fee66aa325c2",
+  "strategy": "manual-commit",
+  "branch": "refactor/strategy-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/docs/TRYED.md",
+    "agent/docs/benchmarks/2026-10-11-tactical-ev-none.md",
+    "agent/docs/benchmarks/README.md",
+    "agent/docs/runs.md",
+    "agent/docs/simulator.md",
+    "agent/docs/strategies.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/fe/e66aa325c2/0/metadata.json",
+      "transcript": "/fe/e66aa325c2/0/full.jsonl",
+      "compact_transcript": "/fe/e66aa325c2/0/transcript.jsonl",
+      "content_hash": "/fe/e66aa325c2/0/content_hash.txt",
+      "prompt": "/fe/e66aa325c2/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 10,
+    "cache_creation_tokens": 11658,
+    "cache_read_tokens": 1990945,
+    "output_tokens": 7185,
+    "api_call_count": 5
+  }
+}
