@@ -1,0 +1,62 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "9d2217f2defb",
+  "session_id": "39b0be0b-4193-4571-b64b-b4338c0899f0",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-11T11:04:20.748999Z",
+  "branch": "fix/stale-sockets",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/src/negotiator/client.py",
+    "agent/tests/test_client.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "e71bd77daf99",
+  "checkpoint_transcript_start": 31,
+  "transcript_lines_at_start": 31,
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "prompt-skill-claude-code-claude-api-2026-10-11T10:07:50.259013Z",
+      "event_type": "prompt_invocation",
+      "skill": {
+        "name": "claude-api"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "prompt_slash_command",
+        "confidence": "explicit"
+      },
+      "turn_id": "e71bd77daf99",
+      "timestamp": "2026-10-11T10:07:50.259013Z",
+      "native": {
+        "command": "/claude-api"
+      },
+      "collapse": {
+        "target": "user_message",
+        "label": "/claude-api",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "initial_attribution": {
+    "calculated_at": "2026-10-11T11:04:20.740604Z",
+    "agent_lines": 34,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 34,
+    "total_lines_changed": 34,
+    "agent_percentage": 100,
+    "metric_version": 2
+  }
+}
