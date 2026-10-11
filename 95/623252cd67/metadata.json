@@ -3,7 +3,7 @@
   "checkpoint_id": "95623252cd67",
   "strategy": "manual-commit",
   "branch": "fix/final-robustness",
-  "checkpoints_count": 1,
+  "checkpoints_count": 4,
   "files_touched": [
     "agent/src/negotiator/runner.py",
     "agent/tests/test_timeouts.py"
@@ -14,13 +14,19 @@
       "transcript": "/95/623252cd67/0/full.jsonl",
       "content_hash": "/95/623252cd67/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/95/623252cd67/1/metadata.json",
+      "transcript": "/95/623252cd67/1/full.jsonl",
+      "content_hash": "/95/623252cd67/1/content_hash.txt",
+      "prompt": "/95/623252cd67/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 36,
+    "cache_creation_tokens": 26117,
+    "cache_read_tokens": 3162287,
+    "output_tokens": 9555,
+    "api_call_count": 18
   }
 }
