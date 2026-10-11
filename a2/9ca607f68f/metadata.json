@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.11.4",
+  "checkpoint_id": "a29ca607f68f",
+  "strategy": "manual-commit",
+  "branch": "refactor/strategy-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "agent/README.md",
+    "agent/docs/TRYED.md",
+    "agent/docs/benchmarks/2026-10-11-tactical-ev-none.md",
+    "agent/docs/benchmarks/2026-10-11-tactical-gen-flags-none.md",
+    "agent/docs/benchmarks/README.md",
+    "agent/docs/gameplan-2026-10-11.md",
+    "agent/docs/runs.md",
+    "agent/src/negotiator/client.py",
+    "agent/src/negotiator/guards.py",
+    "agent/src/negotiator/strategy/__init__.py",
+    "agent/src/negotiator/strategy/tactical/__init__.py",
+    "agent/src/negotiator/strategy/tactical/choice.py",
+    "agent/src/negotiator/strategy/tactical/concession.py",
+    "agent/src/negotiator/strategy/tactical/plan.py",
+    "agent/src/negotiator/strategy/tactical/planning.py",
+    "agent/src/negotiator/strategy/tactical/reading.py",
+    "agent/src/negotiator/strategy/tactical/sheets.py",
+    "agent/src/negotiator/strategy/tactical/writing.py",
+    "agent/tests/test_arguments.py",
+    "agent/tests/test_client.py",
+    "agent/tests/test_structures.py",
+    "agent/tests/test_tactical.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a2/9ca607f68f/0/metadata.json",
+      "transcript": "/a2/9ca607f68f/0/full.jsonl",
+      "compact_transcript": "/a2/9ca607f68f/0/transcript.jsonl",
+      "content_hash": "/a2/9ca607f68f/0/content_hash.txt",
+      "prompt": "/a2/9ca607f68f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 75,
+    "cache_creation_tokens": 140384,
+    "cache_read_tokens": 4524115,
+    "output_tokens": 33766,
+    "api_call_count": 38
+  }
+}
