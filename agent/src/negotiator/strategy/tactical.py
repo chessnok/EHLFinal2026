@@ -42,6 +42,7 @@ from negotiator.guards import accept_problems
 from negotiator.ledger import CITED_DRIVER, argument_key, arguments_read, data_facts, reply_facts
 from negotiator.menu import acceptance, priced_menu, proposed_values, requests_in, satisfies, structure_key
 from negotiator.profile import SupplierProfile, build_profile
+from negotiator.reply_parser import ReplyFacts, parse_reply
 from negotiator.session import Negotiation
 from negotiator.strategy.base import Decision
 from negotiator.strategy.baseline import SIGNATURE, BaselineStrategy, describe
@@ -210,6 +211,10 @@ class Plan:
     figures_asked: bool = False  # its last e-mail asked for the figures behind our proposal
     figures_reply: bool = False
     answered_fixed: set = field(default_factory=set)  # fixed fields whose request we have answered
+    facts: ReplyFacts | None = None  # everything its last e-mail said (reply_parser)
+    banned_series: set = field(default_factory=set)  # index series it said do not reach its costs
+    price_terms: dict = field(default_factory=dict)  # terms its price is tied to ("calculated for 60 days")
+    bigger_step: bool = False  # it called our last step too small
     spent_kinds: set = field(default_factory=set)  # argument kinds the arena called `duplicate` (fresh_args)
 
 
@@ -229,9 +234,17 @@ FLAGS: dict[str, str] = {
     "clause it must have kept, no 'pays early' that is not",
     "fresh_args": "never an argument the arena already counted (one per kind, index series, part); one held back from "
     "the first e-mail for a later round; a bundle's orders per part",
+    "respond_all": "every question, condition, wish and signal of its last e-mail is taken up (reply_parser): "
+    "answered, kept in the options or said honestly why not; implies answers",
     "all_windows": "an index fall over the steepest window the arena accepts (<= 12 months, ending within the last "
     "12), not only one ending at the latest month; one per series",
 }
+
+
+def snap_option(options, value):
+    """The allowed option nearest to a value it named (54 days -> 56); the value itself where any is allowed."""
+    numeric = [o for o in options or [] if isinstance(o, int | float)]
+    return min(numeric, key=lambda o: abs(o - value)) if numeric and value not in numeric else value
 
 
 class TacticalStrategy(BaselineStrategy):
@@ -243,6 +256,8 @@ class TacticalStrategy(BaselineStrategy):
         if unknown:
             raise ValueError(f"unknown tactical flags: {sorted(unknown)}")
         self.flags = {name: bool(flags.get(name, False)) for name in FLAGS}
+        if self.flags["respond_all"]:
+            self.flags["answers"] = True  # its plain answers are part of answering everything
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
 
@@ -659,6 +674,9 @@ class TacticalStrategy(BaselineStrategy):
                 self._read_breakdown(neg, sid, plan, reply)
             if FIGURES_ASKED.search(reply.get("body", "")):
                 plan.figures_asked = True
+            facts = self._read_reply(neg, sid, reply)
+            if facts and self.flags["respond_all"]:
+                self._take_in(neg, sid, plan, facts)
             if (
                 self.flags["answers"]
                 and MUST_CLAUSE.search(reply.get("body", ""))
@@ -703,6 +721,70 @@ class TacticalStrategy(BaselineStrategy):
                 plan.belief.observe(reply)
             self._update_upper(neg, sid, plan)
         plan.seen_replies = len(replies)
+
+    @staticmethod
+    def _read_reply(neg: Negotiation, sid: str, reply: dict) -> ReplyFacts | None:
+        """Every reply read in full and logged - reading changes nothing; what we do with it is `_take_in`."""
+        try:
+            facts = parse_reply(reply.get("body", ""))
+            neg.recorder.event("reply_facts", session_id=neg.session_id, supplier_id=sid, facts=facts.summary())
+            return facts
+        except Exception as e:  # a reader must never cost a case
+            log.warning("%s: reply parser failed: %r", sid, e)
+            return None
+
+    def _take_in(self, neg: Negotiation, sid: str, plan: Plan, f: ReplyFacts) -> None:
+        """Its questions, conditions, wishes and signals become our plan: what the next e-mail must take up."""
+        case = neg.case
+        negotiable = case["negotiable"]
+        options = case.get("term_options", {})
+        plan.facts = f
+        if "figures" in f.questions:
+            plan.figures_asked = True
+        for kind, detail in f.conditions:
+            if kind == "index_clause" and "index_clause" in negotiable:
+                plan.request_counts["index_clause"] = max(2, plan.request_counts.get("index_clause", 0))
+            elif kind in ("payment_days", "lead_time_days") and kind in negotiable and detail:
+                plan.price_terms[kind] = snap_option(options.get(kind), int(detail))
+            elif kind == "incoterm" and "incoterm" in negotiable:
+                plan.requests.add("incoterm")
+        for lever, want in f.wishes.items():
+            if lever in negotiable:
+                plan.requests.add(lever)
+                if isinstance(want, int):
+                    plan.proposed.setdefault(lever, [])
+                    v = snap_option(options.get(lever), want)
+                    if v not in plan.proposed[lever]:
+                        plan.proposed[lever].append(v)
+        if f.signals & {"figures_confirm_its_case", "argument_not_its_reality"}:
+            for e in plan.last_claims:  # the index argument it rejected: never again in this thread
+                if e.kind in ("index", "recent_drop") and (e.meta or {}).get("series"):
+                    plan.banned_series.add(e.meta["series"])
+        if "breakdown_answer" in f.signals:
+            plan.asked_breakdown = True
+        if f.signals & {"our_step_too_small", "far_apart"}:
+            plan.bigger_step = True
+        if f.signals & {"price_frozen", "terms_room"}:
+            plan.lever_turn = True  # its price list is frozen: our step goes into the terms
+        for sig in f.signals:
+            if sig.startswith("builds_on_option_"):
+                self._keep_its_option(neg, sid, plan, sig.rsplit("_", 1)[-1])
+        useless = {"price history": "orders", "delivery record": "scorecard", "volume change": "forecast"}
+        for data_kind, verdict in f.claim_reactions:
+            if verdict in ("no_change", "known") and data_kind.strip() in useless:
+                plan.banned_kinds.add(useless[data_kind.strip()])
+
+    @staticmethod
+    def _keep_its_option(neg: Negotiation, sid: str, plan: Plan, which: str) -> None:
+        """ "Building on your Option B": that structure is what it works with - it stays in our menu."""
+        index = {"a": 0, "b": 1, "c": 2, "first": 0, "second": 1, "third": 2}.get(which)
+        ours = [m for m in neg.threads[sid].messages if m.get("from") == "buyer" and m.get("term_sheets")]
+        if index is None or not ours or index >= len(ours[-1]["term_sheets"]):
+            return
+        for f, v in ours[-1]["term_sheets"][index]["terms"].items():
+            if f != "unit_price" and f in neg.case["negotiable"] and v is not None:
+                plan.requests.add(f)
+                plan.proposed[f] = [v] + [x for x in plan.proposed.get(f, []) if x != v]
 
     def _learn_claims(self, t, plan: Plan, reply: dict) -> None:
         """The arena's checks of our last e-mail, matched to its arguments the way the arena reads them (the
@@ -796,6 +878,9 @@ class TacticalStrategy(BaselineStrategy):
             # a real counter-step: at least half of its last move (cent steps read as no movement)
             step = min(plan.policy.reciprocity * max(their_move, 0.0), max(by_time, 0.5 * max(their_move, 0.0)))
             step = max(step, min_step)
+            if self.flags["respond_all"] and plan.bigger_step and math.isfinite(plan.open_c):
+                step = max(step, min(0.02 * plan.open_c, 0.6 * gap))  # "two cents does not enable us"
+                plan.bigger_step = False
             if self.flags["persistent"]:
                 step = min(step, max(PERSIST_STEP * step, PERSIST_MIN * last))
         if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
@@ -1271,6 +1356,8 @@ class TacticalStrategy(BaselineStrategy):
             limit = max(ask_c, min(neg.cost(sid, t) for t in valid), (ask_c + their_c) / 2)
             valid = [t for t in valid if neg.cost(sid, t) <= limit * (1 + STALL_EPS)]
         pool = valid or under_floor  # never go silent: an offer under its floor beats none
+        if self.flags["respond_all"] and plan.price_terms:  # "our price is calculated for 60 days"
+            pool = [t for t in pool if all(t.get(f) == v for f, v in plan.price_terms.items())] or pool
         if not pool:
             return []
         if neg.buyer.get("category_goal") in RELATIONSHIP_GOALS and plan.full_cost:
@@ -1428,6 +1515,13 @@ class TacticalStrategy(BaselineStrategy):
             prefer += EVIDENCE_FIRST.get(key, [])
         pool.sort(key=lambda e: (e not in fresh, e.kind not in prefer, -e.strength))
         limit = plan.policy.claims_first if first else (2 if fresh else 1)
+        if self.flags["respond_all"] and not first and plan.figures_asked:
+            limit = max(limit, 2)
+            order = ["should_cost", "recent_drop", "index", "notice", "quality", "orders", "rival_offer"]
+            pool.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
+        if self.flags["respond_all"] and plan.banned_series:
+            pool = [e for e in pool if (e.meta or {}).get("series") not in plan.banned_series]
+        asked_rival = self.flags["respond_all"] and plan.facts is not None and "competitor" in plan.facts.questions
         if self.flags["fresh_claims"] and not first:
             limit = 3  # the arena reads up to 3 per message, and every round anew (P01's best session)
             if plan.figures_asked:
@@ -1441,7 +1535,7 @@ class TacticalStrategy(BaselineStrategy):
                 if len(picked) - companions >= limit:
                     break
                 if e.kind == "rival_offer":
-                    if any((sid, r) in self.used_rival_refs for r in e.refs):
+                    if any((sid, r) in self.used_rival_refs for r in e.refs) and not asked_rival:
                         continue
                 elif any(r in self.used_refs for r in e.refs) or (
                     # a bundle's parts each count their own orders (api.md): the key check below keeps one per part
@@ -1491,7 +1585,7 @@ class TacticalStrategy(BaselineStrategy):
         for e in picked:
             plan.used_sentences.add(e.sentence)
         plan.figures_reply, plan.figures_asked = (
-            self.flags["fresh_claims"] and plan.figures_asked and bool(picked),
+            (self.flags["fresh_claims"] or self.flags["respond_all"]) and plan.figures_asked and bool(picked),
             False,
         )
         for e in picked:
@@ -1537,6 +1631,8 @@ class TacticalStrategy(BaselineStrategy):
                 for s in said
             ]
             said += self._fixed_field_answers(neg, plan)
+        if self.flags["respond_all"]:
+            said += self._take_up_lines(neg, plan, sheets)
         lines += said
         if not plan.asked_breakdown and p.has("open_book") and not plan.breakdown_read:
             lines.append("Could you send us a cost breakdown for this part?")
@@ -1593,6 +1689,24 @@ class TacticalStrategy(BaselineStrategy):
         ]
         prices = [p for p in prices if p]
         return len(prices) >= 2 and prices[-1] < prices[-2] - 1e-9
+
+    def _take_up_lines(self, neg, plan: Plan, sheets: list[dict]) -> list[str]:
+        """One sentence for each condition and request of its last e-mail that the options alone do not answer."""
+        f, out = plan.facts, []
+        if not f:
+            return out
+        if "call" in f.questions:
+            out.append("We would rather settle it here in writing: the options below are ready to sign.")
+        if f.signals & {"price_frozen", "terms_room"}:
+            out.append("We understand that your price list stays; the options below move on the terms instead.")
+        if any(k == "index_clause" for k, _ in f.conditions) and "index_clause" in neg.case["negotiable"]:
+            if sheets and all(sh["terms"].get("index_clause") for sh in sheets):
+                out.append("Every option includes the index clause you require.")
+        for lever, value in plan.price_terms.items():
+            if sheets and all(sh["terms"].get(lever) == value for sh in sheets):
+                out.append(f"All options keep {FIELD_WORDS.get(lever, lever)} at {value} days, as your price requires.")
+        plan.price_terms.clear()
+        return out
 
     def _fixed_field_answers(self, neg, plan: Plan) -> list[str]:
         """It asks for a lever this case does not let us move: say so once, and name what can move (P11 asked for
