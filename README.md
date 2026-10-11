@@ -88,7 +88,7 @@ uv run negotiator me                                        # team, practice quo
 uv run negotiator run --set sandbox                         # free sandbox cases D01, D02
 uv run negotiator play case:P05                             # one practice case (quota: 200 per 24 h)
 uv run negotiator run --set practice --parallel 5           # all hosted practice cases
-uv run negotiator run --set practice --strategy tactical+no_hedged_series --cases case:P08   # a flag variant
+uv run negotiator run --set practice --strategy tactical+own_structures --cases case:P05   # a flag variant
 uv run negotiator stats                                     # best / mean score per case across all runs
 ```
 
@@ -163,7 +163,7 @@ Final checklist:
 | `reply_parser.py` | every supplier e-mail as data; logged as `reply_facts` |
 | `conduct.py` | the conduct rules (honest, sourced, no bluff) and the check that enforces them |
 | `guards.py` | hard rules before every send and accept |
-| `strategy/tactical.py` | **the final strategy** (sections 6 and 7) |
+| `strategy/tactical/` | **the final strategy** (sections 6 and 7): `plan`, `planning`, `reading`, `concession`, `sheets`, `writing`; `choice` is the `tactical-ev` variant |
 | `strategy/baseline.py`, `playbook.py`, `experiments.py`, `llm_strategy.py`, `written.py`, `decided.py` | earlier or comparison strategies, kept for measurement |
 | `writer.py` · `reader.py` · `llm.py` | optional LLM wording and reading (`tactical-llm`), checked and with a template fallback |
 | `sim/` | the local supplier simulator: fit from our own runs, local arena, bench |
@@ -196,7 +196,7 @@ only states the computed facts.
   - A condition the supplier asks for is granted at our price when it costs us at most 0.2 % of C (`cheap_yes`).
   - Every menu option costs us the same, so whichever the supplier picks, we pay the same.
 
-**Default flags of `tactical` (each one measured on practice before it went on):**
+**Adopted flags, now part of `tactical` (each one measured on practice before it went on; no switch any more):**
 
 | Flag | What | Measured |
 |---|---|---|
@@ -205,7 +205,8 @@ only states the computed facts.
 | `fast_pay` | in an RFQ, a 14-day payment option at option A's C for a supplier that asks for faster payment | P-50/P-52: P05 0.824 → 0.865 |
 | `no_hedged_series` | a supplier that bought its material forward hears no argument on that series ("not our reality"), and the slot goes to the next argument | P-57: P08 0.626 → 0.659 |
 
-Other flags exist for experiments and are off. Turn one on with `--strategy tactical+<flag>`.
+The flags still open are in `FLAGS` (`strategy/tactical/plan.py`), all off. Turn one on with
+`--strategy tactical+<flag>`.
 
 ## 7. How a change gets into the final model
 
@@ -219,7 +220,8 @@ Other flags exist for experiments and are off. Turn one on with `--strategy tact
 5. **Adopt** only if no case loses more than 0.02 and no case newly scores zero. Every run is a row in
    [`agent/docs/runs.md`](agent/docs/runs.md) (P-1 … P-57, sandbox S-*), adopted or not, with the reason.
 
-Rejected on practice (kept as flags, off):
+Rejected on practice (`soft_anchor` and the double-count argument are still flags, off; the others were deleted
+with their code when the strategy became a package, see `agent/docs/TRYED.md`):
 - answering every sentence of the supplier (`respond_all`, `respond_lite`);
 - a justified-rise argument;
 - a higher first offer (`soft_anchor`);

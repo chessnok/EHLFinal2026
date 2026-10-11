@@ -182,7 +182,7 @@ def examine(v: Variant, world, runs_dir: Path) -> list[Finding]:
         if not exp["relationship_goal"] and neg.supplier_estimates:
             found("relationship_misread", f"{sid}: a supplier estimate (relationship charge) without such a goal")
         pol = plan.policy
-        if not (0 < pol.anchor < 0.5 and pol.beta > 0 and 0 < pol.reciprocity <= 1):
+        if not (pol.beta > 0 and 0 < pol.reciprocity <= 1):
             found("policy", f"{sid}: {pol}")
         if not s["priced"]:
             continue

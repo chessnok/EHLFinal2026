@@ -262,3 +262,29 @@ def test_without_a_model_it_is_tactical() -> None:
     strategy = STRATEGIES["tactical-llm"](None, None)
     assert strategy.writer is None and strategy.reader is None and isinstance(strategy, TacticalStrategy)
     assert Writer(object()).settings.message_budget_s == 10.0
+
+
+def test_the_model_only_adds_signals_it_can_show() -> None:
+    """reading.Signals: the patterns read first; the model's last word, approval and price count with their proof."""
+    from negotiator.strategy.tactical.reading import merge_hints, read_signals
+
+    case = {"negotiable": ["unit_price", "payment_days"], "term_options": {"payment_days": [30, 60]}}
+    body = "We are at the end of the road here. I would need my director to sign off before going to EUR 9.40."
+    reply = {"body": body, "status": "open", "term_sheets": [{"terms": {"unit_price": 9.8, "payment_days": 30}}]}
+    plain = read_signals(reply, case["negotiable"])
+    assert not plain.firm and not plain.pending and plain.stated_price is None  # the patterns miss all three
+    raw = {
+        "last_word": True,
+        "last_word_quote": "We are at the end of the road here",
+        "approval_pending": True,
+        "approval_quote": "I would need my director to sign off",
+        "stated_price": 9.4,
+    }
+    hints, dropped = checked_hints(raw, case, reply)
+    merged = merge_hints(read_signals(reply, case["negotiable"]), hints, reply, case["negotiable"])
+    assert merged.firm and merged.pending and merged.stated_price == 9.4 and not dropped
+    assert set(merged.by_model) == {"firm", "pending", "stated_price"}
+    invented = {**raw, "last_word_quote": "this is our final offer", "approval_quote": "", "stated_price": 9.1}
+    hints, dropped = checked_hints(invented, case, reply)
+    merged = merge_hints(read_signals(reply, case["negotiable"]), hints, reply, case["negotiable"])
+    assert not merged.firm and not merged.pending and merged.stated_price is None and len(dropped) == 3

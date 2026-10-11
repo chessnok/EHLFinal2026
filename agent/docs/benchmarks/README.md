@@ -120,3 +120,12 @@ Practice with gpt-4o: P11 0.672 (as `tactical`), P08 0.507 (`tactical` 0.550).
 | tactical+late_facts | P07, P08, P18, P05 | 0.734, 0.593, 0.685, 0.865 | [record](2026-10-11-tactical-gen-flags-none.md) |
 | tactical+no_q1 | P08, P18 | 0.582, 0.542 | [record](2026-10-11-tactical-gen-flags-none.md) |
 | tactical+hide_own_cost | P01, P02, P03, P10 | 0.871, 0.599, 0.923, 0.633 | [record](2026-10-11-tactical-gen-flags-none.md) |
+
+`refactor/strategy-review` (the review of `tactical.py`: fixes, flags settled, package, choice by expected cost), all
+ten practice cases:
+
+| Strategy | Mean | Record |
+|---|---|---|
+| tactical-ev, first response table (`ed34340`) | 0.749 | [record](2026-10-11-tactical-ev-none.md) |
+| tactical-ev (`1d30525`) | 0.754 | [record](2026-10-11-tactical-ev-none.md) |
+| tactical (`1d30525`) | 0.750 | [record](2026-10-11-tactical-ev-none.md) |

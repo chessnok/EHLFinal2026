@@ -208,6 +208,50 @@ def cmd_bench(args, settings: Settings) -> None:
         console.print_json(json.dumps({f"{n}|{c}": v for (n, c), v in out["scores"].items()}))
 
 
+# The split of docs/backlog.md: a change is tuned on the first set and reported on the second, which nobody looks at
+# while tuning. The sandbox cases are tuning cases (they are free to play on the arena).
+HOLDOUT = ("case:P02", "case:P03", "case:P18")
+
+
+def cmd_robust(args, settings: Settings) -> None:
+    """Strategies against perturbed suppliers, tuning and held-out cases apart: mean, worst case and - against the
+    first strategy, same supplier seeds - on how many sessions each other one is ahead."""
+    from negotiator.data import WorldData
+
+    model = _model(settings, refit=args.refit)
+    data = WorldData(settings.data_dir, settings.release_dir)
+    case_ids = sorted(model["cases"])
+    out = bench(model, settings, data, args.strategies, case_ids, args.reps, SIM_RUNS, strangers=args.strangers,
+                perturb=not args.plain)  # fmt: skip
+    sets = {"tune": [c for c in case_ids if c not in HOLDOUT], "held out": [c for c in case_ids if c in HOLDOUT]}
+    shown = sets if args.holdout else {"tune": sets["tune"]}
+    what = "as fitted" if args.plain else "floors, steps, final-offer rates and round limits moved per session"
+    table = Table(title=f"{args.reps} sessions per case, suppliers {what}" + (", strangers" if args.strangers else ""))
+    for col in ("set", "strategy", "mean", "worst case (mean)", "worst session", "no deal", "ahead of the first"):
+        table.add_column(col, no_wrap=True)
+    result = {}
+    for label, ids in shown.items():
+        base = [v for c in ids for v in out["scores"][(args.strategies[0], c)]]
+        for name in args.strategies:
+            per_case = {c: statistics.mean(out["scores"][(name, c)]) for c in ids}
+            flat = [v for c in ids for v in out["scores"][(name, c)]]
+            worst = min(per_case, key=per_case.get)
+            ahead = sum(a > b + 1e-9 for a, b in zip(flat, base, strict=True))
+            behind = sum(a < b - 1e-9 for a, b in zip(flat, base, strict=True))
+            result[f"{label}|{name}"] = {"mean": statistics.mean(flat), "worst_case": per_case[worst],
+                                         "worst_session": min(flat), "per_case": per_case}  # fmt: skip
+            table.add_row(label, name, f"{statistics.mean(flat):.3f}",
+                          f"{per_case[worst]:.3f} ({worst.replace('case:', '')})", f"{min(flat):.3f}",
+                          f"{sum(v == 0 for v in flat)}/{len(flat)}",
+                          "–" if name == args.strategies[0] else f"+{ahead} / -{behind} of {len(flat)}")  # fmt: skip
+    console.print(table)
+    if not args.holdout:
+        console.print(f"held-out cases {', '.join(HOLDOUT)} not shown: add --holdout once the change is fixed")
+    console.print("A simulator, not the arena: a mean difference under 0.08 is noise (docs/simulator.md).")
+    if args.json:
+        console.print_json(json.dumps(result))
+
+
 def cmd_serve(args, settings: Settings) -> None:
     from arena_kit.data import DataPackage
 
@@ -249,6 +293,15 @@ def add_parser(add) -> None:
                    help="fit the suppliers without the sessions these strategies played (a blind test)")  # fmt: skip
     b.add_argument("--json", action="store_true")
     b.set_defaults(sim_func=cmd_bench)
+    r = sub.add_parser("robust", help="strategies against perturbed suppliers: mean and worst case, tune / held out")
+    r.add_argument("strategies", nargs="+", choices=list(STRATEGIES))
+    r.add_argument("--reps", type=int, default=6)
+    r.add_argument("--holdout", action="store_true", help="also show the held-out cases (not while tuning)")
+    r.add_argument("--plain", action="store_true", help="the suppliers as fitted, nothing moved")
+    r.add_argument("--strangers", action="store_true", help="each supplier behaves like another fitted supplier")
+    r.add_argument("--refit", action="store_true", help="calibrate again from runs/ first")
+    r.add_argument("--json", action="store_true")
+    r.set_defaults(sim_func=cmd_robust)
     s = sub.add_parser("serve", help="the simulator as a local arena")
     s.add_argument("--port", type=int, default=8100)
     s.add_argument("--seed", type=int, default=0)

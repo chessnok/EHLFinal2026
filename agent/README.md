@@ -159,7 +159,7 @@ round limit and the clock leave, capped tit-for-tat by the supplier's last move 
 a half step after two stalls; the third settles the thread). Each round sends up to three sheets of equal C: our
 C-optimal terms, a trade the supplier values (early payment for the cash-short, a long commitment for those who want
 volume), a pure price move. Arguments are chosen by profile; irrelevant or contradicted kinds are dropped. A final
-offer is probed once only when walking would cost little. The guards (`guards.py`) refuse any accept that breaks a
+offer is taken, never pushed. The guards (`guards.py`) refuse any accept that breaks a
 must-have (read on the quote PDF's standard terms; unknown counts as broken) or loses to the alternative. The tactics
 are inspired by ASTRA (Kwon et al., [DSincerity/ASTRA-NegoAgent](https://github.com/DSincerity/ASTRA-NegoAgent)):
 opponent modelling, an optimiser over the cost function, offers of equal value, tit-for-tat - no code taken.

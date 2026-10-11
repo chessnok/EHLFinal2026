@@ -21,6 +21,7 @@ import statistics
 import threading
 import time
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 
 import arena_kit.sim as kit
@@ -60,6 +61,12 @@ def price_cap(case: dict, ref: dict, c_best: float):
 
 
 JITTER = 0.3  # with --jitter a floor moves by up to this share of the supplier's room, either way
+# `perturb`: per session the supplier's steps and its readiness to call an offer final are scaled, and the round
+# limit moves - a strategy fitted to one deterministic bot shows here (the bands are a stress test, not a fit)
+PERTURB_STEP = (0.8, 1.25)
+PERTURB_FINAL = (0.7, 1.5)
+PERTURB_ROUNDS = (-3, -2, -1, 0, 0, 1)
+MIN_ROUNDS = 3
 
 
 def session_profiles(model: dict, case: dict, rng: random.Random, strangers: bool, jitter: bool) -> tuple[dict, float]:
@@ -85,13 +92,18 @@ def session_profiles(model: dict, case: dict, rng: random.Random, strangers: boo
 
 
 def new_thread(model: dict, case: dict, sup: str, rng: random.Random, profile: Profile | None = None,
-               c_best: float | None = None, persona: str = "fitted", llm=None) -> Thread:  # fmt: skip
+               c_best: float | None = None, persona: str = "fitted", llm=None,
+               bend: tuple[float, float] | None = None) -> Thread:  # fmt: skip
+    """`bend`: (steps x, final-offer rate x) on top of the persona, for a perturbed session."""
     profile = profile or model["profiles"][f"{case['case_id']}|{sup}"]
     c_best = model["results"][case["case_id"]]["c_best"] if c_best is None else c_best
     cap = price_cap(case, profile.ref, c_best)
     if PERSONAS[persona].llm:  # the fitted supplier's money, a model's decisions and words
         return LLMThread(profile, model["pool"], rng, cap=cap, llm=llm)
-    return Thread(profile, model["pool"], rng, cap=cap, persona=PERSONAS[persona])
+    who = PERSONAS[persona]
+    if bend:
+        who = replace(who, step=who.step * bend[0], final=who.final * bend[1])
+    return Thread(profile, model["pool"], rng, cap=cap, persona=who)
 
 
 def _text(value):
@@ -107,9 +119,10 @@ class CalibratedSim(kit.Sim):
     """The kit's simulator with fitted suppliers, the arena's yardstick and no practice quota."""
 
     def __init__(self, model: dict, facts=None, seed: int = 0, strangers: bool = False, no_clock: bool = True,
-                 persona: str = "fitted", jitter: bool = False, llm=None):  # fmt: skip
+                 persona: str = "fitted", jitter: bool = False, llm=None, perturb: bool = False):  # fmt: skip
         super().__init__(model["cases"], facts, no_clock=no_clock)
         self.model, self.seed, self.strangers, self.persona, self.jitter = model, seed, strangers, persona, jitter
+        self.perturb = perturb  # floors (as --jitter), step sizes, final-offer rates and the round limit move
         self.llm = llm  # the model behind the opponent `llm`
         if PERSONAS[persona].llm and llm is None:
             raise ValueError("the llm opponent needs a model")
@@ -131,10 +144,15 @@ class CalibratedSim(kit.Sim):
              "created_at": self.clock(), "late": set()}  # fmt: skip
         fixed = case.get("fixed_terms", {})
         world = random.Random(f"{self.seed}/{case_id}/{self.opened[case_id]}")
-        profiles, s["c_best"] = session_profiles(self.model, case, world, self.strangers, self.jitter)
+        profiles, s["c_best"] = session_profiles(self.model, case, world, self.strangers, self.jitter or self.perturb)
+        bend = None
+        if self.perturb:
+            bend = (world.uniform(*PERTURB_STEP), world.uniform(*PERTURB_FINAL))
+            limit = max(MIN_ROUNDS, (case.get("round_limit") or 10) + world.choice(PERTURB_ROUNDS))
+            case = s["case"] = {**case, "round_limit": limit}
         for sup in case["suppliers"]:
             rng = random.Random(f"{self.seed}/{case_id}/{self.opened[case_id]}/{sup}")
-            sim = new_thread(self.model, case, sup, rng, profiles[sup], s["c_best"], self.persona, self.llm)
+            sim = new_thread(self.model, case, sup, rng, profiles[sup], s["c_best"], self.persona, self.llm, bend)
             p = sim.profile
             standard = {k: v for k, v in p.ref.items() if k not in fixed and k != "unit_price"}
             th = s["threads"][sup] = {"key": sup.split(":", 1)[1], "round": 0, "n": 0, "timeouts": 0,
@@ -398,7 +416,7 @@ def arena_scores(sessions: list[dict]) -> dict:
 
 def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str], reps: int, runs_dir: Path,
           strangers: bool = False, parallel: int = 8, llm=None, opponents: tuple[str, ...] = ("fitted",),
-          jitter: bool = False, supplier_llm=None) -> dict:  # fmt: skip
+          jitter: bool = False, supplier_llm=None, perturb: bool = False) -> dict:  # fmt: skip
     """Play each strategy `reps` times on every case against every opponent; rep i meets the same supplier seed
     for every strategy. Returns (strategy, case) -> scores, (strategy, opponent) -> outcomes, and the run folders.
     `supplier_llm`: the model of the opponent `llm`."""
@@ -414,7 +432,7 @@ def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str
     for opponent in opponents:
         for rep in range(reps):
             sim = CalibratedSim(model, getattr(data, "facts", None), rep, strangers, persona=opponent, jitter=jitter,
-                                llm=supplier_llm)  # fmt: skip
+                                llm=supplier_llm, perturb=perturb)  # fmt: skip
             url, key, server = serve(sim)
             local = Settings(**{**settings.__dict__, "arena_url": url, "api_key": key, "runs_dir": runs_dir,
                                 "final_mode": False})  # fmt: skip
@@ -423,8 +441,9 @@ def bench(model: dict, settings, data, strategies: list[str], case_ids: list[str
                 recorder = Recorder(runs_dir, f"sim-{name}-{opponent}-s{rep}", logging.ERROR)
                 client = ArenaClient(local, recorder)
                 client.pacer = _Pacer(1000.0)
+                # a perturbed session has its own round limit: the case comes from the session, not from the model
                 outcomes = play_many(client, recorder, case_ids, lambda n=name: STRATEGIES[n](data, llm), data,
-                                     parallel=parallel, cases=model["cases"])  # fmt: skip
+                                     parallel=parallel, cases=None if perturb else model["cases"])  # fmt: skip
                 recorder.close()
                 write_report(recorder.dir, outcomes)
                 runs.append(recorder.dir.name)
