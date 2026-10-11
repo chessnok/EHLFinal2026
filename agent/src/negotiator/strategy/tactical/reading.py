@@ -275,8 +275,7 @@ class ReadingMixin:
             sheets = [s["terms"] for s in m.get("term_sheets") or [] if s.get("terms")]
             if not sheets:
                 continue
-            valid = [s for s in sheets if neg.keeps_must_haves(sid, s)] or sheets[:1]
-            c = min(neg.cost(sid, s) for s in valid)
+            c = neg.cost(sid, sheets[0])  # EXPERIMENT (bisect of P-60): the primary sheet, as on main
             if math.isfinite(c):
                 out.append(c)
         return out
