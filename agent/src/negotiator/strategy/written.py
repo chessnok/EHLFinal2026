@@ -33,8 +33,8 @@ SEND_BY_S = 45.0  # of the arena's 60 s per move: the latest moment after a repl
 class WrittenStrategy(TacticalStrategy):
     name = "tactical-llm"
 
-    def __init__(self, data: WorldData | None = None, llm=None, reader: bool = False, **flags) -> None:
-        super().__init__(data, None, **flags)
+    def __init__(self, data: WorldData | None = None, llm=None, reader: bool = False) -> None:
+        super().__init__(data, None)
         self.settings = WriterSettings.from_env()
         self.writer = Writer(llm, self.settings) if llm else None
         self.reader = Reader(llm) if llm and reader else None

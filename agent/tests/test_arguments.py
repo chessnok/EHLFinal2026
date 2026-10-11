@@ -1,4 +1,4 @@
-"""Arguments the arena still counts: its reading of our e-mails, fresh arguments per round (`fresh_args`)."""
+"""The arena's reading of our e-mails (the ledger), and the supplier's cheaper alternative sheet."""
 
 from pathlib import Path
 
@@ -37,158 +37,16 @@ def test_argument_key_counts_orders_per_part_and_a_forecast_per_kind(world: Worl
     assert argument_key("qn:1") == argument_key("sc:1@2026Q3") == ("record",)
 
 
-def test_bundle_orders_are_one_argument_per_part(world: WorldData) -> None:
-    rows = world.query(
-        "SELECT supplier_id, part_id FROM po_lines GROUP BY supplier_id, part_id HAVING count(*) >= 3 "
-        "AND count(DISTINCT price) = 1"
-    )
-    by_supplier: dict[str, list[str]] = {}
-    for r in rows:
-        by_supplier.setdefault(r["supplier_id"], []).append(r["part_id"])
-    sid, parts = next((s, p) for s, p in by_supplier.items() if len(p) >= 2)
-    out = world.evidence_orders_per_part(parts[:2], sid)
-    assert len(out) == 2 and {e.meta["part"] for e in out} == set(parts[:2])
-    assert {argument_key(e.refs[0], world.facts) for e in out} == {("orders", p) for p in parts[:2]}
-    assert world.evidence_orders_per_part(parts[:1], sid) == []  # one part: `evidence_orders` does it
-
-
-# ---------------------------------------------------------------- choosing fresh arguments
-def _ev(kind: str, refs: list[str], strength: float) -> Evidence:
-    return Evidence(kind=kind, refs=refs, sentence=f"{kind} {' '.join(refs)}", strength=strength)
-
-
-def _setup(tmp_path: Path, world: WorldData, **flags):
-    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
-    strategy = TacticalStrategy(world, **flags)
-    strategy.prepare(neg)
-    plan = strategy.tplans[sid]
-    plan.counters, plan.banned_kinds = [], set()
-    plan.evidence = [
-        _ev("index", ["idx:TA@2025-08", "idx:TA@2026-08"], 5.0),
-        _ev("quote", ["quote:TQ"], 4.0),
-        _ev("forecast", ["fc:T1@2026-09"], 3.0),
-        _ev("recent_drop", ["idx:TA@2026-02", "idx:TA@2026-05"], 2.0),  # a second window of the same series
-    ]
-    return neg, sid, strategy, plan
-
-
-def test_first_email_keeps_one_argument_back(tmp_path, world) -> None:
-    neg, sid, strategy, plan = _setup(tmp_path, world, fresh_args=True)
-    picked = strategy._choose_claims(neg, sid, plan, first=True)
-    # three counted arguments (TA, the quote, the forecast): two now, one for round 2; never TA twice
-    assert [e.kind for e in picked] == ["index", "quote"]
-    neg2, sid2, old, plan2 = _setup(tmp_path / "old", world)
-    assert [e.kind for e in old._choose_claims(neg2, sid2, plan2, first=True)] == ["index", "quote", "forecast"]
-
-
-def test_later_rounds_skip_what_the_arena_counted(tmp_path, world) -> None:
-    neg, sid, strategy, plan = _setup(tmp_path, world, fresh_args=True)
-    t = neg.threads[sid]
-    t.messages.append({"from": "buyer", "body": "Our forecast rose 5% (fc:T0@2026-09).", "refs": ["fc:T0@2026-09"]})
-    t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": t.messages[0]["term_sheets"]})
-    plan.evidence = [e for e in plan.evidence if e.kind != "index"]  # TA's first window went out in round 1 ...
-    t.messages[1]["body"] += "\nTA changed -3% (idx:TA@2025-08, idx:TA@2026-08)."
-    picked = strategy._choose_claims(neg, sid, plan, first=False)
-    # ... so neither its second window nor a second forecast (another part's) is fresh: the quote is
-    assert [e.kind for e in picked] == ["quote"]
-    picked = strategy._choose_claims(neg, sid, plan, first=False)
-    assert picked == []  # nothing fresh left: no duplicate instead
-
-
-def test_a_duplicate_spends_the_kind(tmp_path, world) -> None:
-    neg, sid, strategy, plan = _setup(tmp_path, world, fresh_args=True)
-    t = neg.threads[sid]
-    body = "TA changed -3% (idx:TA@2025-08, idx:TA@2026-08).\nOrders (po:T1-10, po:T2-10)."
-    t.messages.append({"from": "buyer", "body": body, "refs": []})
-    reply = {
-        "from": f"sales@{sid}",
-        "status": "open",
-        "term_sheets": t.messages[0]["term_sheets"],
-        "claim_results": [{"index": 0, "result": "duplicate"}, {"index": 1, "result": "duplicate"}],
-    }
-    t.messages.append(reply)
-    strategy._learn_claims(t, plan, reply)
-    # an index series is counted by series and orders by part (api.md: "order lines of different parts are
-    # separate arguments"), so a duplicate spends neither kind; the cited series and part stay spent by key
-    assert plan.spent_kinds == set()
-
-
-def test_a_bundle_cites_the_orders_of_each_part(tmp_path, world) -> None:
-    by_part: dict[str, str] = {}
-    for ref, fact in world.facts.items():
-        if ref.startswith("po:") and fact.get("part"):
-            by_part.setdefault(fact["part"], ref)
-    (p1, r1), (p2, r2) = list(by_part.items())[:2]
-    neg, sid, strategy, plan = _setup(tmp_path, world, fresh_args=True)
-    plan.evidence = [_ev("orders", [r1], 3.0), _ev("orders", [r2], 2.0), _ev("forecast", ["fc:T1@2026-09"], 1.0)]
-    picked = strategy._choose_claims(neg, sid, plan, first=True)
-    assert [e.refs[0] for e in picked] == [r1, r2]  # both parts now (the forecast is kept back for round 2)
-
-
 def test_a_contract_clause_without_a_letter_is_not_read() -> None:
     assert arguments_read("The contract says 90 days (ctr:7#3.2).", []) == []
     read = arguments_read("Your letter gives 30 days (doc:1-M2) against 90 (ctr:7#3.2).", [])
     assert [k for k, _ in read] == [("notice",)]
 
 
-# ---------------------------------------------------------------- index falls over any valid window (`all_windows`)
-def _drivers(world: WorldData) -> list[str]:
-    return [r["series_id"] for r in world.query("SELECT DISTINCT series_id FROM cost_drivers")]
-
-
-def test_steepest_drop_keeps_the_arenas_window_rule(world) -> None:
-    from negotiator.ledger import MAX_AGE, MAX_SPAN, MIN_DROP, _month_no, recent_drop, steepest_drop
-
-    last = _month_no(world.query("SELECT max(month) AS m FROM index_values")[0]["m"])
-    found = 0
-    for series in _drivers(world):
-        drop = steepest_drop(world, series)
-        if not drop:
-            continue
-        found += 1
-        earlier, later, pct, months = drop
-        m0, m1 = _month_no(earlier.split("@")[1]), _month_no(later.split("@")[1])
-        assert 1 <= m1 - m0 <= MAX_SPAN and m1 >= last - MAX_AGE and pct <= -MIN_DROP and months == m1 - m0
-        assert world.fact(earlier) and world.fact(later)
-        recent = recent_drop(world, series)
-        assert not recent or pct <= recent[2] + 1e-9  # never shallower than the window ending at the latest month
-    assert found
-
-
-def test_all_windows_finds_falls_that_have_risen_since(world) -> None:
-    from negotiator.ledger import _drop_evidence, recent_drop, steepest_drop
-
-    series = next(s for s in _drivers(world) if not recent_drop(world, s) and steepest_drop(world, s))
-    assert _drop_evidence(world, series, 0.3, cited=False) is None
-    e = _drop_evidence(world, series, 0.3, cited=False, all_windows=True)
-    assert e and " from " in e.sentence and "over the last" not in e.sentence
-
-
-def test_all_windows_gives_one_fall_per_series(world) -> None:
-    from negotiator.ledger import data_facts
-
-    shared = world.query(
-        "SELECT series_id, group_concat(part_id) AS parts FROM cost_drivers GROUP BY series_id HAVING count(*) >= 2"
-    )
-    parts = sorted({p for r in shared for p in r["parts"].split(",")})[:20]
-    facts = data_facts(world, parts, all_windows=True)
-    series = [e.meta["series"] for e in facts]
-    assert len(series) == len(set(series))
-
-
-def test_all_windows_cites_a_series_once_per_supplier(tmp_path, world) -> None:
-    neg, sid, strategy, plan = _setup(tmp_path, world, all_windows=True)
-    t = neg.threads[sid]
-    t.messages.append({"from": "buyer", "body": "TA fell 3% (idx:TA@2025-01, idx:TA@2025-07).", "refs": []})
-    t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": t.messages[0]["term_sheets"]})
-    picked = strategy._choose_claims(neg, sid, plan, first=False)
-    assert all("idx:TA" not in r for e in picked for r in e.refs)  # another window of TA is a duplicate
-
-
 # ---------------------------------------------------------------- its cheaper alternative sheet
-def _with_alternative(tmp_path: Path, world: WorldData, alternative: dict, **flags):
+def _with_alternative(tmp_path: Path, world: WorldData, alternative: dict):
     neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.0, "payment_days": 14})
-    strategy = TacticalStrategy(world, **flags)
+    strategy = TacticalStrategy(world)
     strategy.prepare(neg)
     neg.threads[sid].messages.append(
         {
@@ -219,3 +77,29 @@ def test_an_alternative_needs_the_completed_sheet_to_be_cheaper(tmp_path, world)
     neg, sid, strategy, plan = _with_alternative(tmp_path, world, {"unit_price": 17.0})
     assert neg.cost(sid, {"unit_price": 17.0}) < neg.cost(sid, {"unit_price": 17.0, "payment_days": 14}) - 100
     assert strategy._take_alternative(neg, sid, plan) is None
+
+
+def test_claim_results_are_matched_the_way_the_arena_reads_our_email(tmp_path, world) -> None:
+    """The arena's `index` counts its arguments, not our sentences: an irrelevant second argument bans its kind."""
+    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    plan, t = strategy.tplans[sid], neg.threads[sid]
+    plan.last_claims = [
+        Evidence(kind="index", refs=["idx:TA@2025-08", "idx:TA@2026-08"], sentence="TA fell."),
+        Evidence(kind="forecast", refs=["fc:T1@2026-09"], sentence="Forecast."),
+    ]
+    body = "TA changed -3% (idx:TA@2025-08, idx:TA@2026-08).\nOur forecast rose 5% (fc:T1@2026-09)."
+    t.messages.append({"from": "buyer", "body": body, "refs": []})
+    read = arguments_read(body, [], world.facts)
+    reply = {
+        "from": f"sales@{sid}",
+        "status": "open",
+        "term_sheets": t.messages[0]["term_sheets"],
+        "claim_results": [
+            {"index": next(i for i, (k, _) in enumerate(read) if k == ("forecast",)), "result": "irrelevant"}
+        ],
+    }
+    t.messages.append(reply)
+    strategy._learn_claims(t, plan, reply)
+    assert plan.banned_kinds >= {"forecast"} and "index" not in plan.banned_kinds

@@ -272,30 +272,6 @@ class WorldData:
                 )
         return out
 
-    def evidence_complaints(self, part_ids: list[str], supplier_id: str, since: str) -> list[Evidence]:
-        """Our quality notifications on these parts from this supplier since `since`, newest first: each one
-        a fresh, checkable argument (its own ID, date and ppm) for a later round."""
-        parts = set(part_ids)
-        rows = [
-            (ref, f)
-            for ref, f in self.facts.items()
-            if ref.startswith("qn:")
-            and f.get("part") in parts
-            and f.get("supplier") == supplier_id
-            and (f.get("date") or "") >= since
-            and f.get("ppm")
-        ]
-        rows.sort(key=lambda r: r[1]["date"], reverse=True)
-        return [
-            Evidence(
-                kind="complaint",
-                refs=[ref],
-                sentence=f"Our quality notification of {f['date']} on this part found {f['ppm']:,} ppm ({ref}).",
-                strength=1.5,
-            )
-            for ref, f in rows
-        ]
-
     def evidence_forecast(self, part_ids: list[str]) -> list[Evidence]:
         """Our latest demand forecast per part (shared with suppliers): the answer to "which volume can you commit to?"
         when volume is not negotiable. The arena checks the recorded change in %."""
@@ -340,36 +316,6 @@ class WorldData:
                 meta={"paid": paid},
             )
         ]
-
-    def evidence_orders_per_part(self, part_ids: list[str], supplier_id: str) -> list[Evidence]:
-        """A bundle: our last orders of each part from this supplier, one argument per part ("order lines of
-        different parts are separate arguments", api.md). The bundle's price is not the parts' prices, so there is no
-        comparison with the quote - the orders say what we pay today, checked by the arena."""
-        if len(part_ids) < 2:
-            return []
-        out = []
-        for part in part_ids:
-            rows = self.query(
-                "SELECT id, price FROM po_lines WHERE part_id = ? AND supplier_id = ? ORDER BY order_date DESC LIMIT 3",
-                (part, supplier_id),
-            )
-            rows = [r for r in rows if self.fact(r["id"])]
-            if len(rows) < 2 or len({r["price"] for r in rows}) != 1:
-                continue
-            ids = [r["id"] for r in rows]
-            per = self.fact(ids[0]).get("price_unit") or 1
-            unit = f" per {per:,}" if per != 1 else ""
-            out.append(
-                Evidence(
-                    kind="orders",
-                    refs=ids,
-                    sentence=f"Our last orders for {part} were at EUR {rows[0]['price']:,.2f}{unit} "
-                    f"({', '.join(ids)}).",
-                    strength=0.5,
-                    meta={"paid": rows[0]["price"], "part": part, "price_unit": per},
-                )
-            )
-        return out
 
     def evidence_quote(self, quote_id: str | None) -> list[Evidence]:
         """The buyer's alternative quote, if the case has one."""
