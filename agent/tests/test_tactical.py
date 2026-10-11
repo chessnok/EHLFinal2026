@@ -335,6 +335,25 @@ def test_own_plant_should_cost_is_not_replaced_by_the_guess(tmp_path, world) -> 
     assert strategy._reanchor(neg, sid, strategy.tplans[sid], theirs, neg.cost(sid, theirs)) is not None
 
 
+def test_own_plant_cost_leaves_the_opening_its_sustainable_margin(tmp_path, world) -> None:
+    """The arena's recorded charges put every strategic supplier at or above its sustainable margin at its own
+    opening: where the should-cost says otherwise (H03) the cost comes down until the opening carries no charge."""
+    from negotiator.strategy.tactical import SHOULD_COST_SHARE
+
+    c = case(category_goal="stabilise", sustainable_margin_pct=3, relationship_eur_per_point=5000)
+    c["parts"], c["suppliers"] = ["part:310010"], ["sup:70110"]
+    own = world.query("SELECT unit_cost FROM should_cost WHERE part_id = 'part:310010' AND supplier_id = 'sup:70110'")
+    should = round(own[0]["unit_cost"] * SHOULD_COST_SHARE, 2)
+    opening = {"unit_price": round(should, 2), "payment_days": 30}  # no margin at all by the should-cost
+    neg, sid = negotiation(tmp_path, world, c, opening)
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    assert plan.full_cost < should and neg.supplier_estimates[sid]["full_cost"] == plan.full_cost
+    assert neg.breakdown(sid, opening)["relationship"] == 0
+    assert neg.breakdown(sid, {**opening, "unit_price": opening["unit_price"] * 0.97})["relationship"] > 0
+
+
 def test_no_margin_estimate_without_the_cases_charge_parameters(tmp_path, world) -> None:
     """A strategic goal without `relationship_eur_per_point`: cost.py charges nothing, so no estimate - with one the
     price that costs us least was 0 and no sheet was left to send."""

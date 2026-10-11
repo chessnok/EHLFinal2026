@@ -33,7 +33,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
-from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer, total_cost
+from arena_kit.cost import RELATIONSHIP_GOALS, closing_terms, complete_offer, supplier_value, total_cost
 
 from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
@@ -336,6 +336,7 @@ class TacticalStrategy(BaselineStrategy):
             cost_source = "own plant" if full_cost else ""
             if full_cost and goal in RELATIONSHIP_GOALS:
                 full_cost = round(full_cost * SHOULD_COST_SHARE, 2)  # one cost for the charge and the floor
+                full_cost = self._cap_at_opening(neg, sid, terms, full_cost, profile)
             guess = None
             if not full_cost and goal in RELATIONSHIP_GOALS:
                 guessed, cost_source = self._fallback_full_cost(neg, sid)
@@ -480,6 +481,20 @@ class TacticalStrategy(BaselineStrategy):
         if not isinstance(opening, int | float) or opening <= 0:
             return None, ""
         return round(opening * (1 - margin / 100) * SHOULD_COST_SHARE, 2), "opening less the sustainable margin"
+
+    def _cap_at_opening(self, neg: Negotiation, sid: str, terms: dict, full_cost: float, p: SupplierProfile) -> float:
+        """The own-plant cost, but never so high that the supplier's opening quote leaves it under the sustainable
+        margin. The arena's recorded margin charges put every strategic supplier at or above that margin at its own
+        opening (implied by the charges on our deals: P01 6.1 % against 3, P02 1.1 against 0.5, P03 10.1 against 8,
+        H03 4.7 against 3, H04, H14 and H29 likewise); the should-cost x SHOULD_COST_SHARE left H03's opening at
+        2.6 % and charged EUR 410 on a deal the arena charged EUR 2.37."""
+        margin = neg.buyer.get("sustainable_margin_pct")
+        if not margin or terms.get("unit_price") is None:
+            return full_cost
+        estimate = self._supplier_estimate(neg, sid, full_cost, p)
+        worth = supplier_value(neg.case, closing_terms(neg.case, terms, neg.threads[sid].standard_terms), estimate)
+        cap = math.floor(worth * (1 - margin / 100) * 100) / 100
+        return min(full_cost, cap) if cap > 0 else full_cost
 
     def _guess_floor(self, neg: Negotiation, sid: str, plan: Plan, terms: dict) -> float:
         """Under a guessed cost, the price that minimises C on these terms with the guessed charge (0 without a
