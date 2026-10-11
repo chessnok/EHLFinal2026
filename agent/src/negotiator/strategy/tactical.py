@@ -271,9 +271,10 @@ def snap_option(options, value):
     return min(numeric, key=lambda o: abs(o - value)) if numeric and value not in numeric else value
 
 
-# On by default since 11 Oct, the winner strategy (P-48: mean 0.764 against 0.748 of the control run P-43;
-# P01 +0.042, P11 +0.038, P18 +0.067, P08 +0.011, the other six unchanged). Switch one off with flag=False.
-DEFAULT_ON = {"clause_rel_only", "justified_arg", "cheap_yes"}
+# On by default since 11 Oct 09:20 (David's decision): clause_rel_only + cheap_yes (P-49: P01 0.924, P08 0.626,
+# P11 0.710, P18 0.685) and fast_pay (P-50: P05 0.824 -> 0.865). justified_arg is off: alone it lost P01 and P08
+# (P-47), and in the combination P08 fell from 0.626 to 0.571. Switch one off with flag=False.
+DEFAULT_ON = {"clause_rel_only", "cheap_yes", "fast_pay"}
 
 
 class TacticalStrategy(BaselineStrategy):

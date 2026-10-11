@@ -70,6 +70,8 @@ suppliers, leverage).
 | P-46 | 11 Oct 08:39 | `3638870` | `tactical+menu_fallback` | P03 | Claude session (David) | P03's empty menu under the margin charge | P03 0.923 | neutral: the menu is no longer empty, but it holds its 432.15 |
 | P-47 | 11 Oct 08:57 | `635bc5d` | `tactical+justified_arg` (P01, P04, P08), `tactical+cheap_yes` (P11, P01) | 5 sessions | Claude session (David) | attribution of the winner parts | justified_arg P01 0.826, P04 0.860, P08 0.507; cheap_yes P11 0.710, P01 0.924 | justified_arg alone loses (P01 −0.075, P08 −0.053); cheap_yes wins (P11 +0.038, P01 +0.023) |
 | P-48 | 11 Oct 08:56 | `635bc5d` | `tactical+winner` (clause_rel_only + justified_arg + cheap_yes) | P01, P04, P08, P11, P18 (the other five are message-identical offline) | Claude session (David) | David's winner strategy | P01 0.943, P04 0.860, P08 0.571, P11 0.710, P18 0.685 · with the unchanged five: mean 0.764 against 0.748 (P-43) | adopted as default on David's decision |
+| P-49 | 11 Oct 09:14 | `ec948f4` | `tactical-nojust` (winner without justified_arg) | P01, P08 | Claude session (David) | is justified_arg what costs P08? | P01 0.924, P08 0.626 | yes: without it P08 +0.055 against winner, P01 −0.019 |
+| P-50 | 11 Oct 09:14 | `ec948f4` | `tactical+fast_pay` (on the winner default) | P05, P01, P02 | Claude session (David) | a 14-day option for a supplier that asks for faster payment | P05 0.865, P02 0.733, P01 see report | adopted with nojust as default (David) |
 
 **Team best per case** (what the practice board counts), as of P-12:
 
