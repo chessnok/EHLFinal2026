@@ -269,6 +269,11 @@ def snap_option(options, value):
     return min(numeric, key=lambda o: abs(o - value)) if numeric and value not in numeric else value
 
 
+# On by default since 11 Oct, the winner strategy (P-48: mean 0.764 against 0.748 of the control run P-43;
+# P01 +0.042, P11 +0.038, P18 +0.067, P08 +0.011, the other six unchanged). Switch one off with flag=False.
+DEFAULT_ON = {"clause_rel_only", "justified_arg", "cheap_yes"}
+
+
 class TacticalStrategy(BaselineStrategy):
     name = "tactical"
 
@@ -277,7 +282,7 @@ class TacticalStrategy(BaselineStrategy):
         unknown = set(flags) - set(FLAGS)
         if unknown:
             raise ValueError(f"unknown tactical flags: {sorted(unknown)}")
-        self.flags = {name: bool(flags.get(name, False)) for name in FLAGS}
+        self.flags = {name: bool(flags.get(name, name in DEFAULT_ON)) for name in FLAGS}
         if self.flags["respond_all"] or self.flags["respond_lite"]:
             self.flags["answers"] = True  # its plain answers are part of answering everything
         if self.flags["guess_anchor"]:

@@ -28,6 +28,8 @@ STRATEGIES: dict[str, Callable[..., Strategy]] = {
     # David's winner strategy: a fixed frame, the head computes and the mouth argues with it, patience (default),
     # yes only to conditions that cost us little and never to the price
     "tactical+winner": partial(TacticalStrategy, clause_rel_only=True, justified_arg=True, cheap_yes=True),
+    # the final model before the winner defaults (tag final-candidate-2026-10-11c), for comparison
+    "tactical-11c": partial(TacticalStrategy, clause_rel_only=False, justified_arg=False, cheap_yes=False),
     # tactical's numbers, a model for the words (and, with +reader, for the levers the regular expressions miss)
     "tactical-llm": WrittenStrategy,
     "tactical-llm+reader": partial(WrittenStrategy, reader=True),
