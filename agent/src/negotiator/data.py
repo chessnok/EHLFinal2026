@@ -1,12 +1,13 @@
 """The data package as an in-memory SQLite database plus the citable facts (facts.json).
 
 Loads `data/*.csv` of package v1 (the submodule's `data/` folder is the same as package.zip) and, once
-downloaded, the Sunday release. Hidden cases may carry their own `facts`; `with_case` merges them.
+downloaded, the Sunday release. Hidden cases may carry their own `facts`; `with_case` returns a view that adds them.
 
 The `evidence_*` helpers return arguments the arena can check: the IDs and the figure computed here,
 one sentence each - the strategy decides which to use.
 """
 
+import copy
 import csv
 import json
 import sqlite3
@@ -80,10 +81,13 @@ class WorldData:
         return self.facts.get(ref)
 
     def with_case(self, case: dict) -> "WorldData":
-        """Case-only facts (hidden cases) become citable for this case."""
-        if case.get("facts"):
-            self.facts = {**self.facts, **case["facts"]}
-        return self
+        """A view for one case: its own facts (the package's plus the case's), the tables shared.
+
+        The final plays cases in parallel on one WorldData: merging a hidden case's facts into it would make
+        them citable - and wrong - in every other case. The caller must use the returned view."""
+        view = copy.copy(self)
+        view.facts = {**self.facts, **(case.get("facts") or {})}
+        return view
 
     def document_text(self, doc_id: str) -> str | None:
         rows = self.query("SELECT file FROM documents WHERE id = ?", (doc_id,))

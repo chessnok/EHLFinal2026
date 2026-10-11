@@ -233,6 +233,8 @@ class TacticalStrategy(BaselineStrategy):
 
     # ------------------------------------------------------------------ prepare
     def prepare(self, neg: Negotiation) -> None:
+        if neg.data is not None:
+            self.data = neg.data  # the session's view for this case: its own facts (WorldData.with_case)
         buyer = neg.buyer
         goal = buyer.get("category_goal", "routine")
         parts = neg.case.get("parts") or []

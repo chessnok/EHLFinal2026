@@ -130,10 +130,9 @@ def quote_text(case: dict, offered: dict, standard: dict) -> str:
 def build_negotiation(runs_dir: Path, world, v: Variant) -> Negotiation:
     """The state right after `POST /v1/sessions`, without a client: the case and each supplier's opening e-mail."""
     case = copy.deepcopy(v.case)
+    world = world.with_case(case) if world else None  # this case's facts, not shared with the next variant
     neg = Negotiation(None, Recorder(runs_dir), world)  # type: ignore[arg-type]
     neg.case, neg.case_id, neg.session_id = case, case.get("case_id", ""), f"brief-{v.id}"
-    if world:
-        world.with_case(case)
     for sid in case["suppliers"]:
         terms = copy.deepcopy(v.openings.get(sid) or {})
         text = v.texts.get(sid) or quote_text(case, terms, v.standards.get(sid) or {})

@@ -171,7 +171,7 @@ def examine(v: Variant, world, runs_dir: Path) -> list[Finding]:
             found("crash:read", f"{sid}: {_where(e)}")
 
     # ---- prepare
-    strategy = TacticalStrategy(world)
+    strategy = TacticalStrategy(neg.data)  # the case's view of the data, with its own facts
     try:
         strategy.prepare(neg)
     except Exception as e:
