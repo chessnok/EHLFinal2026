@@ -71,6 +71,11 @@ KNOWN: dict[str, str] = {
         "suspicion - the opening breaks a must-have on a negotiable field without term_options: the agent never "
         "proposes a value of its own for it (the must-have's) and holds the thread"
     ),
+    "no_first_move:must-have-dearer-than-opening": (
+        "expected - the opening breaks a must-have and even our deepest ask that keeps it costs more than that "
+        "opening: the arena's C_open is then the opening (api.md, case:P10), every deal scores 0 and holding loses "
+        "nothing"
+    ),
 }
 
 
@@ -221,6 +226,8 @@ def examine(v: Variant, world, runs_dir: Path) -> list[Finding]:
             why = _hold_reason(v, sid, s["standard"])
             if why == "unfixable" or (math.isfinite(plan.target_c) and plan.target_c >= exp["c_alt"] - EUR):
                 continue
+            if not why and not s["must_haves_ok"] and plan.target_c >= s["c"] - EUR:
+                why = "must-have-dearer-than-opening"
             if "last round" in str(decision.rationale.get("why")):
                 why = "last-round"
             found(f"no_first_move:{why}" if why else "no_first_move", f"{sid}: {decision.kind} - {decision.rationale}")
@@ -266,11 +273,13 @@ def examine(v: Variant, world, runs_dir: Path) -> list[Finding]:
                 elif soft_floor and price < min(soft_floor, s["price"]) - 0.005:
                     # a deep first ask may sit under the sustainable-margin price where the margin charge is in
                     # C (tactical._sheets): at or above the price that costs us least on its structure, or at
-                    # most ANCHOR_SLACK of the room dearer than that structure's cheapest price
+                    # most ANCHOR_SLACK of the room dearer than that structure's cheapest price - up to the price's
+                    # rounding to cents: under a steep charge one cent is worth EUR 100-200 of C (H16, case:P10)
                     cheapest = strategy._cheapest_price(neg, sid, terms)
                     least = neg.cost(sid, {**terms, "unit_price": cheapest})
                     limit = least + ANCHOR_SLACK * max(0.0, plan.open_c - plan.target_c)
-                    bounded = price >= cheapest - 0.01 or neg.cost(sid, terms) <= limit * (1 + 1e-4)
+                    cent_up = neg.cost(sid, {**terms, "unit_price": round(price + 0.01, 2)})
+                    bounded = price >= cheapest - 0.01 or min(neg.cost(sid, terms), cent_up) <= limit * (1 + 1e-4)
                     if not neg.supplier_estimates.get(sid) or not bounded:
                         found(
                             "ask_below_margin_floor",
