@@ -425,8 +425,8 @@ def _reply(neg, sid, sheets: list[dict], status: str = "open", body: str = "") -
     )
 
 
-def test_a_move_on_its_alternative_sheet_is_a_move(tmp_path, world) -> None:
-    """It holds its primary sheet and comes down on the alternative we judge it by: no stall, and its step counts."""
+def test_its_step_is_read_from_its_primary_sheet(tmp_path, world) -> None:
+    """Stalls and its step follow the sheet the arena closes on; its alternatives do not count as moves (P-61)."""
     neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
     strategy = TacticalStrategy(world)
     strategy.prepare(neg)
@@ -436,12 +436,11 @@ def test_a_move_on_its_alternative_sheet_is_a_move(tmp_path, world) -> None:
     strategy._learn(neg, sid, plan)
     _reply(neg, sid, [{"unit_price": 17.40, "payment_days": 30}, {"unit_price": 16.90, "payment_days": 60}])
     strategy._learn(neg, sid, plan)
-    assert plan.stalls == 0
-    path = strategy._their_c_path(neg, sid)
-    assert path[-1] < path[-2] and path[-1] == neg.cost(sid, neg.best_offer(sid)[1])
+    assert plan.stalls == 1  # only its alternative fell
     _reply(neg, sid, [{"unit_price": 17.30, "payment_days": 30}, {"unit_price": 16.90, "payment_days": 60}])
     strategy._learn(neg, sid, plan)
-    assert plan.stalls == 1  # only its primary sheet fell: the offer we judge it by did not
+    path = strategy._their_c_path(neg, sid)
+    assert plan.stalls == 0 and path[-1] < path[-2]
 
 
 def test_a_message_without_arguments_leaves_no_claims_behind(tmp_path, world) -> None:

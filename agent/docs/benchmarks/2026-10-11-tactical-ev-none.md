@@ -41,10 +41,12 @@ Neither variant of this branch reaches main at the fork. Both lose on P18 and P0
   (`tactical/choice.py`). The first table keyed the supplier's response on the share of the distance between us that
   our ask closes; the second on our step against the supplier's room to its estimated stop.
 
-Not separated by these runs: which of the fixes costs `tactical` P08, P11 and P18. The three suppliers send
-alternative sheets, and reading their step from the best sheet changes our own step from round 2 on; the other
-fixes change no message in a single-supplier thread without a guess floor. This is a reading of the code and the
-traces, not a measurement.
+**Bisect (P-61, P-62; 6 more sessions).** With the supplier's step read from its primary sheet again (`96442d9`,
+nothing else changed) `tactical` scores P11 0.710, P18 0.685, P07 0.728, P08 0.571. Main at the fork (`36a9752`),
+played again, scores P07 0.728 and P08 0.571: its 0.626 and 0.740 above were played before `fast_pay` became a
+default. So the best-sheet reading was the one fix that cost score (P11 −0.084, P18 −0.067; reverted), and with it
+reverted the branch's chain equals main at the fork on all ten cases: mean 0.765. Against that, `tactical-ev`
+(0.754) wins P08 by 0.099 and loses P01 by 0.069 and P18 by 0.133.
 
 ## Runs
 
