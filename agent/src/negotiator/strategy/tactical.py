@@ -90,6 +90,7 @@ CASH_SHORT_RATE = 1.2
 # of P02 (EUR 345.39 against a should-cost of 380: charge EUR 179k, score 0); prices and concessions otherwise
 # follow C without it, as an error of a few per cent in a charge inside C moved D01 from 0.749 to 0.627 (S-26).
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
+GUESS_SLACK = 0.04  # `guess_slack`: the guessed cost floor less its largest observed error (D01 +3.5 %)
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
 ANCHOR_ROUTINE = 0.13  # routine goal: a deeper first ask is answered with a final offer
 ANCHOR_PRICE_ONLY = 0.10  # ... and 10 % where only the price of a running relationship is at stake
@@ -234,6 +235,13 @@ FLAGS: dict[str, str] = {
     "clause it must have kept, no 'pays early' that is not",
     "fresh_args": "never an argument the arena already counted (one per kind, index series, part); one held back from "
     "the first e-mail for a later round; a bundle's orders per part",
+    "guess_anchor": "a strategic supplier without its own should-cost gets the normal first ask, kept above the "
+    "guessed cost floor (implies guess_slack): the 4 % cap was for P02, which has a should-cost floor",
+    "no_guess_floor": "measurement only: no guessed cost floor at all (how much the floor costs D01)",
+    "guess_slack": "the guessed cost floor of a strategic supplier without its own should-cost sits 4 % lower (its "
+    "error was up to +3.5 %; D01 fell 0.969 -> 0.669 with it)",
+    "rel_anchor4": "strategic suppliers keep the 4 % first ask even when their margin charge is estimated (the 10 % "
+    "ask of 11c: D01 0.969 -> 0.669, P01 0.946 -> 0.901, P10 0.663 -> 0.647); the charge stays in C",
     "menu_fallback": "under a margin charge, where the price on the lower side of the C minimum is not below its "
     "offer, ask on the usual side instead of finding no sheet and closing (P03)",
     "clause_rel_only": "an index series named in its quote counts as a request for a clause only with a strategic "
@@ -265,6 +273,8 @@ class TacticalStrategy(BaselineStrategy):
         self.flags = {name: bool(flags.get(name, False)) for name in FLAGS}
         if self.flags["respond_all"] or self.flags["respond_lite"]:
             self.flags["answers"] = True  # its plain answers are part of answering everything
+        if self.flags["guess_anchor"]:
+            self.flags["guess_slack"] = True  # the deep ask needs the (lowered) guessed floor under it
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
 
@@ -426,7 +436,7 @@ class TacticalStrategy(BaselineStrategy):
     def _guess_floor(self, neg: Negotiation, sid: str, plan: Plan, terms: dict) -> float:
         """Under a guessed cost, the price that minimises C on these terms with the guessed charge (0 without a
         guess): no ask and no accept goes under it."""
-        if not plan.guess or terms.get("unit_price") is None:
+        if not plan.guess or terms.get("unit_price") is None or self.flags["no_guess_floor"]:
             return 0.0
         std = neg.threads[sid].standard_terms
 
@@ -440,7 +450,12 @@ class TacticalStrategy(BaselineStrategy):
                 hi = b
             else:
                 lo = a
-        return math.ceil((lo + hi) / 2 * 100 - 1e-6) / 100
+        floor = math.ceil((lo + hi) / 2 * 100 - 1e-6) / 100
+        if self.flags["guess_slack"]:
+            # the guess sat up to 3.5 % above the arena's cost (D01): a floor that high left 2.5 % of room and D01
+            # fell 0.969 -> 0.669; under it by its own error the floor still stops a P02-like squeeze
+            floor = round(floor * (1 - GUESS_SLACK), 2)
+        return floor
 
     def _standard_terms(self, neg: Negotiation, sid: str) -> dict:
         """The supplier's standard terms for the relationship term: its quote PDF, then its master data, then its
@@ -545,11 +560,15 @@ class TacticalStrategy(BaselineStrategy):
             # P07 (bundling, routine): a 13 % ask got 5.59 and four rounds (0.721, P-13); 25-26 % got "your
             # target prices are not feasible", 5.69 and a final offer in round 2 (0.585 P-15, 0.663 P-22)
             depth, extra = min(depth, ANCHOR_ROUTINE), 0.0
-        if neg.supplier_estimates.get(sid):
+        if neg.supplier_estimates.get(sid) and not (
+            self.flags["rel_anchor4"] and neg.buyer.get("category_goal") in RELATIONSHIP_GOALS
+        ):
             # the margin charge is in C: the ask may go as deep as a price-only talk, it stops at the price that
             # costs us least (below). P01 came down to 132.20 after a 10 % ask, to 137.00 after a 3 % one
             depth, extra = ANCHOR_PRICE_ONLY, 0.0
-        elif neg.buyer.get("category_goal") in RELATIONSHIP_GOALS:
+        elif neg.buyer.get("category_goal") in RELATIONSHIP_GOALS and not (
+            self.flags["guess_anchor"] and self._full_cost(neg.case.get("parts") or [], sid) is None
+        ):
             depth, extra = min(depth, ANCHOR_RELATIONSHIP), 0.0  # squeezing a strategic supplier costs us C
         # round 1 carries 67 % of all supplier movement and no supplier ever walked over a deep first offer
         # (0 of 917 replies); within a case deeper first offers went with better scores - so we open deep
