@@ -719,8 +719,8 @@ class TacticalStrategy(BaselineStrategy):
             if not isinstance(i, int) or not 0 <= i < len(read):
                 continue
             key, refs = read[i]
-            if result == "duplicate" and key[0] not in ("index", "rival"):
-                plan.spent_kinds.add(key[0])  # counted once per kind, whatever the part or ID
+            if result == "duplicate" and key[0] not in ("index", "rival", "orders"):
+                plan.spent_kinds.add(key[0])  # counted once per kind, whatever the ID (orders: per part, by key)
             kinds = {c.kind for c in plan.last_claims if set(c.refs) & refs}
             if result == "contradicted":
                 self.banned_case_kinds |= kinds
@@ -1443,7 +1443,12 @@ class TacticalStrategy(BaselineStrategy):
                 if e.kind == "rival_offer":
                     if any((sid, r) in self.used_rival_refs for r in e.refs):
                         continue
-                elif any(r in self.used_refs for r in e.refs) or (e.kind in kinds and e.kind != "recent_drop"):
+                elif any(r in self.used_refs for r in e.refs) or (
+                    # a bundle's parts each count their own orders (api.md): the key check below keeps one per part
+                    e.kind in kinds
+                    and e.kind != "recent_drop"
+                    and not (self.flags["fresh_args"] and e.kind == "orders")
+                ):
                     continue
                 if first and (e.meta or {}).get("later"):
                     continue

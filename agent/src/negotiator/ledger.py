@@ -65,6 +65,8 @@ def arguments_read(body: str, refs: list[str] | None, facts: dict | None = None)
     groups: dict[tuple, set[str]] = {}
     for ref in ids:
         groups.setdefault(argument_key(ref, facts), set()).add(ref)
+    if ("notice",) in groups and not any(r.startswith("doc:") for r in groups[("notice",)]):
+        del groups[("notice",)]  # a contract clause without the notice letter is not read as an argument (P08)
     seen = {k: i for i, k in enumerate(groups)}
     order = sorted(groups, key=lambda k: (KIND_ORDER.get(k[0], 9), k[1] if k[0] == "index" else "", seen[k]))
     return [(k, groups[k]) for k in order][:3]

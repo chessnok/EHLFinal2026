@@ -108,8 +108,27 @@ def test_a_duplicate_spends_the_kind(tmp_path, world) -> None:
     }
     t.messages.append(reply)
     strategy._learn_claims(t, plan, reply)
-    # orders of another part would be counted again; an index series is counted by series, not by kind
-    assert plan.spent_kinds == {"orders"}
+    # an index series is counted by series and orders by part (api.md: "order lines of different parts are
+    # separate arguments"), so a duplicate spends neither kind; the cited series and part stay spent by key
+    assert plan.spent_kinds == set()
+
+
+def test_a_bundle_cites_the_orders_of_each_part(tmp_path, world) -> None:
+    by_part: dict[str, str] = {}
+    for ref, fact in world.facts.items():
+        if ref.startswith("po:") and fact.get("part"):
+            by_part.setdefault(fact["part"], ref)
+    (p1, r1), (p2, r2) = list(by_part.items())[:2]
+    neg, sid, strategy, plan = _setup(tmp_path, world, fresh_args=True)
+    plan.evidence = [_ev("orders", [r1], 3.0), _ev("orders", [r2], 2.0), _ev("forecast", ["fc:T1@2026-09"], 1.0)]
+    picked = strategy._choose_claims(neg, sid, plan, first=True)
+    assert [e.refs[0] for e in picked] == [r1, r2]  # both parts now (the forecast is kept back for round 2)
+
+
+def test_a_contract_clause_without_a_letter_is_not_read() -> None:
+    assert arguments_read("The contract says 90 days (ctr:7#3.2).", []) == []
+    read = arguments_read("Your letter gives 30 days (doc:1-M2) against 90 (ctr:7#3.2).", [])
+    assert [k for k, _ in read] == [("notice",)]
 
 
 # ---------------------------------------------------------------- index falls over any valid window (`all_windows`)
