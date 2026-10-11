@@ -40,6 +40,6 @@ What the arena answered:
 
 ## Runs
 
-Set practice, the Sunday release loaded (`../runs.md` P-58 to P-60): `20261011-112529-practice-tactical+ppm_ladder`
+Set practice, the Sunday release loaded (`../runs.md` P-63 to P-65): `20261011-112529-practice-tactical+ppm_ladder`
 (P11), `20261011-112618-practice-tactical+anchor18` (P08), `20261011-112625-practice-tactical+owner_offer` (P08);
-P-61 and P-62: `20261011-113020-practice-tactical+anchor18` (P18), `20261011-113241-practice-tactical+anchor18` (P05).
+P-66 and P-67: `20261011-113020-practice-tactical+anchor18` (P18), `20261011-113241-practice-tactical+anchor18` (P05).

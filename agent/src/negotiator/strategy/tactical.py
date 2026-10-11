@@ -91,6 +91,7 @@ CASH_SHORT_RATE = 1.2
 # of P02 (EUR 345.39 against a should-cost of 380: charge EUR 179k, score 0); prices and concessions otherwise
 # follow C without it, as an error of a few per cent in a charge inside C moved D01 from 0.749 to 0.627 (S-26).
 RELATIONSHIP_COST_FLOOR = 0.95  # never ask a strategic supplier below 95 % of its should-cost
+YES_ROOM_SHARE = 0.01  # ... and at most this share of the room (`open_c - target_c`)
 CHEAP_YES = 0.002  # `cheap_yes`: a condition of its we accept at our price when it costs us at most this share of C
 GUESS_SLACK = 0.04  # `guess_slack`: the guessed cost floor less its largest observed error (D01 +3.5 %)
 ANCHOR_RELATIONSHIP = 0.04  # stabilise / secure_supply: below its margin the deal costs us
@@ -140,6 +141,7 @@ MUST_CLAUSE = re.compile(
     r"index clause",
     re.I,
 )
+LATE_COMPLAINTS_SINCE = "2025-10-01"  # `late_facts`: our complaints from here on (as `fresh_claims`)
 FIGURES_ASKED = re.compile(
     r"Which figures is that based on|Please (?:send us|provide) the data|data that forms the basis", re.I
 )
@@ -157,6 +159,7 @@ FIELD_WORDS = {
 }
 MAX_SPREAD = 0.08  # options of one message stay within 8 % of each other's price
 EQUAL_C = 0.005  # ... and within 0.5 % of each other's C
+OWN_GAIN = 1.5  # `own_structures`: its own price drop for a structure must exceed what the structure costs us by this
 
 
 def reply_signals(body: str) -> dict:
@@ -222,6 +225,7 @@ class Plan:
     justified_note: str | None = None  # its own drivers x shares against what its quote asks (said once)
     bigger_step: bool = False  # it called our last step too small
     spent_kinds: set = field(default_factory=set)  # argument kinds the arena called `duplicate` (fresh_args)
+    market_backs_ask: bool = False  # the indices back its ask: no index argument in any round (late_facts too)
 
 
 # Candidate changes, each switchable (`tactical+<flag>`) so practice can measure it on its own before it is
@@ -247,14 +251,22 @@ FLAGS: dict[str, str] = {
     "error was up to +3.5 %; D01 fell 0.969 -> 0.669 with it)",
     "rel_anchor4": "strategic suppliers keep the 4 % first ask even when their margin charge is estimated (the 10 % "
     "ask of 11c: D01 0.969 -> 0.669, P01 0.946 -> 0.901, P10 0.663 -> 0.647); the charge stays in C",
-    "fast_pay": "it asked for faster payment and no option pays at 14 days: a 14-day option joins at option A's C "
-    "(P05 0.824 -> 0.865)",
+    "fast_pay": "it asked for faster payment and no option pays at the shortest term allowed (14 days): such an "
+    "option joins at option A's C (P05 0.824 -> 0.865)",
     "cheap_yes": "yes to a condition it asked for (its own sheet value) in option A at our price, only where it "
     "costs us at most 0.2 % of C - never a yes to its price",
     "no_hedged_series": "a hedged supplier hears no argument on the series a clause option follows (P08 "
     "answered 'not our reality' in every session; the slot goes to the next argument) and no fact twice",
     "soft_anchor": "a higher first offer under routine and quality_first goals: the first ask half as deep "
     "(their suppliers moved 0.4-6 % in all; leverage suppliers 15-24 %, P05 36 -> 27.50, need the deep one)",
+    "probe_final": "the old RFQ probe: one price push on a final offer behind a safe rival. Off since P-58 (P05 "
+    "0.865 without it, as with it); in 442 sessions re-sending its own sheet was agreed 71 of 74 times, a push of 2 %+ "
+    "walked 13 of 14, the probe walked Hrvelec 10 of 10 times",
+    "own_structures": "a structure the supplier itself prices cheaply - its own alternative sheets give the rate, "
+    "e.g. P05 Hrvelec 35.00 at 35 days, 31.50 at 52 (snapped to what we may sign: 42) - joins as option B at option "
+    "A's C when its drop is 1.5x what the structure costs us; its own lead time beyond our need also without a pair",
+    "hide_own_cost": "measurement only: the own plant's should-cost is not read (`_full_cost` None), so strategic "
+    "own-plant cases (P01, P02, P03, P10) run the guessed-cost path most hidden strategic suppliers get (A3 floor)",
     "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
     "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
@@ -279,6 +291,11 @@ FLAGS: dict[str, str] = {
     "offered to show it, not for 'a cost breakdown' (P08 refused the plain question in every session)",
     "news": "from round 2 one press report about the supplier's idle capacity (or the case's own news item), cited "
     "by ID next to the round's other arguments - the one checkable kind we never cited (docs/argument-audit.md)",
+    "no_q1": "no question in the first e-mail (each one cost 0.43 pp of the first drop, 9 of 12 suppliers): the "
+    "cost-breakdown request to an open-book supplier waits for round 2",
+    "late_facts": "round 1 as today; from round 2 every offer carries at least one argument the arena has not counted "
+    "for this supplier: remaining strong evidence first, then weak facts kept out of round 1 (price history, a "
+    "delivery or quality record or complaint, an index series it rebuffed), never a counted kind, series or part",
 }
 
 
@@ -310,6 +327,8 @@ class TacticalStrategy(BaselineStrategy):
             self.flags["guess_slack"] = True  # the deep ask needs the (lowered) guessed floor under it
         self.tplans: dict[str, Plan] = {}
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
+        self.refused_kinds: dict[str, set[str]] = {}  # supplier -> kinds it called `irrelevant` (late_facts)
+        self.late_extra: dict[str, list[Evidence]] = {}  # supplier -> weak facts only for rounds 2+ (late_facts)
 
     # ------------------------------------------------------------------ prepare
     def prepare(self, neg: Negotiation) -> None:
@@ -365,6 +384,7 @@ class TacticalStrategy(BaselineStrategy):
                 plan.banned_kinds.add("index")  # "not our reality" until its hedge runs out
             if gt.market_supports_ask:
                 plan.banned_kinds.add("index")  # the indices back its ask: citing them helps it, not us
+                plan.market_backs_ask = True
             self.tplans[sid] = plan
             neg.recorder.event(
                 "plan",
@@ -448,8 +468,9 @@ class TacticalStrategy(BaselineStrategy):
         """The should-cost of THIS supplier's plant for a single-part case; None otherwise.
 
         Another supplier's estimate is a different plant (cost base, process) and a bundle's price is
-        not one part's cost: guessing would push the floor and the margin charge the wrong way."""
-        if not self.data or len(parts) != 1:
+        not one part's cost: guessing would push the floor and the margin charge the wrong way.
+        `hide_own_cost`: None always, so a strategic supplier with an own-plant cost runs the guessed-cost path."""
+        if not self.data or len(parts) != 1 or self.flags["hide_own_cost"]:
             return None
         rows = self.data.query(
             "SELECT unit_cost FROM should_cost WHERE part_id = ? AND supplier_id = ? ORDER BY estimate_date DESC",
@@ -701,6 +722,7 @@ class TacticalStrategy(BaselineStrategy):
             # walk-away for ~+0.05 on average - only an RFQ with a safe rival offer may push once, with a real step
             if (
                 their_c > plan.upper_c
+                and self.flags["probe_final"]
                 and not plan.probed_final
                 and self._may_probe(neg, supplier_id, their_c)
                 and self._may_push(neg, supplier_id)
@@ -733,9 +755,10 @@ class TacticalStrategy(BaselineStrategy):
         t = neg.threads[sid]
         replies = t.supplier_messages
         for reply in replies[plan.seen_replies :]:
-            if self.flags["fresh_args"]:
+            arena_reading = self.flags["fresh_args"] or self.flags["late_facts"]
+            if arena_reading:
                 self._learn_claims(t, plan, reply)
-            for res in [] if self.flags["fresh_args"] else reply.get("claim_results") or []:
+            for res in [] if arena_reading else reply.get("claim_results") or []:
                 i, result = res.get("index"), res.get("result")
                 if not isinstance(i, int) or not 0 <= i < len(plan.last_claims):
                     continue
@@ -813,7 +836,12 @@ class TacticalStrategy(BaselineStrategy):
             if options and want not in options:
                 continue  # a value we may not sign (P10's 54 days) would void the whole option
             trial = {**out, f: want}
-            if neg.keeps_must_haves(sid, trial) and neg.cost(sid, trial) - neg.cost(sid, out) <= CHEAP_YES * base:
+            # a share of C, and never more than 1 % of the room: P02's room is 2.3 % of C, so 0.2 % of C there
+            # would be up to 0.087 of the score for one yes (stress test of 11 Oct)
+            room = plan.open_c - plan.target_c
+            # no room, no free yes; an unknown room (no estimate) keeps the share of C
+            limit = min(CHEAP_YES * base, YES_ROOM_SHARE * max(0.0, room)) if math.isfinite(room) else CHEAP_YES * base
+            if neg.keeps_must_haves(sid, trial) and neg.cost(sid, trial) - neg.cost(sid, out) <= limit:
                 out, granted = trial, granted + [(f, want)]
         if granted:
             words = " and ".join(f"{FIELD_WORDS.get(f, f.replace('_', ' '))} {v}" for f, v in granted)
@@ -968,6 +996,7 @@ class TacticalStrategy(BaselineStrategy):
                 self.banned_case_kinds |= kinds
             elif result == "irrelevant":
                 plan.banned_kinds |= kinds
+                self.refused_kinds.setdefault(plan.supplier_id, set()).update(kinds)
 
     def _facts(self) -> dict:
         return self.data.facts if self.data else {}
@@ -1613,17 +1642,119 @@ class TacticalStrategy(BaselineStrategy):
         # without it practice P02 0.167 -> 0.731)
         cheapest = min(neg.cost(sid, t) for t in picked)
         picked = [t for t in picked if neg.cost(sid, t) <= cheapest * (1 + EQUAL_C)]
+        # never an option dearer for us than its own standing offer: it would simply take that one
+        picked = [t for t in picked if neg.cost(sid, t) < their_c] or picked
         out, keys = [], set()
         for t in picked:
             if structure_key(t) not in keys:
                 keys.add(structure_key(t))
                 out.append({"terms": t})
-                plan.offered[structure_key(t)] = max(plan.offered.get(structure_key(t), 0.0), t["unit_price"])
         if self.flags["ppm_ladder"]:
             out = self._ppm_ladder(neg, sid, plan, out, their_c)
+        if self.flags["own_structures"]:
+            out = self._own_structures(neg, sid, plan, out, their_c)
         if self.flags["fast_pay"]:
             out = self._fast_pay(neg, sid, plan, out, their_c)
-        return out[:3]
+        out = out[:3]
+        for o in out:  # only what is sent counts as offered: a dropped option must not floor the next round
+            t = o["terms"]
+            if structure_key(t) in keys:  # the menu's own options, as before (fast_pay's never counted)
+                plan.offered[structure_key(t)] = max(plan.offered.get(structure_key(t), 0.0), t["unit_price"])
+        return out
+
+    @staticmethod
+    def _own_rates(neg: Negotiation, sid: str) -> dict[str, tuple]:
+        """What the supplier's own sheets say a structure is worth to it: per field, (its value on the dearer sheet,
+        its value on the cheaper one, the price drop) from two sheets of one message that differ in that field only
+        (P05 Hrvelec: 35.00 at 35 days next to 31.50 at 52). The latest message wins."""
+        negotiable = [f for f in neg.case["negotiable"] if f != "unit_price"]
+        rates: dict[str, tuple] = {}
+        for m in neg.threads[sid].supplier_messages:
+            sheets = [s.get("terms") or {} for s in m.get("term_sheets") or []]
+            sheets = [{**sheets[0], **s} for s in sheets if isinstance(s.get("unit_price"), int | float)]
+            for i, x in enumerate(sheets):
+                for y in sheets[i + 1 :]:
+                    diff = [f for f in negotiable if x.get(f) != y.get(f)]
+                    if len(diff) != 1 or x["unit_price"] == y["unit_price"]:
+                        continue
+                    dear, cheap = (x, y) if x["unit_price"] > y["unit_price"] else (y, x)
+                    f = diff[0]
+                    rates[f] = (dear.get(f), cheap.get(f), dear["unit_price"] - cheap["unit_price"])
+        return rates
+
+    def _own_structures(self, neg: Negotiation, sid: str, plan: Plan, out: list[dict], their_c: float) -> list[dict]:
+        """A structure the supplier prices far more cheaply than it costs us joins as option B, at option A's C.
+
+        Lead time is the big asymmetry: our late cost is one sum per day for the whole contract, its overtime is
+        priced per unit - P05 Hrvelec asked 9.9 % less at 52 days than at 35 (n 29; 7 days over our need cost us
+        EUR 1,400 in all), P10's supplier 5.6 % less at 54 days than at 42. Our menu never sent them: at equal C the
+        longer lead time has a slightly lower price, and option A takes the highest price."""
+        if not out:
+            return out
+        case, options = neg.case, neg.case.get("term_options", {})
+        a = out[0]["terms"]
+        a_c = neg.cost(sid, a)
+        keys = {structure_key(sh["terms"]) for sh in out}
+        candidates = []  # (its gain - our cost, terms)
+        rated = False  # a sheet pair already gave its rate for the lead time
+
+        def priced(f, value):
+            terms = complete_offer(case, {**a, f: value})
+            if structure_key(terms) in keys or not neg.keeps_must_haves(sid, terms):
+                return None
+            terms["unit_price"] = max(
+                self._iso_cost_price(neg, sid, terms, a_c), plan.offered.get(structure_key(terms), 0)
+            )
+            return terms
+
+        def allowed(f, near):
+            """The option we may sign nearest to its value (52 days -> 42 under a 42-day must-have)."""
+            opts = [o for o in options.get(f) or [] if o is not None and neg.keeps_must_haves(sid, {**a, f: o})]
+            if not opts:
+                return None
+            if isinstance(near, int | float) and all(isinstance(o, int | float) for o in opts):
+                return min(opts, key=lambda o: (abs(o - near), o))
+            return near if near in opts else None
+
+        for f, (dear, cheap, drop) in self._own_rates(neg, sid).items():
+            value = allowed(f, cheap)
+            if value is None or value == a.get(f):
+                continue
+            if all(isinstance(v, int | float) for v in (dear, cheap, value, a.get(f))):
+                gain = drop * (value - dear) / (cheap - dear)  # its price per unit of the field, within its own pair
+            elif a.get(f) == dear and value == cheap:
+                gain = drop
+            else:
+                continue
+            terms = priced(f, value)
+            if terms and gain > max(0.0, OWN_GAIN * (a["unit_price"] - terms["unit_price"])):
+                candidates.append((gain - (a["unit_price"] - terms["unit_price"]), terms))
+                rated = rated or f == "lead_time_days"
+        if "lead_time_days" in case["negotiable"] and not rated:
+            # its own lead time beyond our need, where no sheet pair gives its rate yet (P05 Hrvelec opened at 52
+            # days, P10's supplier at 54): at equal C it costs us nothing, and a shorter one means overtime for it
+            own = [
+                v
+                for m in neg.threads[sid].supplier_messages
+                for s in m.get("term_sheets") or []
+                if isinstance(v := (s.get("terms") or {}).get("lead_time_days"), int | float)
+            ]
+            need = neg.buyer.get("need_lead_time_days") or 0
+            if own and max(own) > max(need, a.get("lead_time_days") or 0):
+                value = allowed("lead_time_days", max(own))
+                if value is not None and value > (a.get("lead_time_days") or 0):
+                    terms = priced("lead_time_days", value)
+                    if terms:
+                        candidates.append((0.0, terms))
+        for _, terms in sorted(candidates, key=lambda x: -x[0]):
+            if terms["unit_price"] > a["unit_price"] or terms["unit_price"] <= 0:
+                continue  # never an option dearer than A: it anchors its price up
+            if neg.cost(sid, terms) > a_c * (1 + EQUAL_C) or neg.cost(sid, terms) >= their_c:
+                continue  # every option of a message costs us the same
+            plan.offered[structure_key(terms)] = max(plan.offered.get(structure_key(terms), 0.0), terms["unit_price"])
+            log.info("%s: its own structure %s joins at %.2f", sid, structure_key(terms), terms["unit_price"])
+            return out[:1] + [{"terms": terms}] + out[1:2]  # option B: fast_pay may still take option C
+        return out
 
     def _ppm_ladder(self, neg: Negotiation, sid: str, plan: Plan, out: list[dict], their_c: float) -> list[dict]:
         """One sheet per ppm commitment the must-haves allow, tightest first, all at the lowest chargeback and at
@@ -1689,13 +1820,20 @@ class TacticalStrategy(BaselineStrategy):
         return picked
 
     def _fast_pay(self, neg: Negotiation, sid: str, plan: Plan, out: list[dict], their_c: float) -> list[dict]:
-        """It asked for faster payment and no option pays at 14 days: one that does joins, at the same C as option A.
+        """It asked for faster payment and no option pays at the shortest term the case allows (14 days in every
+        practice case): one that does joins, at the same C as option A.
         It costs us ~0.10 EUR a unit for 16 days; P05's 70210 gave 0.50 for it ("I can drop the price to 27.50 for
         14 days payment": 0.824 -> 0.865)."""
-        options = neg.case.get("term_options", {}).get("payment_days") or []
-        if not out or "payment_days" not in neg.case["negotiable"] or "payment_days" not in plan.requests:
+        options = [o for o in neg.case.get("term_options", {}).get("payment_days") or [] if isinstance(o, int | float)]
+        if (
+            not out
+            or not options
+            or "payment_days" not in neg.case["negotiable"]
+            or "payment_days" not in plan.requests
+        ):
             return out
-        if 14 not in options or any((sh["terms"].get("payment_days") or 999) <= 14 for sh in out):
+        fastest = min(options)  # the shortest term the case allows (14 days in every practice case)
+        if any((sh["terms"].get("payment_days") or 999) <= fastest for sh in out):
             return out
         if len(neg.threads) < 2:
             return out  # measured to win only in an RFQ (P05 +0.041); alone it lost P08 0.055 and P07 0.012 (P-51)
@@ -1704,7 +1842,7 @@ class TacticalStrategy(BaselineStrategy):
                 out  # under a margin charge the 14-day option prices high and pulls its price up (P01 0.943 -> 0.818)
             )
         a = out[0]["terms"]
-        base = complete_offer(neg.case, {**a, "payment_days": 14})
+        base = complete_offer(neg.case, {**a, "payment_days": fastest})
         base["unit_price"] = self._iso_cost_price(neg, sid, base, neg.cost(sid, a))
         if base["unit_price"] > a["unit_price"]:
             return out  # never an option dearer than A: it anchors its price up
@@ -1774,7 +1912,8 @@ class TacticalStrategy(BaselineStrategy):
             if plan.figures_asked:
                 order = ["should_cost", "recent_drop", "index", "notice", "quality", "complaint", "orders"]
                 pool.sort(key=lambda e: order.index(e.kind) if e.kind in order else len(order))
-        spent = self._spent_keys(neg, sid) if self.flags["fresh_args"] or self.flags["all_windows"] else set()
+        late = self.flags["late_facts"] and not first
+        spent = self._spent_keys(neg, sid) if self.flags["fresh_args"] or self.flags["all_windows"] or late else set()
 
         def select(limit: float) -> list[Evidence]:
             picked, kinds, keys, companions = [], set(), set(), 0
@@ -1801,6 +1940,7 @@ class TacticalStrategy(BaselineStrategy):
                 key = (
                     self._arg_key(e)
                     if self.flags["fresh_args"]
+                    or late
                     or (self.flags["all_windows"] and e.kind in ("index", "recent_drop"))  # one window per series
                     else None
                 )
@@ -1838,10 +1978,15 @@ class TacticalStrategy(BaselineStrategy):
             open_ref = report is not None and (report.meta or {}).get("any_supplier")
             if report and "news" not in banned and (open_ref or not set(report.refs) & self.used_refs):
                 picked.append(report)
+        if late and not self._carries_fact(picked, spent) and len(picked) < 3:
+            # a round-2+ e-mail without a fact the arena has not counted got a final offer 53-60 % of the time, with
+            # one 4-11 % (442 practice sessions, paired within case and round); even a weak one as the only fact: 0 %
+            pool = [e for e in pool if e.refs and e not in picked] + self._late_pool(neg, sid, plan)
+            picked += select(1)
         for e in picked:
             plan.used_sentences.add(e.sentence)
         plan.figures_reply, plan.figures_asked = (
-            (self.flags["fresh_claims"] or self.flags["respond_all"] or self.flags["respond_lite"])
+            (self.flags["fresh_claims"] or self.flags["respond_all"] or self.flags["respond_lite"] or late)
             and plan.figures_asked
             and bool(picked),
             False,
@@ -1856,7 +2001,7 @@ class TacticalStrategy(BaselineStrategy):
     def _news_evidence(self, neg, sid: str, profile) -> list[Evidence]:
         """Press reports the arena can check ("that it is about this supplier", api.md): the ones that show idle
         capacity (the package's, read by the profile, and a hidden case's own facts), and a news item the case
-        points to without its text (the sandbox). D02: verified, 14.50 -> 13.90 (runs.md S-39, S-40)."""
+        points to without its text (the sandbox). D02: verified, 14.50 -> 13.90 (runs.md S-45, S-46)."""
         idle = [r for r in profile.traits.get("underutilised", []) if r.startswith("news:")]
         for ref, fact in self.data.facts.items():
             if not ref.startswith("news:") or fact.get("supplier") != sid or ref in idle:
@@ -1878,6 +2023,38 @@ class TacticalStrategy(BaselineStrategy):
                 meta = {"later": True, "any_supplier": True}
                 out.append(Evidence(kind="news", refs=[ref], sentence=sentence, meta=meta))
         return out
+
+    def _carries_fact(self, picked: list[Evidence], spent: set) -> bool:
+        """Does a message with these arguments carry one the arena reads and has not counted for this supplier?"""
+        refs = [r for e in picked for r in e.refs]
+        return any(k not in spent for k, _ in arguments_read("", refs, self._facts()))
+
+    def _late_pool(self, neg, sid: str, plan: Plan) -> list[Evidence]:
+        """Weak facts for rounds 2+, kept out of round 1 where they cost the first drop (bot-mechanics.md): the kinds
+        this supplier's plan bans (price history it shrugged off, a delivery record outside quality cases, an index
+        series it rebuffed), our complaints, a bundle's orders per part. Never a kind it found irrelevant or one
+        contradicted in this case. The best kind first: price history, then the record, then a rebuffed series."""
+        if sid not in self.late_extra:
+            extra: list[Evidence] = []
+            parts = neg.case.get("parts") or []
+            if self.data and parts:
+                extra += self.data.evidence_complaints(parts, sid, since=LATE_COMPLAINTS_SINCE)[:1]
+                if not self.flags["fresh_args"]:
+                    extra += self.data.evidence_orders_per_part(parts, sid)
+            self.late_extra[sid] = extra
+        hard = (
+            self.banned_case_kinds
+            | self.refused_kinds.get(sid, set())
+            | ({"index"} if plan.market_backs_ask else set())
+        )
+        seen: set[str] = set()
+        out = []
+        for e in plan.counters + plan.evidence + self.late_extra[sid]:
+            if e.refs and e.kind not in hard and e.sentence not in plan.used_sentences and e.sentence not in seen:
+                seen.add(e.sentence)
+                out.append(e)
+        order = {"orders": 0, "scorecard": 1, "quality": 1, "complaint": 2, "index": 3, "recent_drop": 3}
+        return sorted(out, key=lambda e: (order.get(e.kind, 4), -e.strength))
 
     @staticmethod
     def _drop_hedged_series(neg, plan: Plan) -> None:
@@ -1943,8 +2120,15 @@ class TacticalStrategy(BaselineStrategy):
         if first and plan.justified_note:
             said.append(plan.justified_note)  # the head's sum of its own figures, said by the mouth once
             plan.justified_note = None
+        if first and self.flags["no_q1"]:
+            said = [x for x in said if not x.rstrip().endswith("?")]
         lines += said
-        if not plan.asked_breakdown and p.has("open_book") and not plan.breakdown_read:
+        if (
+            not plan.asked_breakdown
+            and p.has("open_book")
+            and not plan.breakdown_read
+            and not (first and self.flags["no_q1"])  # asked from round 2 on
+        ):
             lines.append(self._breakdown_question(p))
             plan.asked_breakdown = True
         if len(sheets) > 1:

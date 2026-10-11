@@ -58,7 +58,14 @@ def accept_problems(neg, supplier_id: str, term_sheet_id: str | None) -> list[st
     elif c >= neg.c_alt:
         problems.append(f"C {c:,.0f} does not beat the alternative {neg.c_alt:,.0f}")
     elif c >= neg.c_open and (
-        math.isfinite(neg.c_alt) or any(o != supplier_id and ot.live for o, ot in neg.threads.items())
+        math.isfinite(neg.c_alt)
+        or any(
+            o != supplier_id
+            and ot.live
+            and ot.standing[1].get("unit_price")
+            and neg.keeps_must_haves(o, ot.standing[1])
+            for o, ot in neg.threads.items()
+        )
     ):
         # a deal no better than the cheapest opening scores 0; the alternative scores at least that - and in an
         # RFQ without one another live bidder still can (P06 type: the dearer bidder agreed in round 1, C >= C_open,
