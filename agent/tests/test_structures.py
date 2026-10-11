@@ -50,7 +50,7 @@ def answer(neg: Negotiation, strategy: TacticalStrategy, sid: str, status: str, 
     return d
 
 
-# ---------------------------------------------------------------- final_safe
+# ---------------------------------------------------------------- after a final offer
 def _final_offer_behind_a_rival(tmp_path, world, **flags):
     """Two bidders; the dearer one calls 15.40 final while the other stands at 14.00 - the probe's case."""
     c = rfq()
@@ -73,20 +73,20 @@ def _final_offer_behind_a_rival(tmp_path, world, **flags):
     return neg, a, strategy
 
 
-def test_without_final_safe_a_final_offer_behind_a_rival_is_probed(tmp_path, world) -> None:
-    neg, sid, strategy = _final_offer_behind_a_rival(tmp_path, world)
+def test_probe_final_pushes_a_final_offer_behind_a_rival(tmp_path, world) -> None:
+    neg, sid, strategy = _final_offer_behind_a_rival(tmp_path, world, probe_final=True)
     d = strategy.decide(neg, sid)
     assert d.kind == "message" and d.rationale["probe"]
     assert d.message["term_sheets"][0]["terms"]["unit_price"] < 15.4
 
 
-def test_final_safe_never_pushes_a_final_offer(tmp_path, world) -> None:
-    neg, sid, strategy = _final_offer_behind_a_rival(tmp_path, world, final_safe=True)
+def test_a_final_offer_is_never_pushed_by_default(tmp_path, world) -> None:
+    neg, sid, strategy = _final_offer_behind_a_rival(tmp_path, world)
     d = strategy.decide(neg, sid)
     assert d.kind != "message" and not strategy.tplans[sid].probed_final
 
 
-def test_final_safe_still_sends_back_its_own_cheaper_alternative(tmp_path, world) -> None:
+def test_its_own_cheaper_alternative_still_goes_back_after_a_final_offer(tmp_path, world) -> None:
     c = rfq()
     sid = c["suppliers"][0]
     neg = opened(
@@ -95,7 +95,7 @@ def test_final_safe_still_sends_back_its_own_cheaper_alternative(tmp_path, world
         {**c, "suppliers": [sid]},
         {sid: [{"unit_price": 16.0, "payment_days": 60, "lead_time_days": 42}]},
     )
-    strategy = TacticalStrategy(world, final_safe=True)
+    strategy = TacticalStrategy(world)
     strategy.prepare(neg)
     alternative = {"unit_price": 15.2, "payment_days": 60, "lead_time_days": 42}
     answer(

@@ -258,8 +258,9 @@ FLAGS: dict[str, str] = {
     "answered 'not our reality' in every session; the slot goes to the next argument) and no fact twice",
     "soft_anchor": "a higher first offer under routine and quality_first goals: the first ask half as deep "
     "(their suppliers moved 0.4-6 % in all; leverage suppliers 15-24 %, P05 36 -> 27.50, need the deep one)",
-    "final_safe": "after its final offer (or firm words) never a price push: only its own cheapest sheet (primary or "
-    "alternative) goes back - re-sending its own sheet was agreed 71 of 74 times, a push of 2 %+ walked 13 of 14",
+    "probe_final": "the old RFQ probe: one price push on a final offer behind a safe rival. Off since P-58 (P05 "
+    "0.865 without it, as with it); in 442 sessions re-sending its own sheet was agreed 71 of 74 times, a push of 2 %+ "
+    "walked 13 of 14, the probe walked Hrvelec 10 of 10 times",
     "own_structures": "a structure the supplier itself prices cheaply - its own alternative sheets give the rate, "
     "e.g. P05 Hrvelec 35.00 at 35 days, 31.50 at 52 (snapped to what we may sign: 42) - joins as option B at option "
     "A's C when its drop is 1.5x what the structure costs us; its own lead time beyond our need also without a pair",
@@ -707,7 +708,7 @@ class TacticalStrategy(BaselineStrategy):
             # walk-away for ~+0.05 on average - only an RFQ with a safe rival offer may push once, with a real step
             if (
                 their_c > plan.upper_c
-                and not self.flags["final_safe"]
+                and self.flags["probe_final"]
                 and not plan.probed_final
                 and self._may_probe(neg, supplier_id, their_c)
                 and self._may_push(neg, supplier_id)
