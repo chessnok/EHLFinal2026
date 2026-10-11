@@ -3,7 +3,7 @@
   "checkpoint_id": "f040239508b8",
   "strategy": "manual-commit",
   "branch": "fix/final-robustness",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "agent/src/negotiator/session.py"
   ],
@@ -13,13 +13,19 @@
       "transcript": "/f0/40239508b8/0/full.jsonl",
       "content_hash": "/f0/40239508b8/0/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/f0/40239508b8/1/metadata.json",
+      "transcript": "/f0/40239508b8/1/full.jsonl",
+      "content_hash": "/f0/40239508b8/1/content_hash.txt",
+      "prompt": "/f0/40239508b8/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 12,
+    "cache_creation_tokens": 7882,
+    "cache_read_tokens": 945760,
+    "output_tokens": 2685,
+    "api_call_count": 6
   }
 }
