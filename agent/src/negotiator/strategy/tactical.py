@@ -254,6 +254,8 @@ FLAGS: dict[str, str] = {
     "answered 'not our reality' in every session; the slot goes to the next argument) and no fact twice",
     "soft_anchor": "a higher first offer under routine and quality_first goals: the first ask half as deep "
     "(their suppliers moved 0.4-6 % in all; leverage suppliers 15-24 %, P05 36 -> 27.50, need the deep one)",
+    "final_safe": "after its final offer (or firm words) never a price push: only its own cheapest sheet (primary or "
+    "alternative) goes back - re-sending its own sheet was agreed 71 of 74 times, a push of 2 %+ walked 13 of 14",
     "double_count": "our framework agreement already indexes the price to a driver its quote cites: that clause "
     "is cited - a surcharge would count the rise twice (P08, P18 and two unplayed suppliers)",
     "justified_arg": "the first e-mail sets its own cost drivers x their shares (from its quote) against the rise "
@@ -686,6 +688,7 @@ class TacticalStrategy(BaselineStrategy):
             # walk-away for ~+0.05 on average - only an RFQ with a safe rival offer may push once, with a real step
             if (
                 their_c > plan.upper_c
+                and not self.flags["final_safe"]
                 and not plan.probed_final
                 and self._may_probe(neg, supplier_id, their_c)
                 and self._may_push(neg, supplier_id)
