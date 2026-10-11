@@ -33,7 +33,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
-from arena_kit.cost import RELATIONSHIP_GOALS, complete_offer, total_cost
+from arena_kit.cost import RELATIONSHIP_GOALS, closing_terms, complete_offer, total_cost
 
 from negotiator.belief import FloorBelief
 from negotiator.data import Evidence, WorldData
@@ -289,6 +289,10 @@ FLAGS: dict[str, str] = {
     "goal_depth": "the price-only floor (quote x 0.99) and the 10 % first ask only outside a `leverage` goal; a "
     "leverage case gets the 0.86 floor and the 25 % ask whatever its type (final: 5 of 5 leverage price-only "
     "cases - H06, H24, H30, H34, H38 - closed at or under our 10 % ask while C_best sat 14-35 % under the quote)",
+    "rfq_fair": "on a C and price tie a sheet takes the supplier's own value (then its standard terms, then our "
+    "need) - never a stricter lead time than we need at no gain (H10: 21 days against 28 cost a price rise); with "
+    "several bidders the once-per-case arguments (all but rival quotes) are kept for the one with the lowest "
+    "opening C (H10, H09: the dearest bidder decided first and took the index fall)",
     "quiet_keepalive": "the keepalive never asks to confirm the validity of the offer, and a held final offer hears "
     "only the delivery-capacity question (in our runs the validity question to a final offer walked 2 of 4, the "
     "capacity one 0 of 11; H09 and H10 each lost a bidder this way)",
@@ -325,6 +329,9 @@ class TacticalStrategy(BaselineStrategy):
         self.banned_case_kinds: set[str] = set()  # contradicted: never again in this case
         self.refused_kinds: dict[str, set[str]] = {}  # supplier -> kinds it called `irrelevant` (late_facts)
         self.late_extra: dict[str, list[Evidence]] = {}  # supplier -> weak facts only for rounds 2+ (late_facts)
+        self.arg_leader: str | None = None  # rfq_fair: the bidder the once-per-case arguments are kept for
+        self.reserved_refs: set[str] = set()  # ... its arguments' IDs
+        self.reserved_keys: set[tuple] = set()  # ... and their index series (one argument per series)
 
     # ------------------------------------------------------------------ prepare
     def prepare(self, neg: Negotiation) -> None:
@@ -418,6 +425,51 @@ class TacticalStrategy(BaselineStrategy):
                 _k(target_c),
                 _k(plan.upper_c),
             )
+        if self.flags["rfq_fair"]:
+            self._reserve_arguments(neg)
+
+    def _reserve_arguments(self, neg: Negotiation) -> None:
+        """rfq_fair: arguments the arena counts once per case (every one but a rival's quote, api.md) go to the
+        bidder with the lowest opening C; the dearer bidders get rival quotes and what the leader cannot use. In
+        H10 the dearest bidder decided first and took the PPI-D351 fall; the winner got only its quality record.
+        An opening that breaks a must-have ranks behind the rest: P05 Hrvelec (52 days, must-have <= 42) and D02
+        DEMO-C1 opened cheapest and never won in our recorded sessions (P05 Dralveck, D02 DEMO-J1 won every deal)."""
+        opens = {sid: p.open_c for sid, p in self.tplans.items() if math.isfinite(p.open_c)}
+        if len(self.tplans) < 2 or not opens:
+            return
+        self.arg_leader = min(
+            opens, key=lambda sid: (not neg.keeps_must_haves(sid, neg.threads[sid].standing[1]), opens[sid], sid)
+        )
+        for e in self.tplans[self.arg_leader].evidence:
+            if e.kind != "rival_offer" and e.refs:
+                self.reserved_refs.update(e.refs)
+                # an index series counts once whatever the window (P08: `duplicate` on new IDs); a bidder's own
+                # scorecard is its own ID (both verified in every multi-bidder session we recorded)
+                self.reserved_keys.update(k for r in e.refs if (k := argument_key(r))[0] == "index")
+
+    def _reserved_for_leader(self, neg: Negotiation, sid: str, e: Evidence) -> bool:
+        """A once-per-case argument kept for the leading bidder while its thread is live (rfq_fair)."""
+        leader = self.arg_leader
+        if leader is None or sid == leader or e.kind == "rival_offer" or not e.refs:
+            return False
+        if leader not in neg.threads or not neg.threads[leader].live:
+            return False
+        return bool(set(e.refs) & self.reserved_refs) or any(argument_key(r) in self.reserved_keys for r in e.refs)
+
+    def _fair_distance(self, neg: Negotiation, sid: str, theirs: dict, terms: dict) -> tuple:
+        """rfq_fair: how far a structure sits from what the deal would close on without it - the supplier's own
+        value, then its standard terms, then our plan (the lead time we need). On a C and price tie the nearest
+        wins: never a stricter lead time than we need at no gain to us (H10: 21 days asked against a need of 28,
+        "rushing it means we need EUR 97.50")."""
+        ref = closing_terms(neg.case, theirs, neg.threads[sid].standard_terms)
+        off, dist = 0, 0.0
+        for f, v in terms.items():
+            if f == "unit_price" or v == ref.get(f):
+                continue
+            off += 1
+            if isinstance(v, int | float) and isinstance(ref.get(f), int | float):
+                dist += abs(v - ref[f])
+        return off, dist
 
     def _policy(self, goal: str, p: SupplierProfile) -> Policy:
         base = POLICIES.get(goal, DEFAULT_POLICY)
@@ -1592,6 +1644,9 @@ class TacticalStrategy(BaselineStrategy):
             # little and it a lot; P02's paid early instead of a price its margin could not carry
             answered, alike = acceptance(case, t, theirs, plan.requests, plan.proposed)
             worth = plan.belief.value(t) if asymmetric else 0.0
+            if self.flags["rfq_fair"]:  # on a tie the structure nearest its own (and our need)
+                off, dist = self._fair_distance(neg, sid, theirs, t)
+                return (answered, round(worth, 4), alike, t["unit_price"], -off, -dist)
             return (answered, round(worth, 4), alike, t["unit_price"])
 
         # what a package is worth to it ranks the options only where the data shows a lever is worth much more to
@@ -1607,7 +1662,12 @@ class TacticalStrategy(BaselineStrategy):
         pool = [t for t in pool if neg.cost(sid, t) < their_c] or pool
         top = max(t["unit_price"] for t in pool)
         pool = [t for t in pool if t["unit_price"] >= top * (1 - MAX_SPREAD)]
-        picked = [max(pool, key=lambda t: t["unit_price"]), max(pool, key=rank)]
+        if self.flags["rfq_fair"]:
+            # at the same price the nearest to its own value: a stricter lead time at no gain to us costs us price
+            lead = max(pool, key=lambda t: (t["unit_price"], *(-x for x in self._fair_distance(neg, sid, theirs, t))))
+        else:
+            lead = max(pool, key=lambda t: t["unit_price"])
+        picked = [lead, max(pool, key=rank)]
         if plan.lever_turn:  # a structure it has not seen yet carries our step
             new = [t for t in pool if structure_key(t) not in plan.offered]
             if new:
@@ -1852,6 +1912,9 @@ class TacticalStrategy(BaselineStrategy):
         fresh = [e for e in plan.counters if e.kind not in banned and e.sentence not in plan.used_sentences]
         fresh.sort(key=lambda e: -e.strength)
         pool = fresh + [e for e in plan.evidence if e.kind not in banned and e.sentence not in plan.used_sentences]
+        if self.flags["rfq_fair"]:
+            fresh = [e for e in fresh if not self._reserved_for_leader(neg, sid, e)]
+            pool = [e for e in pool if not self._reserved_for_leader(neg, sid, e)]
         rival = self._rival_evidence(neg, sid)
         if rival and "rival_offer" not in banned:
             pool.insert(0, rival)

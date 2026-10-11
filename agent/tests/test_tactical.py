@@ -315,6 +315,73 @@ def test_quiet_keepalive_never_asks_for_validity(tmp_path, world) -> None:
     assert len(bodies) == 2  # capacity and lead time take turns on an open thread
 
 
+def _rfq(tmp_path, world, **flags):
+    """S02 (RFQ, lead time options 21-49 days, need 42): the cheaper bidder names no lead time."""
+    c = json.loads((SIM_CASES / "S02.json").read_text(encoding="utf-8"))
+    neg = Negotiation(None, Recorder(tmp_path), world)  # type: ignore[arg-type]
+    neg.case, neg.case_id, neg.session_id = c, c["case_id"], "s1"
+    for sid, terms in (("sup:70340", {"unit_price": 20.0}), ("sup:70360", {"unit_price": 23.0, "payment_days": 30})):
+        t = ThreadState(sid)
+        sheet = {"term_sheet_id": f"offer:{sid[4:]}-0", "terms": terms}
+        t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": [sheet], "attachments": []})
+        neg.threads[sid] = t
+    strategy = TacticalStrategy(world, **flags)
+    strategy.prepare(neg)
+    return neg, strategy
+
+
+def test_rfq_fair_asks_the_lead_time_we_need_on_a_tie(tmp_path, world) -> None:
+    """21 and 42 days cost us the same where we need 42: option A asked 21 (H10: "rushing it means EUR 97.50")."""
+    leads = {}
+    for on in (False, True):
+        neg, strategy = _rfq(tmp_path / str(on), world, rfq_fair=on)
+        first = strategy.decide(neg, "sup:70340").message["term_sheets"]
+        leads[on] = first[0]["terms"]["lead_time_days"]
+        assert first[0]["terms"]["unit_price"] == max(s["terms"]["unit_price"] for s in first)
+    assert leads == {False: 21, True: 42}
+
+
+def test_rfq_fair_keeps_once_per_case_arguments_for_the_cheapest_bidder(tmp_path, world) -> None:
+    """The dearer bidder decides first: without the flag it takes the PPI-D351 fall (H10), with it the leader."""
+
+    def index_refs(decision) -> set:
+        return {r for r in decision.message.get("refs") or [] if r.startswith("idx:PPI-D351")}
+
+    neg, strategy = _rfq(tmp_path / "off", world)
+    assert index_refs(strategy.decide(neg, "sup:70360")) and not index_refs(strategy.decide(neg, "sup:70340"))
+
+    neg, strategy = _rfq(tmp_path / "on", world, rfq_fair=True)
+    assert strategy.arg_leader == "sup:70340"  # the lower opening C
+    dear = strategy.decide(neg, "sup:70360")
+    assert not index_refs(dear) and any(r.startswith("offer:") for r in dear.message["refs"])  # a rival's quote
+    assert index_refs(strategy.decide(neg, "sup:70340"))
+
+
+def test_rfq_fair_releases_the_arguments_when_the_leader_ends(tmp_path, world) -> None:
+    neg, strategy = _rfq(tmp_path, world, rfq_fair=True)
+    fall = next(e for e in strategy.tplans["sup:70360"].evidence if e.kind == "index")
+    assert strategy._reserved_for_leader(neg, "sup:70360", fall)
+    neg.threads["sup:70340"].messages.append({"from": "sales@sup:70340", "status": "walked_away"})
+    assert not strategy._reserved_for_leader(neg, "sup:70360", fall)
+
+
+def test_rfq_fair_leader_is_a_bidder_that_keeps_the_must_haves(tmp_path, world) -> None:
+    """P05 Hrvelec opened cheapest at 52 days against a must-have of at most 42 and never won."""
+    c = json.loads((SIM_CASES / "S02.json").read_text(encoding="utf-8"))
+    c["buyer"]["must_haves"] = [{"field": "lead_time_days", "op": "<=", "value": 42}]
+    neg = Negotiation(None, Recorder(tmp_path), world)  # type: ignore[arg-type]
+    neg.case, neg.case_id, neg.session_id = c, c["case_id"], "s1"
+    for sid, terms in (("sup:70340", {"unit_price": 18.0, "lead_time_days": 49}), ("sup:70360", {"unit_price": 23.0})):
+        t = ThreadState(sid)
+        sheet = {"term_sheet_id": f"offer:{sid[4:]}-0", "terms": terms}
+        t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": [sheet], "attachments": []})
+        neg.threads[sid] = t
+    strategy = TacticalStrategy(world, rfq_fair=True)
+    strategy.prepare(neg)
+    assert strategy.tplans["sup:70340"].open_c < strategy.tplans["sup:70360"].open_c
+    assert strategy.arg_leader == "sup:70360"
+
+
 def test_accept_guard_refuses_worse_than_opening_when_walking_is_safe(tmp_path, world) -> None:
     c = case(alternative={"kind": "quote", "ref": None, "terms": {"unit_price": 30.0, "payment_days": 60}})
     neg, sid = negotiation(tmp_path, world, c, {"unit_price": 16.0, "payment_days": 60})
