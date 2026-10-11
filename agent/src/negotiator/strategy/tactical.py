@@ -515,8 +515,10 @@ class TacticalStrategy(BaselineStrategy):
             if take := self._take_agreed(neg, supplier_id):
                 return take
             return Decision.hold(supplier_id, "agreed")
-        rounds_left = (neg.case.get("round_limit") or 10) - t.rounds_used
-        if rounds_left <= 1:
+        limit = neg.case.get("round_limit") or 10
+        if limit - t.arena_rounds <= 0 or (limit - t.rounds_used == 1 and t.our_price_path()):
+            # the last round is kept for the close - unless we have not asked anything yet: with round_limit 1
+            # holding would never send an offer at all
             return Decision.hold(supplier_id, "last round: keep it for the close")
         if neg.seconds_to_deadline() < 120:
             return Decision.hold(supplier_id, "the deadline is near")

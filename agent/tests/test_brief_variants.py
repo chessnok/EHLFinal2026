@@ -51,10 +51,6 @@ KNOWN: dict[str, str] = {
         "terms: a must-have on a field that is neither negotiable nor fixed counts as broken on every sheet, and "
         "clean_message strips all term sheets from the e-mail"
     ),
-    "no_first_move:last-round": (
-        "suspicion - tactical.py decide holds when one round is left ('keep it for the close'): with round_limit 1 "
-        "it never sends an offer; api.md says an accept is still possible after the round limit"
-    ),
     "price_fixed": (
         "suspicion - a case whose unit_price is in fixed_terms: session.py Negotiation.cost returns inf for a "
         "sheet without unit_price although the cost function prices it, so c_open is inf and the agent holds"

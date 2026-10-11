@@ -268,6 +268,19 @@ def test_accept_guard_refuses_worse_than_opening_when_walking_is_safe(tmp_path, 
     assert any("opening" in p for p in accept_problems(neg, sid, "offer:x-1"))
 
 
+def test_round_limit_one_still_sends_the_first_offer(tmp_path, world) -> None:
+    """With one round the last round is the first: holding it for the close would never make an offer."""
+    c = case()
+    c["round_limit"] = 1
+    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    first = strategy.decide(neg, sid)
+    assert first.kind == "message" and first.message["term_sheets"]
+    neg.threads[sid].messages.append({"from": "buyer", **first.message})  # the round is spent
+    assert strategy.decide(neg, sid).kind != "message"
+
+
 def test_reply_signals_tell_room_from_a_last_word() -> None:
     from negotiator.strategy.tactical import reply_signals
 
