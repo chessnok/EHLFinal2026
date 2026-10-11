@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "b95690728915",
+  "strategy": "manual-commit",
+  "branch": "feat/gen-safety",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "agent/docs/runs.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b9/5690728915/0/metadata.json",
+      "transcript": "/b9/5690728915/0/full.jsonl",
+      "content_hash": "/b9/5690728915/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  }
+}
