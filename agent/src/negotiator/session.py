@@ -214,7 +214,7 @@ class Negotiation:
             return self.resume(running, case)
         self.session_id, self.case = reply["session_id"], reply["case"]
         if self.data:
-            self.data.with_case(self.case)
+            self.data = self.data.with_case(self.case)  # this case's own facts, not shared with parallel cases
         opened_at = time.monotonic()  # every thread's clock runs from the opening (sandbox: 57.7 s left 2.3 s in)
         for sid, messages in reply["threads"].items():
             state = ThreadState(sid, last_reply_at=opened_at)
@@ -230,6 +230,8 @@ class Negotiation:
         state = self.client.session(session_id)
         self.case_id = state.get("case_id", self.case_id)
         self.case = case or self.case
+        if self.data and self.case:
+            self.data = self.data.with_case(self.case)
         for sid in state.get("threads", {}):
             self.threads[sid] = ThreadState(sid)
             self._sync_thread(sid)
