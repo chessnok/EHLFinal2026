@@ -29,7 +29,8 @@ from negotiator.telemetry import Recorder, log
 # A held thread's clock: answer well before 60 s. We see a reply only when our HTTP call returns, and the arena
 # serves one session's calls one after another - a reply can reach us long after the supplier's clock started.
 KEEPALIVE_AFTER_S = 20.0
-CLOSE_BEFORE_DEADLINE_S = 90.0
+# No keepalive this close to the case's own close (session.CLOSE_BEFORE_DEADLINE_S): its answer would be due then.
+KEEPALIVE_REPLY_S = 60.0
 POLL_S = 0.5
 # Opening a case with a deadline (the final) is tried again after a 429 (too many open sessions), a 5xx or a
 # transport error, with a growing pause, while this much of the cap is left: a case never opened has no deal.
@@ -98,11 +99,10 @@ def _open(neg: Negotiation, case_id: str, case: dict | None, deadline) -> None:
 
 def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
     held: dict[str, Decision] = {}
-    stop = threading.Event()
 
     def worker(sid: str) -> None:
         t = neg.threads[sid]
-        while not neg.ended.is_set() and not stop.is_set():
+        while not neg.ended.is_set() and not neg.closing.is_set():
             # No lock: an LLM call for one thread must not hold up the others (each has its own clock).
             basis = t.version
             with neg.recorder.metrics.timer("strategy.decide"):
@@ -137,15 +137,16 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
             return
 
     live = [sid for sid, t in neg.threads.items() if t.live]
-    with ThreadPoolExecutor(max_workers=max(1, len(live)), thread_name_prefix=f"{neg.case_id}") as pool:
+    pool = ThreadPoolExecutor(max_workers=max(1, len(live)), thread_name_prefix=f"{neg.case_id}")
+    try:
         futures = {sid: pool.submit(worker, sid) for sid in live}
         while not neg.ended.is_set():
             cap = deadline() if callable(deadline) else deadline
             if cap is not None:
                 neg.deadline = cap
-            if neg.seconds_to_deadline() < CLOSE_BEFORE_DEADLINE_S:
+            if neg.closing_soon():
                 log.warning("%s: deadline near - closing", neg.case_id)
-                stop.set()
+                neg.closing.set()
                 break
             running = [sid for sid, f in futures.items() if not f.done()]
             for f in futures.values():
@@ -160,6 +161,8 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
                     continue
                 if t.arena_rounds >= _round_limit(neg) - 1:
                     continue  # the last round is not worth a question
+                if neg.closing_soon(KEEPALIVE_REPLY_S):
+                    continue
                 basis = t.version
                 message = strategy.keepalive(neg, sid)
                 if message is None:
@@ -167,7 +170,13 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
                 neg.recorder.metrics.incr("moves.keepalive")
                 neg.send(sid, message, {"why": "keepalive while other threads negotiate"}, basis=basis)
             time.sleep(POLL_S)
-        stop.set()
+    finally:
+        # Closing by the clock does not wait for the workers: a decision still being made (an LLM call) is
+        # dropped, and an e-mail waiting for the turn is not sent (`Negotiation.send`) - the closing move goes
+        # first. Only an e-mail already at the arena is waited for, by the turn.
+        closing_early = neg.closing.is_set()
+        neg.closing.set()
+        pool.shutdown(wait=not closing_early, cancel_futures=True)
     if not neg.ended.is_set() and len(neg.threads) > 1:
         neg.sync()  # the closing move compares the suppliers: on what stands at the arena now
     if not neg.ended.is_set():

@@ -208,6 +208,62 @@ def test_walk_away_goes_through_a_thread_that_is_still_open(tmp_path) -> None:
     assert arena.calls[-1] == ("walk_away", "sup:B")
 
 
+# ---------------------------------------------------------------- closing before a deadline
+def timed_calls(arena: FakeArena) -> list[tuple[str, float]]:
+    """(action or 'message', time.time() when the arena took it) for every e-mail and closing move."""
+    calls, inner = [], arena.send_message
+
+    def send_message(session_id, supplier_id, message):
+        with arena.lock:  # taken when the arena serves it, not when it was asked
+            calls.append(((message.get("action") or {}).get("type") or "message", time.time()))
+        return inner(session_id, supplier_id, message)
+
+    arena.send_message = send_message  # type: ignore[method-assign]
+    return calls
+
+
+def test_the_close_does_not_wait_for_a_decision_in_progress(tmp_path, monkeypatch) -> None:
+    """A wave's cap: the case closes CLOSE_BEFORE_DEADLINE_S before it. A worker still deciding (an LLM call)
+    when the close begins used to be waited for, and its e-mail sent; the accept came after the supplier's
+    answer - here after the cap. Now the close goes first and the late e-mail is not sent."""
+    monkeypatch.setattr(session, "CLOSE_BEFORE_DEADLINE_S", 1.0)
+    monkeypatch.setattr(session, "MOVE_LIMIT_S", 10.0)
+    arena = FakeArena(rfq("sup:A"), {"sup:A": 0.8}, limit_s=10.0)
+    calls = timed_calls(arena)
+    cap = time.time() + 2.5
+    outcome, _, _ = play(tmp_path, arena, Stepper(rounds=3, think_s=1.8), deadline=cap)
+    assert outcome["deal"] and [c for c, _ in calls] == ["accept"]
+    assert calls[0][1] < cap - 0.5
+    time.sleep(0.5)  # the worker's decision ends: its e-mail is not sent
+    assert [c for c, _ in calls] == ["accept"]
+
+
+def test_an_email_waiting_for_the_turn_is_not_sent_once_the_close_began(tmp_path) -> None:
+    arena = FakeArena(rfq("sup:A"), {"sup:A": 0.05}, limit_s=LIMIT_S)
+    neg = Negotiation(arena, Recorder(tmp_path, "closing"))  # type: ignore[arg-type]
+    neg.open("case:S01")
+    with neg.turn.take(lambda: -1.0):  # another call of the session is at the arena
+        neg.closing.set()
+    assert neg.send("sup:A", {"subject": "s", "body": "b"}) is None
+    assert arena.calls == [] and neg.recorder.metrics.snapshot()["counters"]["moves.not_sent_closing"] == 1
+    # by the clock alone: a deadline closer than CLOSE_BEFORE_DEADLINE_S
+    neg.closing.clear()
+    neg.deadline = time.time() + session.CLOSE_BEFORE_DEADLINE_S - 1
+    assert neg.closing_soon() and neg.send("sup:A", {"subject": "s", "body": "b"}) is None
+    neg.deadline = None
+    assert not neg.closing_soon(10**6)
+
+
+def test_no_keepalive_whose_answer_would_be_due_after_the_close(tmp_path, monkeypatch) -> None:
+    """A held thread gets no keepalive within KEEPALIVE_REPLY_S of the close: it would hold up the closing move."""
+    monkeypatch.setattr(session, "CLOSE_BEFORE_DEADLINE_S", 0.5)
+    monkeypatch.setattr(runner, "KEEPALIVE_REPLY_S", 100.0)
+    arena = FakeArena(rfq("sup:A", "sup:B"), {"sup:A": 0.3, "sup:B": 0.3}, limit_s=LIMIT_S, final_after={"sup:A": 1})
+    outcome, recorder, _ = play(tmp_path, arena, Stepper(rounds=4), deadline=time.time() + 30)
+    assert outcome["deal"]
+    assert "moves.keepalive" not in recorder.metrics.snapshot()["counters"]
+
+
 # ---------------------------------------------------------------- opening in the final
 def failing_open(arena: FakeArena, *errors: ArenaError) -> list[str]:
     """The arena refuses the first openings with these errors; returns the list of attempts."""
