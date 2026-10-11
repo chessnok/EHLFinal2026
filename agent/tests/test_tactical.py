@@ -240,6 +240,148 @@ def test_ground_truth_bounds_hold_without_data() -> None:
     assert gt.lower is not None and gt.lower <= gt.upper <= 11.0
 
 
+def test_goal_depth_floor_follows_the_goal_not_the_case_type() -> None:
+    """`goal_depth`: a single-supplier price increase under a leverage goal is talks with a lever (H30, H38)."""
+    from negotiator.groundtruth import FLOOR_PRICE_ONLY, FLOOR_WITH_LEVERS, floor_factor
+
+    lev = {"type": "renewal", "suppliers": ["sup:x"], "buyer": {"category_goal": "leverage"}}
+    stab = {**lev, "buyer": {"category_goal": "stabilise"}}
+    assert floor_factor(lev) == FLOOR_PRICE_ONLY  # off: the case type decides
+    assert floor_factor(lev, by_goal=True) == FLOOR_WITH_LEVERS
+    assert floor_factor(stab, by_goal=True) == FLOOR_PRICE_ONLY  # a running relationship barely moves
+
+
+def test_goal_depth_asks_deep_on_a_leverage_price_increase(tmp_path, world) -> None:
+    """S01 is a price increase with one supplier and a leverage goal: 10 % first ask without the flag, 25 % with."""
+    from negotiator.strategy.tactical import ANCHOR_DATA_EXTRA, ANCHOR_PRICE_ONLY, ANCHOR_WITH_LEVERS
+
+    asks = {}
+    for on in (False, True):
+        neg, sid = negotiation(tmp_path / str(on), world, case(), {"unit_price": 17.47, "payment_days": 30})
+        strategy = TacticalStrategy(world, goal_depth=on)
+        strategy.prepare(neg)
+        first = strategy.decide(neg, sid)
+        asks[on] = min(s["terms"]["unit_price"] for s in first.message["term_sheets"])
+        assert strategy.tplans[sid].gt.lower == round(17.47 * (0.86 if on else 0.99), 2)
+    assert asks[False] >= round(17.47 * (1 - ANCHOR_PRICE_ONLY - ANCHOR_DATA_EXTRA), 2) - 0.01
+    assert asks[True] < round(17.47 * (1 - ANCHOR_PRICE_ONLY - ANCHOR_DATA_EXTRA), 2)
+    assert asks[True] >= round(17.47 * (1 - ANCHOR_WITH_LEVERS - ANCHOR_DATA_EXTRA), 2) - 0.01
+
+
+def test_goal_depth_keeps_the_shallow_ask_outside_leverage(tmp_path, world) -> None:
+    c = case(category_goal="routine")
+    first = {}
+    for on in (False, True):
+        neg, sid = negotiation(tmp_path / str(on), world, c, {"unit_price": 17.47, "payment_days": 30})
+        strategy = TacticalStrategy(world, goal_depth=on)
+        strategy.prepare(neg)
+        first[on] = strategy.decide(neg, sid).message["term_sheets"]
+    assert first[True] == first[False]
+
+
+def _held_after(tmp_path, world, rounds: int, status: str, **flags):
+    """S01 after `rounds` e-mails of ours, the supplier's latest reply with `status`, round limit 10."""
+    neg, sid = negotiation(tmp_path, world, case(), {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(world, **flags)
+    strategy.prepare(neg)
+    t = neg.threads[sid]
+    reply = dict(t.messages[0])
+    for _ in range(rounds):
+        t.messages += [{"from": "buyer", "body": "offer"}, {**reply, "status": "open"}]
+    t.messages[-1]["status"] = status
+    neg.case["round_limit"] = 10
+    return neg, sid, strategy
+
+
+def test_keepalive_asks_for_validity_without_the_flag(tmp_path, world) -> None:
+    neg, sid, strategy = _held_after(tmp_path, world, 2, "final_offer")
+    assert "validity" in strategy.keepalive(neg, sid)["body"]
+
+
+def test_quiet_keepalive_asks_a_final_offer_only_for_capacity(tmp_path, world) -> None:
+    """`quiet_keepalive`: the validity question to a held final offer walked H09's and H10's bidders."""
+    for rounds in range(1, 7):
+        neg, sid, strategy = _held_after(tmp_path / str(rounds), world, rounds, "final_offer", quiet_keepalive=True)
+        assert "delivery capacity" in strategy.keepalive(neg, sid)["body"]
+
+
+def test_quiet_keepalive_never_asks_for_validity(tmp_path, world) -> None:
+    bodies = set()
+    for rounds in range(1, 7):
+        neg, sid, strategy = _held_after(tmp_path / str(rounds), world, rounds, "open", quiet_keepalive=True)
+        body = strategy.keepalive(neg, sid)["body"]
+        assert "validity" not in body
+        bodies.add(body)
+    assert len(bodies) == 2  # capacity and lead time take turns on an open thread
+
+
+def _rfq(tmp_path, world, **flags):
+    """S02 (RFQ, lead time options 21-49 days, need 42): the cheaper bidder names no lead time."""
+    c = json.loads((SIM_CASES / "S02.json").read_text(encoding="utf-8"))
+    neg = Negotiation(None, Recorder(tmp_path), world)  # type: ignore[arg-type]
+    neg.case, neg.case_id, neg.session_id = c, c["case_id"], "s1"
+    for sid, terms in (("sup:70340", {"unit_price": 20.0}), ("sup:70360", {"unit_price": 23.0, "payment_days": 30})):
+        t = ThreadState(sid)
+        sheet = {"term_sheet_id": f"offer:{sid[4:]}-0", "terms": terms}
+        t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": [sheet], "attachments": []})
+        neg.threads[sid] = t
+    strategy = TacticalStrategy(world, **flags)
+    strategy.prepare(neg)
+    return neg, strategy
+
+
+def test_rfq_fair_asks_the_lead_time_we_need_on_a_tie(tmp_path, world) -> None:
+    """21 and 42 days cost us the same where we need 42: option A asked 21 (H10: "rushing it means EUR 97.50")."""
+    leads = {}
+    for on in (False, True):
+        neg, strategy = _rfq(tmp_path / str(on), world, rfq_fair=on)
+        first = strategy.decide(neg, "sup:70340").message["term_sheets"]
+        leads[on] = first[0]["terms"]["lead_time_days"]
+        assert first[0]["terms"]["unit_price"] == max(s["terms"]["unit_price"] for s in first)
+    assert leads == {False: 21, True: 42}
+
+
+def test_rfq_fair_keeps_once_per_case_arguments_for_the_cheapest_bidder(tmp_path, world) -> None:
+    """The dearer bidder decides first: without the flag it takes the PPI-D351 fall (H10), with it the leader."""
+
+    def index_refs(decision) -> set:
+        return {r for r in decision.message.get("refs") or [] if r.startswith("idx:PPI-D351")}
+
+    neg, strategy = _rfq(tmp_path / "off", world)
+    assert index_refs(strategy.decide(neg, "sup:70360")) and not index_refs(strategy.decide(neg, "sup:70340"))
+
+    neg, strategy = _rfq(tmp_path / "on", world, rfq_fair=True)
+    assert strategy.arg_leader == "sup:70340"  # the lower opening C
+    dear = strategy.decide(neg, "sup:70360")
+    assert not index_refs(dear) and any(r.startswith("offer:") for r in dear.message["refs"])  # a rival's quote
+    assert index_refs(strategy.decide(neg, "sup:70340"))
+
+
+def test_rfq_fair_releases_the_arguments_when_the_leader_ends(tmp_path, world) -> None:
+    neg, strategy = _rfq(tmp_path, world, rfq_fair=True)
+    fall = next(e for e in strategy.tplans["sup:70360"].evidence if e.kind == "index")
+    assert strategy._reserved_for_leader(neg, "sup:70360", fall)
+    neg.threads["sup:70340"].messages.append({"from": "sales@sup:70340", "status": "walked_away"})
+    assert not strategy._reserved_for_leader(neg, "sup:70360", fall)
+
+
+def test_rfq_fair_leader_is_a_bidder_that_keeps_the_must_haves(tmp_path, world) -> None:
+    """P05 Hrvelec opened cheapest at 52 days against a must-have of at most 42 and never won."""
+    c = json.loads((SIM_CASES / "S02.json").read_text(encoding="utf-8"))
+    c["buyer"]["must_haves"] = [{"field": "lead_time_days", "op": "<=", "value": 42}]
+    neg = Negotiation(None, Recorder(tmp_path), world)  # type: ignore[arg-type]
+    neg.case, neg.case_id, neg.session_id = c, c["case_id"], "s1"
+    for sid, terms in (("sup:70340", {"unit_price": 18.0, "lead_time_days": 49}), ("sup:70360", {"unit_price": 23.0})):
+        t = ThreadState(sid)
+        sheet = {"term_sheet_id": f"offer:{sid[4:]}-0", "terms": terms}
+        t.messages.append({"from": f"sales@{sid}", "status": "open", "term_sheets": [sheet], "attachments": []})
+        neg.threads[sid] = t
+    strategy = TacticalStrategy(world, rfq_fair=True)
+    strategy.prepare(neg)
+    assert strategy.tplans["sup:70340"].open_c < strategy.tplans["sup:70360"].open_c
+    assert strategy.arg_leader == "sup:70360"
+
+
 def test_accept_guard_refuses_worse_than_opening_when_walking_is_safe(tmp_path, world) -> None:
     c = case(alternative={"kind": "quote", "ref": None, "terms": {"unit_price": 30.0, "payment_days": 60}})
     neg, sid = negotiation(tmp_path, world, c, {"unit_price": 16.0, "payment_days": 60})
@@ -333,6 +475,53 @@ def test_own_plant_should_cost_is_not_replaced_by_the_guess(tmp_path, world) -> 
     _, theirs = neg.threads[sid].standing
     # with the own plant's cost in C the re-anchor stays as measured (P01 0.969, runs.md P-29; 0.901 without it)
     assert strategy._reanchor(neg, sid, strategy.tplans[sid], theirs, neg.cost(sid, theirs)) is not None
+
+
+def test_own_plant_cost_leaves_the_opening_its_sustainable_margin(tmp_path, world) -> None:
+    """The arena's recorded charges put every strategic supplier at or above its sustainable margin at its own
+    opening: where the should-cost says otherwise (H03) the cost comes down until the opening carries no charge."""
+    from negotiator.strategy.tactical import SHOULD_COST_SHARE
+
+    c = case(category_goal="stabilise", sustainable_margin_pct=3, relationship_eur_per_point=5000)
+    c["parts"], c["suppliers"] = ["part:310010"], ["sup:70110"]
+    own = world.query("SELECT unit_cost FROM should_cost WHERE part_id = 'part:310010' AND supplier_id = 'sup:70110'")
+    should = round(own[0]["unit_cost"] * SHOULD_COST_SHARE, 2)
+    opening = {"unit_price": round(should, 2), "payment_days": 30}  # no margin at all by the should-cost
+    neg, sid = negotiation(tmp_path, world, c, opening)
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    assert plan.full_cost < should and neg.supplier_estimates[sid]["full_cost"] == plan.full_cost
+    assert neg.breakdown(sid, opening)["relationship"] == 0
+    assert neg.breakdown(sid, {**opening, "unit_price": opening["unit_price"] * 0.97})["relationship"] > 0
+
+
+def test_no_margin_estimate_without_the_cases_charge_parameters(tmp_path, world) -> None:
+    """A strategic goal without `relationship_eur_per_point`: cost.py charges nothing, so no estimate - with one the
+    price that costs us least was 0 and no sheet was left to send."""
+    c = case(category_goal="stabilise", sustainable_margin_pct=3)
+    c["parts"], c["suppliers"] = ["part:310010"], ["sup:70110"]
+    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 138.55, "payment_days": 30})
+    strategy = TacticalStrategy(world)
+    strategy.prepare(neg)
+    assert not neg.supplier_estimates.get(sid) and strategy.tplans[sid].full_cost
+    first = strategy.decide(neg, sid)
+    assert first.kind == "message"
+    assert all(0 < sh["terms"]["unit_price"] < 138.55 for sh in first.message["term_sheets"])
+
+
+def test_lower_bound_never_above_the_upper_one(tmp_path) -> None:
+    """An alternative cheaper than the supplier's estimated floor: an offer above our upper bound is no undercut of
+    that floor, so the lower bound stays at or under the upper one."""
+    c = case()
+    alt = {"unit_price": 15.0, "payment_days": 30, "lead_time_days": 42, "volume_per_year": 6650}
+    c["buyer"]["alternative"] = {"kind": "quote", "ref": "quote:x", "terms": {**alt, "contract_months": 12}}
+    neg, sid = negotiation(tmp_path, None, c, {"unit_price": 17.47, "payment_days": 30})
+    strategy = TacticalStrategy(None)
+    strategy.prepare(neg)
+    plan = strategy.tplans[sid]
+    assert neg.c_alt < neg.cost(sid, strategy._ideal(neg, sid, {"payment_days": 30}, plan.gt.lower))
+    assert plan.lower_c <= plan.upper_c <= neg.c_alt
 
 
 def test_reanchor_on_a_strategic_supplier_only_with_a_guess(tmp_path) -> None:
