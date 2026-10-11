@@ -264,6 +264,22 @@ def test_no_keepalive_whose_answer_would_be_due_after_the_close(tmp_path, monkey
     assert "moves.keepalive" not in recorder.metrics.snapshot()["counters"]
 
 
+def test_a_held_thread_without_keepalive_is_closed_on_before_its_clock_runs_out(tmp_path, monkeypatch) -> None:
+    """The strategy sends no keepalive in a thread's last rounds (tactical: two rounds left). The supplier said
+    'final offer' and waits while a rival negotiates; at 60 s a timeout would replace or end its offer. The case
+    closes once the held thread's answer is CLOSE_UNKEPT_AFTER_S old."""
+    monkeypatch.setattr(runner, "CLOSE_UNKEPT_AFTER_S", 0.5)
+
+    class NoKeepalive(Stepper):
+        def keepalive(self, neg, sid):
+            return None
+
+    arena = FakeArena(rfq("sup:A", "sup:B"), {"sup:A": 0.1, "sup:B": 0.25}, limit_s=LIMIT_S, final_after={"sup:A": 1})
+    outcome, recorder, _ = play(tmp_path, arena, NoKeepalive(rounds=8))
+    assert arena.counted()["sup:A"] == 0 and outcome["deal"]
+    assert [e["supplier_id"] for e in events(recorder, "close_unkept_thread")] == ["sup:A"]
+
+
 # ---------------------------------------------------------------- opening in the final
 def failing_open(arena: FakeArena, *errors: ArenaError) -> list[str]:
     """The arena refuses the first openings with these errors; returns the list of attempts."""

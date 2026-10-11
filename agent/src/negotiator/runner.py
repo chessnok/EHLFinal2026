@@ -31,6 +31,9 @@ from negotiator.telemetry import Recorder, log
 KEEPALIVE_AFTER_S = 20.0
 # No keepalive this close to the case's own close (session.CLOSE_BEFORE_DEADLINE_S): its answer would be due then.
 KEEPALIVE_REPLY_S = 60.0
+# A held thread nothing keeps alive (no keepalive in its last rounds, or too near the close) loses its offer to a
+# timeout at 60 s while the others negotiate: the case closes once its supplier's answer is this old.
+CLOSE_UNKEPT_AFTER_S = 40.0
 POLL_S = 0.5
 # Opening a case with a deadline (the final) is tried again after a 429 (too many open sessions), a 5xx or a
 # transport error, with a growing pause, while this much of the cap is left: a case never opened has no deal.
@@ -159,16 +162,27 @@ def _negotiate(neg: Negotiation, strategy: Strategy, deadline) -> None:
                 t = neg.threads[sid]
                 if held[sid].kind != "hold" or not t.live or t.seconds_since_reply() < KEEPALIVE_AFTER_S:
                     continue
-                if t.arena_rounds >= _round_limit(neg) - 1:
-                    continue  # the last round is not worth a question
-                if neg.closing_soon(KEEPALIVE_REPLY_S):
-                    continue
-                basis = t.version
-                message = strategy.keepalive(neg, sid)
+                basis, message = t.version, None
+                # the last round is not worth a question; nor is one answered after the close
+                if t.arena_rounds < _round_limit(neg) - 1 and not neg.closing_soon(KEEPALIVE_REPLY_S):
+                    message = strategy.keepalive(neg, sid)
                 if message is None:
+                    if t.seconds_since_reply() >= CLOSE_UNKEPT_AFTER_S:
+                        neg.recorder.event(
+                            "close_unkept_thread",
+                            session_id=neg.session_id,
+                            case_id=neg.case_id,
+                            supplier_id=sid,
+                            seconds_since_reply=round(t.seconds_since_reply(), 1),
+                        )
+                        log.warning("%s: held without a keepalive - closing before its clock runs out", sid)
+                        neg.closing.set()
+                        break
                     continue
                 neg.recorder.metrics.incr("moves.keepalive")
                 neg.send(sid, message, {"why": "keepalive while other threads negotiate"}, basis=basis)
+            if neg.closing.is_set():
+                break
             time.sleep(POLL_S)
     finally:
         # Closing by the clock does not wait for the workers: a decision still being made (an LLM call) is
