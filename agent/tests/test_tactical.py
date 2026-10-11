@@ -276,36 +276,46 @@ def _strategic(world, tmp_path, offer=None, **buyer):
     return neg, sid, strategy
 
 
-def test_strategic_supplier_without_should_cost_keeps_the_margin_charge(tmp_path, world) -> None:
-    """No should-cost of its plant (P06): its cost is guessed from its opening, so the charge stays in C, the 95 %
-    floor holds and the first ask never goes under the price that costs us least."""
-    from negotiator.strategy.tactical import RELATIONSHIP_COST_FLOOR, SHOULD_COST_SHARE
+def test_strategic_supplier_without_should_cost_gets_a_guess_floor(tmp_path, world) -> None:
+    """No should-cost of its plant (P06): its cost is guessed from its opening and serves as a floor only - C and
+    the target stay without the guessed charge, every sheet sits at or above the price that costs us least with it."""
+    from negotiator.strategy.tactical import SHOULD_COST_SHARE
 
     neg, sid, strategy = _strategic(None, tmp_path)
     plan = strategy.tplans[sid]
-    assert plan.full_cost == round(17.47 * 0.96 * SHOULD_COST_SHARE, 2) and plan.cost_guessed
-    assert neg.supplier_estimates[sid]["full_cost"] == plan.full_cost
+    assert plan.guess["full_cost"] == round(17.47 * 0.96 * SHOULD_COST_SHARE, 2)
+    assert not neg.supplier_estimates.get(sid) and plan.full_cost is None  # not in C
     first = strategy.decide(neg, sid)
     assert first.kind == "message"
     for sheet in first.message["term_sheets"]:
         terms = sheet["terms"]
-        assert RELATIONSHIP_COST_FLOOR * plan.full_cost <= terms["unit_price"] <= 17.47
-        assert terms["unit_price"] >= strategy._cheapest_price(neg, sid, terms) - 0.01
+        assert strategy._guess_floor(neg, sid, plan, terms) - 0.005 <= terms["unit_price"] <= 17.47
 
 
-def test_generic_should_cost_moves_a_guessed_cost_down_by_little(tmp_path, world) -> None:
-    """part:310070 has only a German-base should-cost: it may lower the opening-based guess by 5 % at most."""
-    from negotiator.strategy.tactical import GENERIC_COST_MAX_DROP, SHOULD_COST_SHARE
+def test_the_guess_uses_the_main_sheet_of_the_first_message(tmp_path) -> None:
+    """A cheaper alternative on another structure would set the guess too low - the dangerous direction."""
+    from negotiator.strategy.tactical import SHOULD_COST_SHARE
 
-    c = case(category_goal="stabilise", sustainable_margin_pct=3, relationship_eur_per_point=5000)
-    c["parts"], c["suppliers"] = ["part:310070"], ["sup:70150"]  # a TR plant: DE base x 0.75
-    neg, sid = negotiation(tmp_path, world, c, {"unit_price": 220.0, "payment_days": 30})
-    strategy = TacticalStrategy(world)
-    cost, source = strategy._fallback_full_cost(neg, c["parts"], sid)
-    guess = 220.0 * 0.97 * SHOULD_COST_SHARE
-    assert cost == round(guess * (1 - GENERIC_COST_MAX_DROP), 2) and "DE base x TR" in source
-    neg.threads[sid].messages[0]["term_sheets"][0]["terms"]["unit_price"] = 120.0  # far under it: no move up
-    assert strategy._fallback_full_cost(neg, c["parts"], sid)[0] == round(120.0 * 0.97 * SHOULD_COST_SHARE, 2)
+    c = case(category_goal="stabilise", sustainable_margin_pct=4, relationship_eur_per_point=5000)
+    neg, sid = negotiation(tmp_path, None, c, {"unit_price": 17.47, "payment_days": 30})
+    sheets = neg.threads[sid].messages[0]["term_sheets"]
+    sheets.append({"term_sheet_id": "offer:x-0b", "terms": {"unit_price": 15.0, "payment_days": 90}})
+    cost, _ = TacticalStrategy(None)._fallback_full_cost(neg, sid)
+    assert cost == round(17.47 * 0.96 * SHOULD_COST_SHARE, 2)
+
+
+def test_an_offer_under_the_guess_floor_gets_the_floor(tmp_path) -> None:
+    """It offers a price under the guess floor: we propose the floor on its terms instead of taking it."""
+    neg, sid, strategy = _strategic(None, tmp_path)
+    plan = strategy.tplans[sid]
+    low = {"unit_price": 15.0, "payment_days": 30}
+    neg.threads[sid].messages.append(
+        {"from": f"sales@{sid}", "status": "open", "term_sheets": [{"term_sheet_id": "offer:x-1", "terms": low}]}
+    )
+    floor = strategy._guess_floor(neg, sid, plan, low)
+    assert 15.0 < floor < 17.47
+    d = strategy.decide(neg, sid)
+    assert d.kind == "message" and d.message["term_sheets"][0]["terms"]["unit_price"] == floor
 
 
 def test_own_plant_should_cost_is_not_replaced_by_the_guess(tmp_path, world) -> None:
@@ -318,16 +328,28 @@ def test_own_plant_should_cost_is_not_replaced_by_the_guess(tmp_path, world) -> 
     strategy.prepare(neg)
     own = world.query("SELECT unit_cost FROM should_cost WHERE part_id = 'part:310010' AND supplier_id = 'sup:70110'")
     assert strategy.tplans[sid].full_cost == round(own[0]["unit_cost"] * SHOULD_COST_SHARE, 2)
-    assert not strategy.tplans[sid].cost_guessed
+    assert neg.supplier_estimates[sid]["full_cost"] == strategy.tplans[sid].full_cost
+    assert strategy.tplans[sid].guess is None
+    _, theirs = neg.threads[sid].standing
+    assert strategy._reanchor(neg, sid, strategy.tplans[sid], theirs, neg.cost(sid, theirs)) is None
 
 
-def test_no_reanchor_on_a_strategic_supplier(tmp_path, world) -> None:
-    """Without a margin price there is no estimate - and no 10 % ask under a strategic supplier's price."""
+def test_reanchor_on_a_strategic_supplier_only_with_a_guess(tmp_path) -> None:
+    """No estimate at all: no 10 % ask under a strategic supplier's price. A guess: allowed, clamped to the floor."""
     neg, sid, strategy = _strategic(None, tmp_path, sustainable_margin_pct=None)
-    assert not neg.supplier_estimates.get(sid)
+    assert not neg.supplier_estimates.get(sid) and strategy.tplans[sid].guess is None
     _, theirs = neg.threads[sid].standing
     plan = strategy.tplans[sid]
     assert strategy._reanchor(neg, sid, plan, theirs, neg.cost(sid, theirs)) is None and not plan.reanchored
+
+    neg, sid, strategy = _strategic(None, tmp_path)
+    plan = strategy.tplans[sid]
+    d = strategy._reanchor(neg, sid, plan, theirs, neg.cost(sid, theirs))
+    assert plan.reanchored and d is not None and d.kind == "message"
+    assert all(
+        sh["terms"]["unit_price"] >= strategy._guess_floor(neg, sid, plan, sh["terms"]) - 0.005
+        for sh in d.message["term_sheets"]
+    )
 
 
 def test_reply_signals_tell_room_from_a_last_word() -> None:
