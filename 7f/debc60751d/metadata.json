@@ -3,7 +3,7 @@
   "checkpoint_id": "7fdebc60751d",
   "strategy": "manual-commit",
   "branch": "fix/after-final",
-  "checkpoints_count": 2,
+  "checkpoints_count": 7,
   "files_touched": [
     "agent/src/negotiator/strategy/tactical.py"
   ],
@@ -19,13 +19,19 @@
       "transcript": "/7f/debc60751d/1/full.jsonl",
       "content_hash": "/7f/debc60751d/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/7f/debc60751d/2/metadata.json",
+      "transcript": "/7f/debc60751d/2/full.jsonl",
+      "content_hash": "/7f/debc60751d/2/content_hash.txt",
+      "prompt": "/7f/debc60751d/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 0,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 0,
-    "output_tokens": 0,
-    "api_call_count": 0
+    "input_tokens": 868,
+    "cache_creation_tokens": 562969,
+    "cache_read_tokens": 146191465,
+    "output_tokens": 232325,
+    "api_call_count": 418
   }
 }
